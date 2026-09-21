@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { loadWindowState, manageWindowState } from './windowState';
@@ -7,6 +8,70 @@ import { loadWindowState, manageWindowState } from './windowState';
 if (started) {
   app.quit();
 }
+
+let tray: Tray | null = null;
+
+// Helper to resolve asset paths across dev mode and packaged distribution
+const getAssetPath = (filename: string): string => {
+  const devPath = path.join(__dirname, '../../src/assets', filename);
+  if (fs.existsSync(devPath)) {
+    return devPath;
+  }
+  const packagedPath = path.join(app.getAppPath(), 'src/assets', filename);
+  if (fs.existsSync(packagedPath)) {
+    return packagedPath;
+  }
+  return devPath;
+};
+
+const createSystemTray = (mainWindow: BrowserWindow) => {
+  if (tray) return;
+
+  const trayIconPath = getAssetPath('SystemTray-32.png');
+  const trayIcon = nativeImage.createFromPath(trayIconPath);
+
+  if (trayIcon.isEmpty()) {
+    return;
+  }
+
+  tray = new Tray(trayIcon);
+  tray.setToolTip('BunsenWorship - Live Worship Presentation');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Open BunsenWorship',
+      click: () => {
+        if (mainWindow.isMinimized()) {
+          mainWindow.restore();
+        }
+        mainWindow.show();
+        mainWindow.focus();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit BunsenWorship',
+      click: () => {
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    if (mainWindow.isVisible()) {
+      if (mainWindow.isFocused()) {
+        mainWindow.minimize();
+      } else {
+        mainWindow.focus();
+      }
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+};
 
 const createWindow = () => {
   // Load previous window dimensions and state
@@ -17,6 +82,9 @@ const createWindow = () => {
     minHeight: 600,
   });
 
+  const appIconPath = getAssetPath('AppIcon-256.png');
+  const appIcon = nativeImage.createFromPath(appIconPath);
+
   // Create the browser window with enforced minimum dimensions and restored coordinates
   const mainWindow = new BrowserWindow({
     x: windowState.x,
@@ -25,6 +93,7 @@ const createWindow = () => {
     height: windowState.height,
     minWidth: 960,
     minHeight: 600,
+    icon: appIcon.isEmpty() ? undefined : appIcon,
     show: false, // Prevent flicker before restoring maximized/minimized state
     backgroundColor: '#0b0f19',
     webPreferences: {
@@ -34,6 +103,9 @@ const createWindow = () => {
 
   // Attach state tracker to persist size, position, and maximized/minimized states
   manageWindowState(mainWindow, windowState);
+
+  // Initialize System Tray
+  createSystemTray(mainWindow);
 
   // Restore maximized state before showing
   if (windowState.isMaximized) {
@@ -82,6 +154,13 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+app.on('before-quit', () => {
+  if (tray) {
+    tray.destroy();
+    tray = null;
   }
 });
 
