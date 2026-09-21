@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { loadWindowState, manageWindowState } from './windowState';
+import { createSplashScreen } from './splash';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -74,6 +75,10 @@ const createSystemTray = (mainWindow: BrowserWindow) => {
 };
 
 const createWindow = () => {
+  // Launch instant branded splash screen
+  const splashWindow = createSplashScreen();
+  const splashStartTime = Date.now();
+
   // Load previous window dimensions and state
   const windowState = loadWindowState({
     defaultWidth: 1200,
@@ -94,7 +99,7 @@ const createWindow = () => {
     minWidth: 960,
     minHeight: 600,
     icon: appIcon.isEmpty() ? undefined : appIcon,
-    show: false, // Prevent flicker before restoring maximized/minimized state
+    show: false, // Keep hidden while splash screen is displaying
     backgroundColor: '#0b0f19',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -112,13 +117,33 @@ const createWindow = () => {
     mainWindow.maximize();
   }
 
-  // Once renderer is ready, display window according to previous state
+  // Once renderer is ready, gracefully transition from splash to main window
   mainWindow.once('ready-to-show', () => {
-    if (windowState.isMinimized) {
-      mainWindow.show();
-      mainWindow.minimize();
-    } else {
-      mainWindow.show();
+    const elapsed = Date.now() - splashStartTime;
+    const minSplashDuration = 1400; // Optimal duration for branded presentation feedback
+    const remainingDelay = Math.max(0, minSplashDuration - elapsed);
+
+    setTimeout(() => {
+      // Destroy splash window
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.destroy();
+      }
+
+      // Display main window according to previous state
+      if (windowState.isMinimized) {
+        mainWindow.show();
+        mainWindow.minimize();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }, remainingDelay);
+  });
+
+  // Clean up splash if main window closes prematurely
+  mainWindow.on('closed', () => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.destroy();
     }
   });
 
