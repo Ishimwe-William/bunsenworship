@@ -8,7 +8,9 @@ import { setupAutoUpdater } from './updater';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
-  app.quit();
+  setTimeout(() => {
+    app.quit();
+  }, 1000);
 }
 
 let tray: Tray | null = null;
