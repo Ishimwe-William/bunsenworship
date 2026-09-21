@@ -16,6 +16,7 @@ const config: ForgeConfig = {
     executableName: 'bunsenworship',
     appBundleId: 'com.bunsenplus.worship',
     appCategoryType: 'public.app-category.lifestyle',
+    extraResource: ['src/assets'],
   },
   rebuildConfig: {},
   makers: [

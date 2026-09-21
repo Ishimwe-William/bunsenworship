@@ -19,6 +19,10 @@ const getAssetPath = (filename: string): string => {
   if (fs.existsSync(devPath)) {
     return devPath;
   }
+  const extraResourcePath = path.join(process.resourcesPath, 'assets', filename);
+  if (fs.existsSync(extraResourcePath)) {
+    return extraResourcePath;
+  }
   const packagedPath = path.join(app.getAppPath(), 'src/assets', filename);
   if (fs.existsSync(packagedPath)) {
     return packagedPath;
