@@ -212,24 +212,39 @@ bunsenworship/
 | `npm run make` | Generates distributable platform installers (`.exe`, `.dmg`, `.deb`, `.rpm`, `.zip`). |
 | `npm run publish` | Builds, packages, and publishes installers directly to GitHub Releases. |
 | `npm run generate:icons` | Generates `.ico`, `.icns`, and multi-size PNG icon assets from SVG source. |
+| `npm run release` | Bumps patch version (`1.0.1` -> `1.0.2`), commits, tags, and pushes with tags to trigger CI release. |
+| `npm run release:minor` | Bumps minor version (`1.0.1` -> `1.1.0`), commits, tags, and pushes with tags to trigger CI release. |
+| `npm run release:major` | Bumps major version (`1.0.1` -> `2.0.0`), commits, tags, and pushes with tags to trigger CI release. |
 
 ---
 
 ## Releasing & Continuous Delivery
 
-### Automated Release Pipeline
-1. Update the version in `package.json` (e.g., `1.0.1`).
-2. Commit and create a version tag:
-   ```bash
-   git tag v1.0.1
-   git push origin master --tags
-   ```
-3. The GitHub Actions [Build & Release workflow](.github/workflows/build-and-release.yml) will automatically:
-   - Run linter and typecheck verification.
-   - Build installers across Windows, macOS, and Linux runners in parallel.
-   - Publish a new GitHub Release with all executable assets attached.
-   - Serve the update to all installed client instances via `update.electronjs.org`.
-   - Client instances will detect, download, and silently apply the update upon completion.
+### One-Command Release Workflow
+Easily cut and publish new releases using the release scripts:
+
+```bash
+# Patch release (e.g. 1.0.1 -> 1.0.2)
+npm run release
+# or: npm run release:patch
+
+# Minor feature release (e.g. 1.0.1 -> 1.1.0)
+npm run release:minor
+# or: npm run release minor
+
+# Major breaking release (e.g. 1.0.1 -> 2.0.0)
+npm run release:major
+# or: npm run release major
+```
+
+When you execute any release command, it automatically:
+1. Validates that your git working tree is clean.
+2. Bumps `version` in `package.json` and `package-lock.json`.
+3. Creates a git commit (`Release vX.Y.Z`).
+4. Creates an annotated git tag (`vX.Y.Z`).
+5. Pushes the branch and tag to GitHub (`git push origin master --follow-tags`).
+6. Triggers GitHub Actions to build Windows, macOS, and Linux installers and publish them directly to GitHub Releases.
+7. Any installed clients silently update to the new version in the background without user confirmation prompts.
 
 ---
 

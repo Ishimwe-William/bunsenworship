@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { logout, selectAuthUser } from '../../store/features/auth';
 import { LogoutIcon, GlobeAltIcon, SunIcon, MoonIcon, LaptopIcon } from '../common/Icons';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
+import pkg from '../../../package.json';
 
 export const SettingsScreen: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -199,7 +200,7 @@ export const SettingsScreen: React.FC = () => {
           <div>
             <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t.common.appName}</h3>
             <p className="section-description" style={{ margin: '2px 0 0 0' }}>
-              Version 1.0.1 &bull; {language === 'rw' ? 'Porogaramu yo Kwerekana Indirimbo muri Gahunda zo Kuramya' : 'Professional Live Worship Presentation Platform'}
+              Version {pkg.version} &bull; {language === 'rw' ? 'Porogaramu yo Kwerekana Indirimbo muri Gahunda zo Kuramya' : 'Professional Live Worship Presentation Platform'}
             </p>
           </div>
         </div>

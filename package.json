@@ -20,7 +20,11 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "generate:icons": "electron scripts/generate-icons.js"
+    "generate:icons": "electron scripts/generate-icons.js",
+    "release": "node scripts/release.js",
+    "release:patch": "node scripts/release.js patch",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major"
   },
   "keywords": [
     "worship",
