@@ -226,23 +226,19 @@ Easily cut and publish new releases using the release scripts:
 ```bash
 # Patch release (e.g. 1.0.1 -> 1.0.2)
 npm run release
-# or: npm run release:patch
 
 # Minor feature release (e.g. 1.0.1 -> 1.1.0)
 npm run release:minor
-# or: npm run release minor
 
 # Major breaking release (e.g. 1.0.1 -> 2.0.0)
 npm run release:major
-# or: npm run release major
 ```
 
 When you execute any release command, it automatically:
-1. Validates that your git working tree is clean.
-2. Bumps `version` in `package.json` and `package-lock.json`.
-3. Creates a git commit (`Release vX.Y.Z`).
-4. Creates an annotated git tag (`vX.Y.Z`).
-5. Pushes the branch and tag to GitHub (`git push origin master --follow-tags`).
+1. Bumps `version` in `package.json` and `package-lock.json`.
+2. Creates a git commit with the new version.
+3. Creates a git tag (`vX.Y.Z`).
+4. Pushes the branch and tags to GitHub (`git push && git push --tags`).
 6. Triggers GitHub Actions to build Windows, macOS, and Linux installers and publish them directly to GitHub Releases.
 7. Any installed clients silently update to the new version in the background without user confirmation prompts.
 
