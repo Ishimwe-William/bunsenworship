@@ -2,26 +2,31 @@
 
 > **Professional Worship Presentation & Church Media Broadcast Console for Modern Sanctuaries**
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Electron](https://img.shields.io/badge/Electron-44.4.2-47848F?logo=electron&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)
-![Redux Toolkit](https://img.shields.io/badge/Redux%20Toolkit-2-764ABC?logo=redux&logoColor=white)
+[![Build & Release](https://github.com/Ishimwe-William/bunsenworship/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/Ishimwe-William/bunsenworship/actions/workflows/build-and-release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Electron](https://img.shields.io/badge/Electron-44.4.2-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Redux Toolkit](https://img.shields.io/badge/Redux%20Toolkit-2-764ABC?logo=redux&logoColor=white)](https://redux-toolkit.js.org/)
 
-**BunsenWorship** is a modern, high-performance desktop application engineered for church production teams, worship leaders, and media technicians. Built with Electron, React 19, TypeScript, and Vite, it delivers ultra-low latency slide control, video and lyric projections, multi-screen output management, bilingual localization, and an expandable pro-grade operator console.
+**BunsenWorship** is a modern, high-performance desktop application engineered for church production teams, worship leaders, and media technicians. Built with Electron, React 19, TypeScript, and Vite, it delivers ultra-low latency slide control, video and lyric projections, multi-screen output management, bilingual localization, background auto-updates, and an expandable pro-grade operator console.
 
 ---
 
 ## Key Highlights
 
+- **Multi-OS Installer Generation**: Automated GitHub Actions CI workflow produces ready-to-install packages for **Windows** (`.exe`, `.nupkg`, `.zip`), **macOS** (`.dmg`, `.zip`), and **Linux** (`.deb`, `.rpm`).
+- **Silent Background Auto-Updates**: Seamless updates via `update-electron-app` and GitHub Releases. When a new version is released, it downloads in the background and applies instantly with **no confirmation required**.
+- **Branded Startup Experience**: Fast splash screen with animated branding, smooth window transitions, and window geometry/state persistence across app launches.
+- **System Tray Integration**: Background tray menu with quick-access controls for toggling console visibility, window restoration, and safe shutdown.
 - **Pro Broadcast Operator Console**: Dedicated screens for *Live Show*, *Media Library*, *Integrations*, *Outputs*, *Remotes*, and *Settings*.
 - **Expandable / Collapsible Pro Sidebar**: Compact mode for maximum viewport space and expanded mode with full labels, active indicator bars, and user session controls.
-- **Complete Authentication Flow**: Sign In, Sign Up, 6-digit PIN verification, Forgot Password, and Reset Password with Google Sign-In and universal email support (any provider: Gmail, Outlook, Yahoo, or custom church domains).
+- **Complete Authentication Flow**: Sign In, Sign Up, 6-digit PIN verification, Forgot Password, and Reset Password with Google Sign-In and universal email support.
 - **Zero-Emoji SVG Iconography**: Clean, crisp SVG vector icons throughout the interface for a refined, professional broadcast aesthetic.
 - **Bilingual Localization (EN / RW)**: Real-time language switching between English and Kinyarwanda (*Ikinyarwanda*) powered by typed Redux state.
 - **Modular Theme Engine**: Pure CSS custom properties supporting **Dark**, **Light**, and **System** themes with automatic persistence and zero style runtime overhead.
-- **Sanctuary Projection Monitor**: Left-side visual preview displaying high-visibility audience display status (`OUTPUT 1: 4K AUDIENCE SANCTUARY`), live lyric cards, and active stage badges.
+- **Sanctuary Projection Monitor**: Visual preview displaying audience display status (`OUTPUT 1: 4K AUDIENCE SANCTUARY`), live lyric cards, and active stage badges.
 
 ---
 
@@ -55,7 +60,7 @@
   - `Black Screen`: Instantly black out projection screens during prayer or transitions.
   - `Clear Text`: Drop lyrics and scripture while retaining video/image background loops.
   - `Show Logo`: Return screens to the church or ministry branding graphic.
-  - `Next Slide`: Seamlessly advance verses and choruses with hotkey support.
+  - `Next Slide`: Advance verses and choruses with hotkey support.
   - `Take Live`: Push previewed content straight to active sanctuary outputs.
 - **Dynamic Slide Queue**: Group songs and scriptures by liturgical sections (*Verse 1*, *Chorus*, *Verse 2*, *Bridge*, *Outro*).
 
@@ -65,7 +70,12 @@
   - **Stage Confidence Monitors**: High-contrast, inverted lyrics, clocks, and stage timers for singers and speakers.
   - **Live Stream Overlays (NDI / SDI / Alpha Channel)**: Lower-third lyric generation for OBS, vMix, and ATEM switchers.
 
-### 3. Comprehensive Authentication Suite
+### 3. Silent Auto-Updates & CI/CD
+- **Zero-Confirmation Updates**: Downloaded updates restart and apply automatically in the background without interrupting worship operators with confirmation modals.
+- **Cross-Platform Matrix CI**: GitHub Actions automatically builds and uploads installable files for Windows, macOS, and Linux on every master push and release tag.
+- **Publishing Integration**: Automatically publishes signed releases and assets directly to GitHub Releases upon tag creation (`v*`).
+
+### 4. Comprehensive Authentication Suite
 - **Universal Email Sign-In**: Open to all domains (`@gmail.com`, `@outlook.com`, `@icloud.com`, `@yahoo.com`, or `@churchdomain.org`).
 - **Registration**: Clean registration without unnecessary mandatory fields.
 - **6-Digit PIN Verification**: Auto-advancing boxes with digit formatting, paste detection, backspace navigation, countdown timers, and demo auto-fill (`123456`).
@@ -73,7 +83,7 @@
 - **Google Sign-In**: Streamlined one-click authentication.
 - **Demo Quick-Access**: Instant one-click sign-in for stage tests and rehearsal demos.
 
-### 4. Bilingual Localization (English & Kinyarwanda)
+### 5. Bilingual Localization (English & Kinyarwanda)
 - Real-time language switching without page reloads.
 - 100% typed translation dictionaries for:
   - Navigation tabs and console actions.
@@ -81,12 +91,23 @@
   - Complete authentication screens, error messages, and validation notices.
   - System and performance settings.
 
-### 5. Modular Redux State Management
+### 6. Modular Redux State Management
 - Architecture organized into distinct, isolated domain slices:
   - `src/store/features/theme`: Theme mode (`dark`, `light`, `system`), resolved colors, and DOM attribute bindings.
   - `src/store/features/language`: Active locale (`en`, `rw`), translation dictionaries, and formatting helpers.
   - `src/store/features/navigation`: Active console tab (`live-show`, `media-library`, `integrations`, `outputs`, `remotes`, `settings`) and sidebar expansion state.
   - `src/store/features/auth`: User credentials, authentication status, pending PIN verification, password reset tokens, and session persistence.
+  - `src/store/features/presentation`: Live broadcast state, blackout mode, logo overlay, and active slide queue.
+
+---
+
+## Supported Installers & Operating Systems
+
+| Operating System | Package Formats | Target Architectures |
+|:---|:---|:---|
+| **Windows** | Squirrel Installer (`.exe`), NuGet (`.nupkg`), `.zip` | `x64` |
+| **macOS** | Apple Disk Image (`.dmg`), Compressed Archive (`.zip`) | `x64`, Apple Silicon / Universal |
+| **Linux** | Debian (`.deb`), Red Hat / Fedora (`.rpm`) | `x64` |
 
 ---
 
@@ -100,6 +121,7 @@
 | **Vite** | `^5.4.21` | High-speed frontend tooling and bundler |
 | **Electron Forge** | `^7.11.2` | Packaging, making installers, and native integration |
 | **Redux Toolkit** | `^2.12.0` | Predictable state container and modular feature slices |
+| **update-electron-app** | `^3.3.0` | Background update orchestration with auto-restart |
 | **CSS Custom Properties** | Native | Zero-dependency styling system with instantaneous theme transitions |
 
 ---
@@ -108,64 +130,47 @@
 
 ```
 bunsenworship/
-├── forge.config.ts             # Electron Forge configuration (Vite plugin, fuses, makers)
-├── vite.main.config.ts         # Vite configuration for Electron main process
-├── vite.preload.config.ts      # Vite configuration for Electron preload script
-├── vite.renderer.config.ts     # Vite configuration for React renderer
-├── package.json                # Project dependencies and script declarations
-├── tsconfig.json               # TypeScript compiler options
+├── .github/
+│   └── workflows/
+│       └── build-and-release.yml   # Multi-OS CI/CD pipeline (Windows, macOS, Linux)
+├── scripts/
+│   └── generate-icons.js           # Multi-resolution icon & favicon generator
+├── forge.config.ts                 # Electron Forge config (Makers, Publishers, Fuses, Vite)
+├── vite.main.config.ts             # Vite configuration for Electron main process
+├── vite.preload.config.ts          # Vite configuration for Electron preload script
+├── vite.renderer.config.ts         # Vite configuration for React renderer
+├── package.json                    # Project metadata, scripts, and dependencies
+├── tsconfig.json                   # TypeScript compiler options
 ├── src/
-│   ├── main.ts                 # Electron main process window management & lifecycle
-│   ├── preload.ts              # Secure Electron IPC preload bridge
-│   ├── renderer.tsx            # React application root mounting point
-│   ├── App.tsx                 # Root layout, navigation router, and authentication guard
-│   ├── App.css                 # Global console layouts, header, topbar, and screen scroll styles
+│   ├── main.ts                     # Main process: window lifecycle, tray, and splash
+│   ├── updater.ts                  # Background silent auto-updater (no confirmation)
+│   ├── splash.ts                   # Branded animated splash screen window
+│   ├── windowState.ts              # Window coordinate & dimension persistence
+│   ├── preload.ts                  # Secure Electron IPC preload bridge
+│   ├── renderer.tsx                # React application root mounting point
+│   ├── App.tsx                     # Root layout, navigation router, and authentication guard
+│   ├── App.css                     # Global console layouts, header, topbar, and screen scroll styles
 │   │
-│   ├── components/             # Modular UI components
-│   │   ├── auth/               # Full authentication suite
-│   │   │   ├── AuthContainer.tsx       # Auth split-screen layout & screen router
-│   │   │   ├── AuthHero.tsx            # Sanctuary projection preview & 4K badge
-│   │   │   ├── LoginForm.tsx           # Email/password login with demo shortcut
-│   │   │   ├── RegisterForm.tsx        # Account registration
-│   │   │   ├── PinVerificationForm.tsx # 6-digit numeric PIN verification
-│   │   │   ├── ForgotPasswordForm.tsx  # Reset request initiation
-│   │   │   ├── ResetPasswordForm.tsx   # New password configuration
-│   │   │   ├── GoogleSignInButton.tsx  # Google branded OAuth button
-│   │   │   └── Auth.css                # Authentication styling & animations
-│   │   │
-│   │   ├── common/             # Shared primitives & zero-emoji icons
-│   │   │   └── Icons.tsx               # SVG icons (Logout, Eye, Key, Sun, Moon, etc.)
-│   │   │
-│   │   ├── language/           # Language switcher & translation hooks
-│   │   │   └── LanguageToggle.tsx      # Segmented EN/RW button group
-│   │   │
-│   │   ├── screens/            # Application viewports
-│   │   │   ├── LiveShowScreen.tsx      # Main live production screen
-│   │   │   ├── MediaLibraryScreen.tsx  # Background loops, audio, and slides
-│   │   │   ├── IntegrationsScreen.tsx  # CCLI, SongSelect, Planning Center, NDI
-│   │   │   ├── OutputsScreen.tsx       # Multi-display routing
-│   │   │   ├── RemotesScreen.tsx       # Mobile & tablet remote controls
-│   │   │   └── SettingsScreen.tsx      # Hardware acceleration, language, display
-│   │   │
-│   │   ├── sidebar/            # Console navigation sidebar
-│   │   │   ├── Sidebar.tsx             # Expandable/collapsible sidebar component
-│   │   │   ├── NavIcons.tsx            # SVG tab icons & BunsenWorship branding logo
-│   │   │   └── Sidebar.css             # Transitions, active states & responsive rules
-│   │   │
-│   │   └── theme/              # Theme switcher controls
-│   │       └── ThemeToggle.tsx         # Compact and dropdown theme pickers
+│   ├── assets/                     # Application icons (.ico, .icns, PNG sizes 16-512)
+│   │   ├── icon.ico                # Windows executable & installer icon
+│   │   ├── icon.icns               # macOS bundle icon
+│   │   └── AppIcon-*.png           # Multi-resolution icons & system tray assets
 │   │
-│   ├── store/                  # Redux Toolkit store & feature slices
-│   │   ├── index.ts            # Configured Redux store
-│   │   ├── hooks.ts            # Typed useAppDispatch & useAppSelector
-│   │   └── features/
-│   │       ├── auth/           # Authentication state, actions, and selectors
-│   │       ├── language/       # Localization state & EN/RW dictionary tables
-│   │       ├── navigation/     # Active tab navigation & sidebar collapse state
-│   │       └── theme/          # Theme tokens, mode toggle, and DOM sync
+│   ├── components/                 # Modular UI components
+│   │   ├── auth/                   # Full authentication suite (Login, Register, PIN, Reset)
+│   │   ├── common/                 # Zero-emoji SVG icons & reusable primitives
+│   │   ├── language/               # Language switcher & translation hooks
+│   │   ├── screens/                # LiveShow, MediaLibrary, Outputs, Settings, etc.
+│   │   ├── sidebar/                # Expandable console sidebar & navigation icons
+│   │   └── theme/                  # Dark / Light / System theme toggles
+│   │
+│   ├── store/                      # Redux Toolkit store & feature slices
+│   │   ├── index.ts                # Configured Redux store
+│   │   ├── hooks.ts                # Typed useAppDispatch & useAppSelector
+│   │   └── features/               # Auth, language, navigation, theme, presentation
 │   │
 │   └── styles/
-│       └── theme.css           # CSS variables for Dark, Light, and System modes
+│       └── theme.css               # CSS variables for Dark, Light, and System modes
 ```
 
 ---
@@ -173,7 +178,7 @@ bunsenworship/
 ## Getting Started
 
 ### Prerequisites
-- **Node.js**: `v18.x` or higher (recommended: `v20+`)
+- **Node.js**: `v20.x` or higher (LTS recommended)
 - **npm**: `v9.x` or higher
 
 ### Installation
@@ -189,6 +194,11 @@ bunsenworship/
    npm install
    ```
 
+3. Launch development server:
+   ```bash
+   npm start
+   ```
+
 ---
 
 ## Available Scripts
@@ -199,27 +209,36 @@ bunsenworship/
 | `npm run lint` | Runs ESLint across all TypeScript and TSX files. |
 | `npx tsc --noEmit` | Runs the TypeScript compiler to verify static type integrity. |
 | `npm run package` | Builds and packages the application for the local platform (Windows, macOS, Linux). |
-| `npm run make` | Generates distributable platform installers (Squirrel `.exe`, `.deb`, `.rpm`, `.zip`). |
-| `npm run publish` | Publishes packaged installers to your configured release provider. |
+| `npm run make` | Generates distributable platform installers (`.exe`, `.dmg`, `.deb`, `.rpm`, `.zip`). |
+| `npm run publish` | Builds, packages, and publishes installers directly to GitHub Releases. |
+| `npm run generate:icons` | Generates `.ico`, `.icns`, and multi-size PNG icon assets from SVG source. |
 
 ---
 
-## Testing & Demo Mode
+## Releasing & Continuous Delivery
 
-BunsenWorship includes built-in test credentials for rapid inspection:
-
-- **Quick Demo Login**: Click **"Quick Demo Login"** on the Sign In screen to enter immediately as *Senior Worship Director*.
-- **Google Sign-In**: Click **"Sign in with Google"** to authenticate via the simulated OAuth provider.
-- **PIN Verification**: Use any 6 digits (or click **"Auto-fill PIN: 123456"**) to verify your account or complete a password reset.
-- **Language Switch**: Click the **EN / RW** pill toggle in the top-right header at any time to switch between English and Kinyarwanda.
+### Automated Release Pipeline
+1. Update the version in `package.json` (e.g., `1.0.1`).
+2. Commit and create a version tag:
+   ```bash
+   git tag v1.0.1
+   git push origin master --tags
+   ```
+3. The GitHub Actions [Build & Release workflow](.github/workflows/build-and-release.yml) will automatically:
+   - Run linter and typecheck verification.
+   - Build installers across Windows, macOS, and Linux runners in parallel.
+   - Publish a new GitHub Release with all executable assets attached.
+   - Serve the update to all installed client instances via `update.electronjs.org`.
+   - Client instances will detect, download, and silently apply the update upon completion.
 
 ---
 
 ## Security & Architecture Principles
 
-1. **Context Isolation**: Renderer and main processes are separated via `contextBridge` in [`src/preload.ts`](file:///D:/dev/electron/bunsenworship/src/preload.ts).
-2. **Electron Fuses**: Configured in [`forge.config.ts`](file:///D:/dev/electron/bunsenworship/forge.config.ts) to disable `runAsNode`, enforce ASAR integrity validation, and prevent arbitrary Node CLI execution.
-3. **Pure CSS Performance**: No bulky CSS-in-JS runtimes or heavy utility frameworks. The UI relies strictly on CSS variables defined in [`src/styles/theme.css`](file:///D:/dev/electron/bunsenworship/src/styles/theme.css), ensuring smooth 60 FPS transitions during live church services.
+1. **Context Isolation**: Renderer and main processes are separated via `contextBridge` in [`src/preload.ts`](src/preload.ts).
+2. **Electron Fuses**: Configured in [`forge.config.ts`](forge.config.ts) to disable `runAsNode`, enforce ASAR integrity validation, and prevent arbitrary Node CLI execution.
+3. **Pure CSS Performance**: No bulky CSS-in-JS runtimes or heavy utility frameworks. The UI relies strictly on CSS variables defined in [`src/styles/theme.css`](src/styles/theme.css), ensuring smooth 60 FPS transitions during live church services.
+4. **Resilient Window Management**: Splash window safely disposes upon main window readiness; main window bounds are saved to disk on resize/move.
 
 ---
 
