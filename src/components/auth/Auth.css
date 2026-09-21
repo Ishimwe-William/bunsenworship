@@ -61,28 +61,111 @@
   gap: 2rem;
 }
 
+.auth-hero-dominant-brand {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.dominant-logo-frame {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: heroLogoFloat 4s ease-in-out infinite;
+}
+
+@keyframes heroLogoFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.dominant-logo-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.24) 0%, rgba(255, 61, 0, 0.15) 50%, transparent 70%);
+  pointer-events: none;
+  filter: blur(10px);
+}
+
+.dominant-logo-icon {
+  width: 96px;
+  height: 96px;
+  filter: drop-shadow(0 8px 24px rgba(255, 61, 0, 0.35));
+}
+
+.dominant-brand-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.dominant-brand-title {
+  font-size: 2.125rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--hero-brand-name);
+  line-height: 1;
+}
+
+.dominant-brand-title span {
+  background: linear-gradient(135deg, #00e5ff 0%, #6366f1 60%, #ff3d00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dominant-badge-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--hero-brand-sub);
+  text-transform: uppercase;
+}
+
+.dominant-pro-badge {
+  color: var(--color-primary);
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.dominant-version-tag {
+  color: var(--text-muted);
+}
+
+.dominant-dot-separator {
+  color: var(--border-strong);
+}
+
+.dominant-brand-lead {
+  font-size: 0.875rem;
+  color: var(--hero-text-secondary);
+  line-height: 1.4;
+  margin-top: 0.25rem;
+  max-width: 420px;
+}
+
+/* Legacy fallback header if needed */
 .auth-hero-brand {
   display: flex;
   align-items: center;
   gap: 0.875rem;
-}
-
-.auth-hero-brand-name {
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--hero-brand-name);
-  line-height: 1.1;
-  transition: color 0.25s ease;
-}
-
-.auth-hero-brand-sub {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  color: var(--hero-brand-sub);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  transition: color 0.25s ease;
 }
 
 /* Simulated Sanctuary Projection Card */
@@ -149,9 +232,21 @@
 }
 
 .screen-card-body {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  overflow: hidden;
+}
+
+.screen-card-watermark {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 0.25rem;
+  opacity: 0.14;
+  pointer-events: none;
+  filter: drop-shadow(0 0 16px rgba(0, 229, 255, 0.4));
+  transform: rotate(-5deg);
 }
 
 .screen-card-song-title {
@@ -160,6 +255,7 @@
   letter-spacing: 0.08em;
   color: var(--color-accent);
   text-transform: uppercase;
+  z-index: 2;
 }
 
 .screen-card-lyrics {
@@ -169,6 +265,7 @@
   color: var(--hero-card-lyrics);
   font-style: italic;
   transition: color 0.25s ease;
+  z-index: 2;
 }
 
 .screen-card-footer {
@@ -178,6 +275,7 @@
   padding-top: 0.75rem;
   border-top: 1px solid var(--hero-card-border);
   transition: border-color 0.25s ease;
+  z-index: 2;
 }
 
 .pill-badge {
@@ -188,6 +286,22 @@
   background: var(--hero-badge-bg);
   color: var(--hero-badge-text);
   transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.hero-feature-pills {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--hero-text-secondary);
+}
+
+.hero-feature-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .auth-hero-tagline {

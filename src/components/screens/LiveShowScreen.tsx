@@ -9,6 +9,7 @@ import {
 } from '../../store/features/presentation';
 import { useLanguage } from '../language';
 import { BlackoutIcon, ClearTextIcon, LogoDisplayIcon } from '../common/Icons';
+import { BunsenWorshipLogo } from '../sidebar/NavIcons';
 
 export const LiveShowScreen: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -21,9 +22,14 @@ export const LiveShowScreen: React.FC = () => {
   return (
     <div className="screen-content">
       <div className="screen-header">
-        <div>
-          <h2 className="screen-title">{t.liveShow.title}</h2>
-          <p className="screen-description">{t.liveShow.description}</p>
+        <div className="screen-header-brand-group">
+          <div className="screen-header-logo-badge">
+            <BunsenWorshipLogo size={48} />
+          </div>
+          <div>
+            <h2 className="screen-title">{t.liveShow.title}</h2>
+            <p className="screen-description">{t.liveShow.description}</p>
+          </div>
         </div>
       </div>
 

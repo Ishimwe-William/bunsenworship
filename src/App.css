@@ -110,6 +110,25 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.screen-header-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+}
+
+.screen-header-logo-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 14px rgba(255, 61, 0, 0.28));
+  transition: transform 0.2s ease;
+}
+
+.screen-header-logo-badge:hover {
+  transform: scale(1.05);
+}
+
 .screen-title {
   font-size: 1.5rem;
   font-weight: 700;

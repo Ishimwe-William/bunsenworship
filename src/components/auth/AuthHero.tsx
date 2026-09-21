@@ -44,16 +44,30 @@ export const AuthHero: React.FC = () => {
 
       {/* Hero Foreground Content */}
       <div className="auth-hero-content">
-        {/* Brand Header */}
-        <div className="auth-hero-brand">
-          <BunsenWorshipLogo size={42} />
-          <div>
-            <h1 className="auth-hero-brand-name">{t.common.appName}</h1>
-            <span className="auth-hero-brand-sub">{t.common.consoleSubtitle}</span>
+        {/* Dominant Hero Brand Showcase */}
+        <div className="auth-hero-dominant-brand">
+          <div className="dominant-logo-frame">
+            <div className="dominant-logo-glow" />
+            <BunsenWorshipLogo size={96} className="dominant-logo-icon" />
+          </div>
+          <div className="dominant-brand-details">
+            <h1 className="dominant-brand-title">
+              Bunsen<span>Worship</span>
+            </h1>
+            <div className="dominant-badge-strip">
+              <span className="dominant-pro-badge">{t.common.consoleSubtitle}</span>
+              <span className="dominant-dot-separator">&bull;</span>
+              <span className="dominant-version-tag">PRO PRESENTER v1.0.0</span>
+            </div>
+            <p className="dominant-brand-lead">
+              {language === 'rw'
+                ? "Sisitemu y'inzobere yo kwerekana indirimbo, amashusho na Bibiliya muri gahunda zo kuramya."
+                : 'Advanced multi-screen worship presentation and live broadcast control platform.'}
+            </p>
           </div>
         </div>
 
-        {/* Realistic Live Screen Projection Card */}
+        {/* Realistic Live Screen Projection Card with Subtle Logo Watermark */}
         <div className="auth-hero-screen-card">
           <div className="screen-card-topbar">
             {/* Prominent & Clearly Visible Output Target Badge */}
@@ -65,6 +79,9 @@ export const AuthHero: React.FC = () => {
           </div>
 
           <div className="screen-card-body">
+            <div className="screen-card-watermark" aria-hidden="true">
+              <BunsenWorshipLogo size={88} />
+            </div>
             <span className="screen-card-song-title">
               {language === 'rw' ? 'INDIRIMBO YA 124' : 'AMAZING GRACE'}
             </span>
@@ -86,7 +103,7 @@ export const AuthHero: React.FC = () => {
           </div>
 
           <div className="screen-card-footer">
-            <span className="pill-badge">Audience Main</span>
+            <span className="pill-badge">Audience Main 4K</span>
             <span className="pill-badge">Stage Foldback</span>
             <span className="pill-badge">OBS NDI Stream</span>
           </div>
@@ -94,11 +111,11 @@ export const AuthHero: React.FC = () => {
 
         {/* Feature Highlights */}
         <div className="auth-hero-footer-text">
-          <p className="auth-hero-tagline">
-            {language === 'rw'
-              ? 'Porogaramu y&apos;inzobere yo kwerekana indirimbo, amashusho na Bibiliya mu nsengero.'
-              : 'Professional multi-screen presentation software designed for modern sanctuary worship.'}
-          </p>
+          <div className="hero-feature-pills">
+            <span className="hero-feature-item">&bull; Zero-Lag Projection</span>
+            <span className="hero-feature-item">&bull; Multi-Screen Overrides</span>
+            <span className="hero-feature-item">&bull; Dual Language Support</span>
+          </div>
         </div>
       </div>
     </div>

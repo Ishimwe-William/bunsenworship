@@ -83,7 +83,7 @@ export const Sidebar: React.FC = () => {
       {/* Brand Header */}
       <div className="sidebar-header">
         <div className="sidebar-brand-icon" title={`${t.common.appName} ${t.common.consoleSubtitle}`}>
-          <BunsenWorshipLogo size={34} />
+          <BunsenWorshipLogo size={38} />
         </div>
         {isExpanded && (
           <div className="sidebar-brand-text">
