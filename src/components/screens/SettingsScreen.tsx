@@ -199,7 +199,7 @@ export const SettingsScreen: React.FC = () => {
           <div>
             <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t.common.appName}</h3>
             <p className="section-description" style={{ margin: '2px 0 0 0' }}>
-              Version 1.0.0 &bull; {language === 'rw' ? 'Porogaramu yo Kwerekana Indirimbo muri Gahunda zo Kuramya' : 'Professional Live Worship Presentation Platform'}
+              Version 1.0.1 &bull; {language === 'rw' ? 'Porogaramu yo Kwerekana Indirimbo muri Gahunda zo Kuramya' : 'Professional Live Worship Presentation Platform'}
             </p>
           </div>
         </div>
