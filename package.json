@@ -1,9 +1,10 @@
 {
   "name": "bunsenworship",
-  "productName": "bunsenworship",
+  "productName": "Bunsen Worship",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "Bunsen Worship is an Electron application for managing worship presentations.",
   "main": ".vite/build/main.js",
+  "package": "com.bunsenplus.worship",
   "private": true,
   "scripts": {
     "start": "electron-forge start",
@@ -12,10 +13,15 @@
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."
   },
-  "keywords": [],
+  "keywords": [
+    "worship",
+    "presentation",
+    "electron",
+    "application"
+  ],
   "author": {
-    "name": "github-actions[bot]",
-    "email": "github-actions[bot]@users.noreply.github.com"
+    "name": "William Ishimwe",
+    "email": "bunsenplus.org@gmail.com"
   },
   "license": "MIT",
   "devDependencies": {
