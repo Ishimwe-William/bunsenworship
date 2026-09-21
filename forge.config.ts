@@ -1,8 +1,10 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
+import { PublisherGithub } from '@electron-forge/publisher-github';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
@@ -11,15 +13,48 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: 'src/assets/icon',
+    executableName: 'bunsenworship',
+    appBundleId: 'com.bunsenplus.worship',
+    appCategoryType: 'public.app-category.lifestyle',
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
+      name: 'bunsenworship',
       setupIcon: 'src/assets/icon.ico',
     }),
-    new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerZIP({}, ['darwin', 'win32']),
+    new MakerDMG(
+      {
+        icon: 'src/assets/icon.icns',
+        name: 'BunsenWorship',
+      },
+      ['darwin'],
+    ),
+    new MakerRpm({
+      options: {
+        icon: 'src/assets/AppIcon-512.png',
+        categories: ['AudioVideo', 'Utility'],
+        homepage: 'https://github.com/Ishimwe-William/bunsenworship',
+      },
+    }),
+    new MakerDeb({
+      options: {
+        icon: 'src/assets/AppIcon-512.png',
+        categories: ['AudioVideo', 'Utility'],
+        homepage: 'https://github.com/Ishimwe-William/bunsenworship',
+      },
+    }),
+  ],
+  publishers: [
+    new PublisherGithub({
+      repository: {
+        owner: 'Ishimwe-William',
+        name: 'bunsenworship',
+      },
+      prerelease: false,
+      draft: false,
+    }),
   ],
   plugins: [
     new VitePlugin({
