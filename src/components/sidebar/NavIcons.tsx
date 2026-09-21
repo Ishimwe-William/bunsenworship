@@ -9,19 +9,32 @@ export const BunsenWorshipLogo: React.FC<IconProps> = ({ className = '', size = 
   <svg
     width={size}
     height={size}
-    viewBox="0 0 40 40"
+    viewBox="0 0 128 128"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     className={className}
+    aria-label="BunsenWorship Logo"
   >
-    <rect width="40" height="40" rx="10" fill="#2563eb" />
-    <path
-      d="M11 20C11 17.5 13 15 14.5 15C16 15 16.5 25 18 25C19.5 25 20.5 12 22 12C23.5 12 24.5 28 26 28C27.5 28 28.5 20 30 20"
-      stroke="white"
-      strokeWidth="3.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+    <rect width="128" height="128" rx="26" fill="#08090C" />
+    <rect x="7" y="7" width="114" height="114" rx="25" fill="#141922" stroke="#1F2633" strokeWidth="2" />
+    <path d="M-18 23L-53.507 -28L17.507 -28L-18 23Z" fill="url(#bw_ambient_beam)" />
+    <circle cx="64" cy="82" r="26.5" fill="#141922" stroke="#00E5FF" strokeWidth="2.5" />
+    <ellipse cx="64" cy="61.5" rx="22.5" ry="34" fill="url(#bw_flame_outer)" />
+    <ellipse cx="64" cy="68" rx="11.5" ry="20.5" fill="url(#bw_flame_inner)" />
+    <defs>
+      <linearGradient id="bw_ambient_beam" x1="-18" y1="23" x2="-18" y2="-45" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#00E5FF" stopOpacity="0.15" />
+        <stop offset="0.85" stopColor="#00E5FF" stopOpacity="0" />
+      </linearGradient>
+      <linearGradient id="bw_flame_outer" x1="64" y1="95.5" x2="64" y2="27.5" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#FF3D00" />
+        <stop offset="1" stopColor="#FF9100" />
+      </linearGradient>
+      <linearGradient id="bw_flame_inner" x1="64" y1="88.5" x2="64" y2="47.5" gradientUnits="userSpaceOnUse">
+        <stop offset="0.1" stopColor="#FFEA00" />
+        <stop offset="0.9" stopColor="#FFEA00" stopOpacity="0" />
+      </linearGradient>
+    </defs>
   </svg>
 );
 
