@@ -237,3 +237,79 @@ export const ArrowLeftIcon: React.FC<IconProps> = ({ className = '', size = 16 }
   </svg>
 );
 
+export const BlackoutIcon: React.FC<IconProps> = ({ className = '', size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <line x1="8" y1="21" x2="16" y2="21" />
+    <line x1="12" y1="17" x2="12" y2="21" />
+    <rect x="5" y="6" width="14" height="8" fill="currentColor" opacity="0.85" />
+  </svg>
+);
+
+export const ClearTextIcon: React.FC<IconProps> = ({ className = '', size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M4 7V4h16v3" />
+    <line x1="9" y1="20" x2="15" y2="20" />
+    <line x1="12" y1="4" x2="12" y2="20" />
+    <line x1="3" y1="3" x2="21" y2="21" strokeWidth="2.2" />
+  </svg>
+);
+
+export const LogoDisplayIcon: React.FC<IconProps> = ({ className = '', size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M12 2l2.4 6.8L21 10.5l-5.4 4.4L17.2 22 12 18.3 6.8 22l1.6-7.1L3 10.5l6.6-1.7L12 2z" />
+  </svg>
+);
+
+export const GoLiveIcon: React.FC<IconProps> = ({ className = '', size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M4.93 4.93a10 10 0 0 0 0 14.14" />
+    <path d="M7.76 7.76a6 6 0 0 0 0 8.48" />
+    <circle cx="12" cy="12" r="2" fill="currentColor" />
+    <path d="M16.24 7.76a6 6 0 0 1 0 8.48" />
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+  </svg>
+);
+
+
+

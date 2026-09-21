@@ -6,6 +6,7 @@ import { Sidebar } from './components/sidebar';
 import { ThemeToggle } from './components/theme';
 import { LanguageToggle, useLanguage } from './components/language';
 import { AuthContainer } from './components/auth';
+import { BroadcastControls } from './components/broadcast';
 import {
   LiveShowScreen,
   MediaLibraryScreen,
@@ -68,12 +69,12 @@ export const App: React.FC = () => {
             <span className="breadcrumb-active">{tabTitles[activeTab]}</span>
           </div>
 
-          <div className="topbar-actions">
-            <div className="live-indicator-badge">
-              <span className="live-indicator-dot" />
-              <span>{t.common.onAir}</span>
-            </div>
+          {/* Master Global Broadcast Controls (Black, Clear, Logo) */}
+          <div className="topbar-broadcast-center">
+            <BroadcastControls />
+          </div>
 
+          <div className="topbar-actions">
             {/* Language Switcher (EN / RW) */}
             <LanguageToggle variant="segmented" />
 

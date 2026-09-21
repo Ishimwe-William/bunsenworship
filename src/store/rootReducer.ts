@@ -3,6 +3,7 @@ import { themeReducer } from './features/theme';
 import { navigationReducer } from './features/navigation';
 import { languageReducer } from './features/language';
 import { authReducer } from './features/auth';
+import { presentationReducer } from './features/presentation';
 
 /**
  * Root reducer combining all modular feature reducers.
@@ -13,6 +14,7 @@ export const rootReducer = combineReducers({
   navigation: navigationReducer,
   language: languageReducer,
   auth: authReducer,
+  presentation: presentationReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;
