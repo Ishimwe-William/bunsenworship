@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { loadWindowState, manageWindowState } from './windowState';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -8,13 +9,45 @@ if (started) {
 }
 
 const createWindow = () => {
-  // Create the browser window.
+  // Load previous window dimensions and state
+  const windowState = loadWindowState({
+    defaultWidth: 1200,
+    defaultHeight: 760,
+    minWidth: 960,
+    minHeight: 600,
+  });
+
+  // Create the browser window with enforced minimum dimensions and restored coordinates
   const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    x: windowState.x,
+    y: windowState.y,
+    width: windowState.width,
+    height: windowState.height,
+    minWidth: 960,
+    minHeight: 600,
+    show: false, // Prevent flicker before restoring maximized/minimized state
+    backgroundColor: '#0b0f19',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
+  });
+
+  // Attach state tracker to persist size, position, and maximized/minimized states
+  manageWindowState(mainWindow, windowState);
+
+  // Restore maximized state before showing
+  if (windowState.isMaximized) {
+    mainWindow.maximize();
+  }
+
+  // Once renderer is ready, display window according to previous state
+  mainWindow.once('ready-to-show', () => {
+    if (windowState.isMinimized) {
+      mainWindow.show();
+      mainWindow.minimize();
+    } else {
+      mainWindow.show();
+    }
   });
 
   // and load the index.html of the app.
@@ -27,7 +60,7 @@ const createWindow = () => {
   }
 
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 };
 
 // This method will be called when Electron has finished
