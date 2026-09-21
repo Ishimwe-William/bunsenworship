@@ -53,6 +53,12 @@ export interface LiveShowTranslations {
   blackScreen: string;
   clearText: string;
   logo: string;
+  blackShort: string;
+  clearShort: string;
+  logoShort: string;
+  goLive: string;
+  goLiveShort: string;
+  offAir: string;
   nextSlide: string;
   takeLive: string;
   verse: string;

@@ -1,7 +1,21 @@
 import React from 'react';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  clearAllOverrides,
+  selectIsBlackout,
+  selectIsLive,
+  selectIsLogoActive,
+  selectIsTextCleared,
+} from '../../store/features/presentation';
 import { useLanguage } from '../language';
+import { BlackoutIcon, ClearTextIcon, LogoDisplayIcon } from '../common/Icons';
 
 export const LiveShowScreen: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const isLive = useAppSelector(selectIsLive);
+  const isBlackout = useAppSelector(selectIsBlackout);
+  const isTextCleared = useAppSelector(selectIsTextCleared);
+  const isLogoActive = useAppSelector(selectIsLogoActive);
   const { language, t } = useLanguage();
 
   return (
@@ -11,18 +25,43 @@ export const LiveShowScreen: React.FC = () => {
           <h2 className="screen-title">{t.liveShow.title}</h2>
           <p className="screen-description">{t.liveShow.description}</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button type="button" className="btn-secondary">
-            {t.liveShow.blackScreen}
-          </button>
-          <button type="button" className="btn-secondary">
-            {t.liveShow.clearText}
-          </button>
-          <button type="button" className="btn-primary">
-            {t.liveShow.logo}
+      </div>
+
+      {/* Active Override Notification Banner */}
+      {(isBlackout || isTextCleared || isLogoActive) && (
+        <div
+          className={`broadcast-override-banner ${
+            isBlackout ? 'blackout' : isLogoActive ? 'logo-active' : 'clear-text'
+          }`}
+        >
+          <div className="broadcast-override-info">
+            {isBlackout && <BlackoutIcon size={18} />}
+            {isLogoActive && !isBlackout && <LogoDisplayIcon size={18} />}
+            {isTextCleared && !isBlackout && !isLogoActive && <ClearTextIcon size={18} />}
+            <span>
+              {isBlackout
+                ? language === 'rw'
+                  ? 'Ekrani yose irabura kuri ubu ku byerekanirwaho byose (Kanda F1 cyangwa Umukara hejuru ngo ukomeze).'
+                  : 'Blackout is active on all audience outputs (Click Black in header or press F1 to resume).'
+                : isLogoActive
+                ? language === 'rw'
+                  ? 'Ikimenyetso cy’itorero kiri kwerekanwa ku byerekanirwaho (Kanda F3 cyangwa Ikimenyetso hejuru).'
+                  : 'Church logo is currently displayed on all projection screens (Click Logo in header or press F3).'
+                : language === 'rw'
+                ? 'Amagambo yakuweho, amavidewo niyo ari kugaragara gusa (Kanda F2 cyangwa Kuraho hejuru).'
+                : 'Lyric text is cleared, video loop background only (Click Clear in header or press F2).'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => dispatch(clearAllOverrides())}
+            style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+          >
+            {language === 'rw' ? 'Subiza Bisanzwe' : 'Resume Normal'}
           </button>
         </div>
-      </div>
+      )}
 
       <div className="slide-cards-grid">
         <article className="slide-card">
@@ -30,9 +69,12 @@ export const LiveShowScreen: React.FC = () => {
             <strong>Slide 1 &bull; {t.liveShow.verse} 1</strong>
             <span
               className="slide-badge"
-              style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)', color: 'var(--color-success)' }}
+              style={{
+                backgroundColor: isLive ? 'rgba(34, 197, 94, 0.2)' : 'rgba(148, 163, 184, 0.15)',
+                color: isLive ? 'var(--color-success)' : 'var(--text-muted)',
+              }}
             >
-              {t.common.live}
+              {isLive ? t.common.live : t.common.standby}
             </span>
           </div>
           <p className="slide-lyrics">
