@@ -67,12 +67,12 @@ jobs:
           npm run lint
           npx tsc --noEmit
 
-      - name: Build installable packages (Non-release)
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') && github.event_name != 'release' && inputs.publish != true }}
+      - name: Build installable packages (Pull Requests)
+        if: ${{ github.event_name == 'pull_request' }}
         run: npm run make
 
-      - name: Build and publish release packages (Release)
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.publish == true }}
+      - name: Build and publish release packages to GitHub Releases
+        if: ${{ github.event_name != 'pull_request' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run publish
