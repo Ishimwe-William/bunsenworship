@@ -244,6 +244,6 @@ bunsenworship/
 
 ## Author & License
 
-- **Author**: William Ishimwe ([bunsenplus.org@gmail.com](mailto:bunsenplus.org@gmail.com))
+- **Author**: William Ishimwe ([ishimwe.william2000@gmail.com](mailto:ishimwe.william2000@gmail.com))
 - **Organization**: [BunsenPlus](https://github.com/Ishimwe-William)
 - **License**: Licensed under the [MIT License](LICENSE).
