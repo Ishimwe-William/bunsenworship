@@ -16,8 +16,8 @@
 
 ## Key Highlights
 
-- **Multi-OS Installer Generation**: Automated GitHub Actions CI workflow produces ready-to-install packages for **Windows** (`.exe`, `.nupkg`, `.zip`), **macOS** (`.dmg`, `.zip`), and **Linux** (`.deb`, `.rpm`).
-- **Silent Background Auto-Updates**: Seamless updates via `update-electron-app` and GitHub Releases. When a new version is released, it downloads in the background and applies instantly with **no confirmation required**.
+- **Multi-OS Installer Generation**: Automated GitHub Actions CI workflow produces ready-to-install packages for **Windows** (NSIS `.exe`, `.zip`), **macOS** (`.dmg`, `.zip`), and **Linux** (`.AppImage`, `.deb`, `.rpm`).
+- **Silent Background Auto-Updates**: Seamless updates via `electron-updater` and GitHub Releases. When a new version is released, it downloads in the background and applies automatically with **no confirmation required**.
 - **Branded Startup Experience**: Fast splash screen with animated branding, smooth window transitions, and window geometry/state persistence across app launches.
 - **System Tray Integration**: Background tray menu with quick-access controls for toggling console visibility, window restoration, and safe shutdown.
 - **Pro Broadcast Operator Console**: Dedicated screens for *Live Show*, *Media Library*, *Integrations*, *Outputs*, *Remotes*, and *Settings*.
@@ -247,7 +247,7 @@ When you execute any release command, it automatically:
 ## Security & Architecture Principles
 
 1. **Context Isolation**: Renderer and main processes are separated via `contextBridge` in [`src/preload.ts`](src/preload.ts).
-2. **Electron Fuses**: Configured in [`forge.config.ts`](forge.config.ts) to disable `runAsNode`, enforce ASAR integrity validation, and prevent arbitrary Node CLI execution.
+2. **ASAR Packaging**: Built with `electron-builder` to bundle assets and compiled source cleanly inside an ASAR container.
 3. **Pure CSS Performance**: No bulky CSS-in-JS runtimes or heavy utility frameworks. The UI relies strictly on CSS variables defined in [`src/styles/theme.css`](src/styles/theme.css), ensuring smooth 60 FPS transitions during live church services.
 4. **Resilient Window Management**: Splash window safely disposes upon main window readiness; main window bounds are saved to disk on resize/move.
 

@@ -74,6 +74,7 @@ jobs:
       - name: Build and publish release packages to GitHub Releases
         if: ${{ github.event_name != 'pull_request' }}
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run publish
 
@@ -81,5 +82,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bunsenworship-${{ matrix.os }}
-          path: out/make/**/*
+          path: dist-release/**/*
           if-no-files-found: warn

@@ -3,7 +3,7 @@
   "productName": "Bunsen Worship",
   "version": "1.0.1",
   "description": "Bunsen Worship is an Electron application for managing worship presentations.",
-  "main": ".vite/build/main.js",
+  "main": "dist/main/main.js",
   "package": "com.bunsenplus.worship",
   "private": true,
   "repository": {
@@ -15,15 +15,75 @@
     "url": "https://github.com/Ishimwe-William/bunsenworship/issues"
   },
   "scripts": {
-    "start": "electron-forge start",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "publish": "electron-forge publish",
+    "start": "node scripts/dev.mjs",
+    "build:renderer": "vite build --config vite.renderer.config.ts",
+    "build:preload": "vite build --config vite.preload.config.ts",
+    "build:main": "vite build --config vite.main.config.ts",
+    "build": "npm run build:renderer && npm run build:preload && npm run build:main",
+    "package": "npm run build && electron-builder --win --publish never",
+    "make": "npm run build && electron-builder",
+    "publish": "npm run build && electron-builder --publish always",
     "lint": "eslint --ext .ts,.tsx .",
     "generate:icons": "electron scripts/generate-icons.js",
     "release": "npm version patch && git push && git push --tags",
     "release:minor": "npm version minor && git push && git push --tags",
     "release:major": "npm version major && git push && git push --tags"
+  },
+  "build": {
+    "appId": "com.bunsenplus.worship",
+    "productName": "Bunsen Worship",
+    "files": [
+      "dist/**/*",
+      "src/assets/**/*",
+      "package.json"
+    ],
+    "compression": "normal",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src/assets/icon.ico",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Bunsen Worship",
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "src/assets/icon.icns",
+      "category": "public.app-category.lifestyle"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "icon": "src/assets/AppIcon-512.png",
+      "category": "AudioVideo"
+    },
+    "directories": {
+      "output": "dist-release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Ishimwe-William",
+      "repo": "bunsenworship",
+      "releaseType": "release"
+    }
   },
   "keywords": [
     "worship",
@@ -37,24 +97,13 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@electron-forge/cli": "^7.11.2",
-    "@electron-forge/maker-deb": "^7.11.2",
-    "@electron-forge/maker-dmg": "^7.11.2",
-    "@electron-forge/maker-rpm": "^7.11.2",
-    "@electron-forge/maker-squirrel": "^7.11.2",
-    "@electron-forge/maker-zip": "^7.11.2",
-    "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
-    "@electron-forge/plugin-fuses": "^7.11.2",
-    "@electron-forge/plugin-vite": "^7.11.2",
-    "@electron-forge/publisher-github": "^7.11.2",
-    "@electron/fuses": "^1.8.0",
-    "@types/electron-squirrel-startup": "^1.0.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.7.0",
     "electron": "44.4.2",
+    "electron-builder": "^26.15.3",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
     "typescript": "^5.9.3",
@@ -62,10 +111,10 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
-    "electron-squirrel-startup": "^1.0.1",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.8.9",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-redux": "^9.3.0",
-    "update-electron-app": "^3.3.0"
+    "react-redux": "^9.3.0"
   }
 }

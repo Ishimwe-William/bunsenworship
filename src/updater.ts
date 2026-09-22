@@ -1,51 +1,73 @@
-import { app, autoUpdater } from 'electron';
-import { updateElectronApp, UpdateSourceType } from 'update-electron-app';
+import { app } from 'electron';
+import { autoUpdater } from 'electron-updater';
+import log from 'electron-log';
 
 /**
- * Initializes automatic background updates for BunsenWorship.
- * When a new release is detected and downloaded, the application automatically
- * installs and restarts with no user confirmation required.
+ * Initializes automatic background updates for BunsenWorship via electron-updater.
+ * Directly communicates with GitHub Releases (Ishimwe-William/bunsenworship).
+ * When a new release is detected and downloaded, the update is applied cleanly.
  */
 export function setupAutoUpdater(): void {
-  // In development mode, autoUpdater will fail or throw because there are no code-signed packages or feed URLs.
+  // In development mode, skip autoUpdater
   if (!app.isPackaged) {
     console.log('[AutoUpdater] Development mode detected; skipping background update service.');
-    return;
-  }
-
-  // Only macOS (darwin) and Windows (win32) support Electron native autoUpdater
-  if (process.platform !== 'win32' && process.platform !== 'darwin') {
-    console.log(`[AutoUpdater] Native auto-updates are not supported on ${process.platform}.`);
     return;
   }
 
   try {
     console.log('[AutoUpdater] Initializing background update service for Ishimwe-William/bunsenworship...');
 
-    updateElectronApp({
-      updateSource: {
-        type: UpdateSourceType.ElectronPublicUpdateService,
-        repo: 'Ishimwe-William/bunsenworship',
-        host: 'https://update.electronjs.org',
-      },
-      updateInterval: '10 minutes',
-      notifyUser: true,
-      // Handle the downloaded update automatically without prompting the user
-      onNotifyUser: (info) => {
-        console.log(
-          `[AutoUpdater] Update ${info.releaseName || 'new version'} successfully downloaded. Applying update immediately (no confirmation needed)...`,
-        );
-        autoUpdater.quitAndInstall();
-      },
-      logger: {
-        log: (msg: string) => console.log(`[AutoUpdater] ${msg}`),
-        info: (msg: string) => console.info(`[AutoUpdater] ${msg}`),
-        error: (msg: string) => console.error(`[AutoUpdater] ${msg}`),
-        warn: (msg: string) => console.warn(`[AutoUpdater] ${msg}`),
-      },
+    autoUpdater.logger = log;
+    if (log && log.transports && log.transports.file) {
+      log.transports.file.level = 'info';
+    }
+
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.allowDowngrade = false;
+
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'Ishimwe-William',
+      repo: 'bunsenworship',
+      releaseType: 'release',
     });
 
-    console.log('[AutoUpdater] Auto-updater configured successfully (no-confirmation auto-install active).');
+    autoUpdater.on('checking-for-update', () => {
+      console.log('[AutoUpdater] Checking for updates on GitHub Releases...');
+    });
+
+    autoUpdater.on('update-available', (info) => {
+      console.log(`[AutoUpdater] Update available: v${info.version}`);
+    });
+
+    autoUpdater.on('update-not-available', () => {
+      console.log('[AutoUpdater] Application is up to date.');
+    });
+
+    autoUpdater.on('error', (err) => {
+      console.error('[AutoUpdater] Auto-updater error:', err == null ? 'unknown' : (err.stack || err).toString());
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log(`[AutoUpdater] Update v${info.version} downloaded successfully.`);
+      // Silently installs update without blocking user
+      autoUpdater.quitAndInstall(true, true);
+    });
+
+    // Check on startup
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.error('[AutoUpdater] Initial check error:', err);
+    });
+
+    // Periodically check every 15 minutes
+    setInterval(() => {
+      autoUpdater.checkForUpdates().catch((err) => {
+        console.error('[AutoUpdater] Background check error:', err);
+      });
+    }, 15 * 60 * 1000);
+
+    console.log('[AutoUpdater] Background update service active (direct GitHub Releases integration).');
   } catch (error) {
     console.error('[AutoUpdater] Error initializing autoUpdater:', error);
   }
