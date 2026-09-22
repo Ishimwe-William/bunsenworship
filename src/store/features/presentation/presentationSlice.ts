@@ -44,6 +44,15 @@ const initialState: PresentationState = {
   rundown: initialRundown,
   backgroundThemes: defaultThemes,
   activeBackgroundId: 'clouds-cathedral',
+  videoPlayback: {
+    isPlaying: true,
+    currentTime: 0,
+    duration: 0,
+    volume: 1.0,
+    isMuted: false,
+    playbackRate: 1.0,
+    isLooping: false,
+  },
 };
 
 export const presentationSlice = createSlice({
@@ -101,9 +110,25 @@ export const presentationSlice = createSlice({
         state.liveRundownId = state.selectedRundownId;
         state.isLive = true;
 
-        // Auto-advance preview to the subsequent slide in the deck
         const currentItem = state.rundown.find((r) => r.id === state.selectedRundownId);
         if (currentItem) {
+          const targetSlide = currentItem.slides.find((s) => s.id === state.previewSlideId);
+          if (targetSlide && targetSlide.videoType && targetSlide.videoType !== 'none') {
+            state.videoPlayback.currentTime = targetSlide.videoStartTime || 0;
+            state.videoPlayback.isPlaying = targetSlide.autoPlay !== false;
+            state.videoPlayback.isLooping = Boolean(targetSlide.loop || targetSlide.videoLoop);
+            if (targetSlide.videoVolume !== undefined) {
+              state.videoPlayback.volume = targetSlide.videoVolume;
+            }
+            if (targetSlide.videoMuted !== undefined) {
+              state.videoPlayback.isMuted = targetSlide.videoMuted;
+            }
+            if (targetSlide.videoPlaybackRate !== undefined) {
+              state.videoPlayback.playbackRate = targetSlide.videoPlaybackRate;
+            }
+          }
+
+          // Auto-advance preview to the subsequent slide in the deck
           const currentIndex = currentItem.slides.findIndex((s) => s.id === state.previewSlideId);
           if (currentIndex >= 0 && currentIndex < currentItem.slides.length - 1) {
             state.previewSlideId = currentItem.slides[currentIndex + 1].id;
@@ -120,9 +145,25 @@ export const presentationSlice = createSlice({
       state.liveSlideId = action.payload.slideId;
       state.isLive = true;
 
-      // Set preview to next slide
       const currentItem = state.rundown.find((r) => r.id === action.payload.rundownId);
       if (currentItem) {
+        const targetSlide = currentItem.slides.find((s) => s.id === action.payload.slideId);
+        if (targetSlide && targetSlide.videoType && targetSlide.videoType !== 'none') {
+          state.videoPlayback.currentTime = targetSlide.videoStartTime || 0;
+          state.videoPlayback.isPlaying = targetSlide.autoPlay !== false;
+          state.videoPlayback.isLooping = Boolean(targetSlide.loop || targetSlide.videoLoop);
+          if (targetSlide.videoVolume !== undefined) {
+            state.videoPlayback.volume = targetSlide.videoVolume;
+          }
+          if (targetSlide.videoMuted !== undefined) {
+            state.videoPlayback.isMuted = targetSlide.videoMuted;
+          }
+          if (targetSlide.videoPlaybackRate !== undefined) {
+            state.videoPlayback.playbackRate = targetSlide.videoPlaybackRate;
+          }
+        }
+
+        // Set preview to next slide
         const currentIndex = currentItem.slides.findIndex((s) => s.id === action.payload.slideId);
         if (currentIndex >= 0 && currentIndex < currentItem.slides.length - 1) {
           state.previewSlideId = currentItem.slides[currentIndex + 1].id;
@@ -188,6 +229,18 @@ export const presentationSlice = createSlice({
         videoPath?: string;
         youtubeUrl?: string;
         videoType?: 'local' | 'youtube' | 'none';
+        autoPlay?: boolean;
+        loop?: boolean;
+        videoLoop?: boolean;
+        videoVolume?: number;
+        videoMuted?: boolean;
+        videoPlaybackRate?: number;
+        videoStartTime?: number;
+        videoEndTime?: number;
+        videoFit?: 'contain' | 'cover' | 'fill';
+        videoTransition?: 'CUT' | 'FADE' | 'CROSSFADE';
+        videoTransitionDuration?: number;
+        videoTitle?: string;
       }>
     ) => {
       const item = state.rundown.find((r) => r.id === action.payload.rundownId);
@@ -213,6 +266,42 @@ export const presentationSlice = createSlice({
           }
           if (action.payload.videoType !== undefined) {
             slide.videoType = action.payload.videoType;
+          }
+          if (action.payload.autoPlay !== undefined) {
+            slide.autoPlay = action.payload.autoPlay;
+          }
+          if (action.payload.loop !== undefined) {
+            slide.loop = action.payload.loop;
+          }
+          if (action.payload.videoLoop !== undefined) {
+            slide.videoLoop = action.payload.videoLoop;
+          }
+          if (action.payload.videoVolume !== undefined) {
+            slide.videoVolume = action.payload.videoVolume;
+          }
+          if (action.payload.videoMuted !== undefined) {
+            slide.videoMuted = action.payload.videoMuted;
+          }
+          if (action.payload.videoPlaybackRate !== undefined) {
+            slide.videoPlaybackRate = action.payload.videoPlaybackRate;
+          }
+          if (action.payload.videoStartTime !== undefined) {
+            slide.videoStartTime = action.payload.videoStartTime;
+          }
+          if (action.payload.videoEndTime !== undefined) {
+            slide.videoEndTime = action.payload.videoEndTime;
+          }
+          if (action.payload.videoFit !== undefined) {
+            slide.videoFit = action.payload.videoFit;
+          }
+          if (action.payload.videoTransition !== undefined) {
+            slide.videoTransition = action.payload.videoTransition;
+          }
+          if (action.payload.videoTransitionDuration !== undefined) {
+            slide.videoTransitionDuration = action.payload.videoTransitionDuration;
+          }
+          if (action.payload.videoTitle !== undefined) {
+            slide.videoTitle = action.payload.videoTitle;
           }
         }
       }
@@ -314,6 +403,43 @@ export const presentationSlice = createSlice({
         state.previewSlideId = action.payload[0].slides[0]?.id || null;
       }
     },
+    setVideoPlaying: (state, action: PayloadAction<boolean>) => {
+      state.videoPlayback.isPlaying = action.payload;
+    },
+    toggleVideoPlay: (state) => {
+      state.videoPlayback.isPlaying = !state.videoPlayback.isPlaying;
+    },
+    setVideoCurrentTime: (state, action: PayloadAction<number>) => {
+      state.videoPlayback.currentTime = action.payload;
+    },
+    setVideoDuration: (state, action: PayloadAction<number>) => {
+      state.videoPlayback.duration = action.payload;
+    },
+    setVideoVolume: (state, action: PayloadAction<number>) => {
+      state.videoPlayback.volume = Math.max(0, Math.min(1, action.payload));
+      if (action.payload > 0) {
+        state.videoPlayback.isMuted = false;
+      }
+    },
+    setVideoMuted: (state, action: PayloadAction<boolean>) => {
+      state.videoPlayback.isMuted = action.payload;
+    },
+    toggleVideoMute: (state) => {
+      state.videoPlayback.isMuted = !state.videoPlayback.isMuted;
+    },
+    setVideoPlaybackRate: (state, action: PayloadAction<number>) => {
+      state.videoPlayback.playbackRate = action.payload;
+    },
+    setVideoLooping: (state, action: PayloadAction<boolean>) => {
+      state.videoPlayback.isLooping = action.payload;
+    },
+    toggleVideoLoop: (state) => {
+      state.videoPlayback.isLooping = !state.videoPlayback.isLooping;
+    },
+    restartVideo: (state) => {
+      state.videoPlayback.currentTime = 0;
+      state.videoPlayback.isPlaying = true;
+    },
   },
 });
 
@@ -345,6 +471,17 @@ export const {
   reorderRundown,
   reorderSlides,
   setLoadedRundown,
+  setVideoPlaying,
+  toggleVideoPlay,
+  setVideoCurrentTime,
+  setVideoDuration,
+  setVideoVolume,
+  setVideoMuted,
+  toggleVideoMute,
+  setVideoPlaybackRate,
+  setVideoLooping,
+  toggleVideoLoop,
+  restartVideo,
 } = presentationSlice.actions;
 
 export const presentationReducer = presentationSlice.reducer;

@@ -36,7 +36,7 @@ export const findRundownItemById = (rundown: RundownItem[], itemId: string): Run
   return rundown.find(item => item.id === itemId) || null;
 };
 
-export const createNewSlide = (section: string = 'New Slide', lines: string[] = ['New content']): Slide => {
+export const createNewSlide = (section = 'New Slide', lines: string[] = ['New content']): Slide => {
   return {
     id: `s-${Date.now()}`,
     section,
@@ -47,7 +47,7 @@ export const createNewSlide = (section: string = 'New Slide', lines: string[] = 
 export const createNewRundownItem = (
   title: string,
   type: RundownItem['type'],
-  time: string = '09:30'
+  time = '09:30'
 ): Omit<RundownItem, 'id'> => {
   return {
     title,

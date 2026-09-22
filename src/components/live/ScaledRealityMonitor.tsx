@@ -1,6 +1,14 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Slide } from '../../store/features/presentation';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import {
+  Slide,
+  selectVideoPlayback,
+  setVideoDuration,
+  setVideoCurrentTime,
+  setVideoPlaying,
+} from '../../store/features/presentation';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
+import { buildYouTubeEmbedUrl } from '../../utils/videoHelpers';
 
 export interface ScaledRealityMonitorProps {
   slide: Slide | null;
@@ -25,11 +33,15 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
   emptyLabel = '[No Content]',
   isLive = false,
 }) => {
+  const dispatch = useAppDispatch();
+  const videoPlayback = useAppSelector(selectVideoPlayback);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [scale, setScale] = useState<number>(0.1875);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const lastDispatchedTimeRef = useRef<number>(0);
 
+  // Responsive scale factor to fit 1920x1080 stage inside container
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -42,30 +54,119 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     };
 
     updateScale();
-
     const resizeObserver = new ResizeObserver(updateScale);
     resizeObserver.observe(el);
 
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Auto-play video when slide changes and is live
+  const hasVideo = Boolean(
+    slide &&
+      (slide.videoType === 'local' ||
+        slide.videoType === 'youtube' ||
+        slide.videoUrl ||
+        slide.videoPath ||
+        slide.youtubeUrl) &&
+      slide.videoType !== 'none'
+  );
+
+  const isYouTubeVideo = Boolean(
+    slide &&
+      (slide.videoType === 'youtube' ||
+        (slide.youtubeUrl && !slide.videoPath && !slide.videoUrl))
+  );
+
+  const isLocalVideo = Boolean(
+    hasVideo && !isYouTubeVideo && (slide?.videoPath || slide?.videoUrl)
+  );
+
+  const localVideoSrc = slide?.videoPath || slide?.videoUrl || '';
+
+  // Synchronize local video element with Redux playback state when Live
   useEffect(() => {
-    if (videoRef.current && slide && isLive) {
-      if (slide.videoType === 'local' && (slide.videoUrl || slide.videoPath)) {
-        videoRef.current.currentTime = 0;
-        videoRef.current.play().catch(err => console.log('Video autoplay blocked:', err));
-        setIsVideoPlaying(true);
+    if (!isLive || !videoRef.current || !isLocalVideo) return;
+    const v = videoRef.current;
+
+    // Play / Pause
+    if (videoPlayback.isPlaying && v.paused) {
+      v.play().catch((err) => console.log('Video play deferred:', err));
+    } else if (!videoPlayback.isPlaying && !v.paused) {
+      v.pause();
+    }
+
+    // Volume & Mute
+    v.volume = videoPlayback.volume;
+    v.muted = videoPlayback.isMuted;
+
+    // Playback rate
+    if (v.playbackRate !== videoPlayback.playbackRate) {
+      v.playbackRate = videoPlayback.playbackRate;
+    }
+
+    // Loop
+    const shouldLoop = Boolean(slide?.loop ?? slide?.videoLoop ?? videoPlayback.isLooping);
+    if (v.loop !== shouldLoop) {
+      v.loop = shouldLoop;
+    }
+  }, [
+    isLive,
+    isLocalVideo,
+    videoPlayback.isPlaying,
+    videoPlayback.volume,
+    videoPlayback.isMuted,
+    videoPlayback.playbackRate,
+    videoPlayback.isLooping,
+    slide?.loop,
+    slide?.videoLoop,
+  ]);
+
+  // Synchronize external seeks (when user drags timeline seekbar)
+  useEffect(() => {
+    if (!isLive || !videoRef.current || !isLocalVideo) return;
+    const v = videoRef.current;
+    if (Math.abs(v.currentTime - videoPlayback.currentTime) > 1.0) {
+      v.currentTime = videoPlayback.currentTime;
+    }
+  }, [isLive, isLocalVideo, videoPlayback.currentTime]);
+
+  // When live slide changes, reset video time if configured
+  useEffect(() => {
+    if (!isLive || !videoRef.current || !isLocalVideo) return;
+    const v = videoRef.current;
+    const startTime = slide?.videoStartTime || 0;
+    v.currentTime = startTime;
+    if (slide?.autoPlay !== false) {
+      v.play().catch((err) => console.log('Autoplay deferred:', err));
+      dispatch(setVideoPlaying(true));
+    }
+  }, [slide?.id, isLive, isLocalVideo, slide?.videoStartTime, slide?.autoPlay, dispatch]);
+
+  const handleLoadedMetadata = useCallback(() => {
+    if (!videoRef.current) return;
+    const dur = videoRef.current.duration;
+    if (isLive && !isNaN(dur) && dur > 0) {
+      dispatch(setVideoDuration(dur));
+    }
+  }, [isLive, dispatch]);
+
+  const handleTimeUpdate = useCallback(() => {
+    if (!isLive || !videoRef.current) return;
+    const cur = videoRef.current.currentTime;
+    // Throttle dispatch to every 0.25 seconds
+    if (Math.abs(cur - lastDispatchedTimeRef.current) >= 0.25) {
+      lastDispatchedTimeRef.current = cur;
+      dispatch(setVideoCurrentTime(cur));
+    }
+  }, [isLive, dispatch]);
+
+  const handleEnded = useCallback(() => {
+    if (isLive) {
+      const isLoop = Boolean(slide?.loop ?? slide?.videoLoop ?? videoPlayback.isLooping);
+      if (!isLoop) {
+        dispatch(setVideoPlaying(false));
       }
     }
-  }, [slide, isLive]);
-
-  // Get YouTube video ID from URL
-  const getYouTubeId = (url: string): string | null => {
-    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-    const match = url.match(regex);
-    return match ? match[1] : null;
-  };
+  }, [isLive, slide?.loop, slide?.videoLoop, videoPlayback.isLooping, dispatch]);
 
   // Compute responsive typographic scale for 1920x1080 canvas
   const lines = slide?.lines || [];
@@ -89,22 +190,16 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     lineHeight = 1.25;
   }
 
-  const hasVideo = slide?.videoType && slide.videoType !== 'none';
-  const isLocalVideo = slide?.videoType === 'local' && (slide.videoUrl || slide.videoPath);
-  const isYouTubeVideo = slide?.videoType === 'youtube' && slide.youtubeUrl;
-  const youtubeId = isYouTubeVideo ? getYouTubeId(slide.youtubeUrl) : null;
-
-  const handleVideoToggle = () => {
-    if (videoRef.current) {
-      if (isVideoPlaying) {
-        videoRef.current.pause();
-        setIsVideoPlaying(false);
-      } else {
-        videoRef.current.play();
-        setIsVideoPlaying(true);
-      }
-    }
-  };
+  // Build YouTube embed URL if applicable
+  const youtubeUrl = isYouTubeVideo
+    ? buildYouTubeEmbedUrl(slide?.youtubeUrl || '', {
+        autoplay: isLive && slide?.autoPlay !== false,
+        loop: Boolean(slide?.loop ?? slide?.videoLoop),
+        mute: !isLive || Boolean(slide?.videoMuted),
+        startTime: slide?.videoStartTime,
+        controls: true,
+      })
+    : null;
 
   return (
     <div
@@ -138,28 +233,46 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
 
         {/* Video Layer */}
         {hasVideo && !isBlackout && (
-          <div className="stage-video-layer">
-            {isLocalVideo && (
+          <div
+            className={`stage-video-layer ${
+              transitionType === 'FADE' ? 'is-video-fade' : ''
+            }`}
+            style={{
+              animation:
+                transitionType === 'FADE'
+                  ? `stageVideoFadeIn ${fadeDuration}s ease-out`
+                  : 'none',
+              zIndex: 5,
+            }}
+          >
+            {isLocalVideo && localVideoSrc && (
               <video
                 ref={videoRef}
-                src={slide.videoPath || slide.videoUrl}
-                autoPlay={isLive}
-                loop={slide.loop || false}
-                muted={false}
+                src={localVideoSrc}
+                autoPlay={isLive && slide?.autoPlay !== false}
+                loop={Boolean(slide?.loop ?? slide?.videoLoop ?? videoPlayback.isLooping)}
+                muted={!isLive || videoPlayback.isMuted}
                 playsInline
                 style={{
                   width: '100%',
                   height: '100%',
-                  objectFit: 'contain',
+                  objectFit: slide?.videoFit || 'contain',
                 }}
-                onPlay={() => setIsVideoPlaying(true)}
-                onPause={() => setIsVideoPlaying(false)}
-                onEnded={() => setIsVideoPlaying(false)}
+                onLoadedMetadata={handleLoadedMetadata}
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={handleEnded}
+                onPlay={() => {
+                  if (isLive) dispatch(setVideoPlaying(true));
+                }}
+                onPause={() => {
+                  if (isLive) dispatch(setVideoPlaying(false));
+                }}
               />
             )}
-            {isYouTubeVideo && youtubeId && (
+
+            {isYouTubeVideo && youtubeUrl && (
               <iframe
-                src={`https://www.youtube.com/embed/${youtubeId}?autoplay=${isLive ? 1 : 0}&controls=1&mute=0&rel=0&modestbranding=1`}
+                src={youtubeUrl}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 style={{
@@ -167,21 +280,8 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
                   height: '100%',
                   border: 'none',
                 }}
-                title={slide.section || 'Video'}
+                title={slide?.videoTitle || slide?.section || 'YouTube Video'}
               />
-            )}
-            {/* Video Controls Overlay */}
-            {isLocalVideo && (
-              <div className="stage-video-controls">
-                <button
-                  type="button"
-                  className="video-control-btn"
-                  onClick={handleVideoToggle}
-                  title={isVideoPlaying ? 'Pause' : 'Play'}
-                >
-                  {isVideoPlaying ? '⏸' : '▶'}
-                </button>
-              </div>
             )}
           </div>
         )}
@@ -213,7 +313,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
           </div>
         )}
 
-        {/* Reality Content State */}
+        {/* Reality Content State (Lyrics or Overrides) */}
         {isBlackout ? (
           <div className="stage-blackout-state">
             <span className="stage-badge-blackout">&bull; BLACKOUT ACTIVE &bull;</span>
@@ -226,7 +326,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
           <div className="stage-cleared-state">
             <span>[ Text Cleared &bull; Background Only ]</span>
           </div>
-        ) : slide && !hasVideo && lines.length > 0 ? (
+        ) : slide && lines.length > 0 ? (
           <div
             key={slide.id}
             className={`stage-lyrics-wrap ${

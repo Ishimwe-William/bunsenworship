@@ -390,12 +390,15 @@ export const MediaLibraryScreen: React.FC = () => {
       );
     } else {
       // Video / Still image
+      const isVideoAsset = asset.format === 'MOV' || asset.format === 'MP4' || Boolean(asset.videoUrl || asset.youtubeUrl);
+      const isYouTube = Boolean(asset.youtubeUrl);
+
       dispatch(
         addRundownItem({
           title: asset.title,
           subtitle: `${asset.format} ${asset.resolution || 'Media'} • ${asset.durationOrSlides}`,
           time: '09:00',
-          type: asset.format === 'MOV' || asset.format === 'MP4' ? 'LOOP' : 'IMAGE',
+          type: isVideoAsset ? 'LOOP' : 'IMAGE',
           slides: [
             {
               id: `s-media-${Date.now()}`,
@@ -403,6 +406,15 @@ export const MediaLibraryScreen: React.FC = () => {
               lines: [],
               imageUrl: asset.thumbnailUrl,
               imageFit: 'cover',
+              videoType: isYouTube ? 'youtube' : (isVideoAsset ? 'local' : 'none'),
+              videoUrl: asset.videoUrl || asset.filePath,
+              videoPath: asset.filePath || asset.videoUrl,
+              youtubeUrl: asset.youtubeUrl,
+              autoPlay: true,
+              loop: true,
+              videoLoop: true,
+              videoFit: 'contain',
+              videoTitle: asset.title,
             },
           ],
         })

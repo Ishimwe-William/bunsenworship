@@ -766,5 +766,116 @@ export const VideoIcon: React.FC<IconProps> = ({ className = '', size = 16, styl
   </svg>
 );
 
+export const PauseIcon: React.FC<IconProps> = ({ className = '', size = 16, style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <rect x="6" y="4" width="4" height="16" />
+    <rect x="14" y="4" width="4" height="16" />
+  </svg>
+);
+
+export const VolumeIcon: React.FC<IconProps> = ({ className = '', size = 16, style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+  </svg>
+);
+
+export const VolumeXIcon: React.FC<IconProps> = ({ className = '', size = 16, style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+    <line x1="23" y1="9" x2="17" y2="15" />
+    <line x1="17" y1="9" x2="23" y2="15" />
+  </svg>
+);
+
+export const RepeatIcon: React.FC<IconProps> = ({ className = '', size = 16, style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <polyline points="17 1 21 5 17 9" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <polyline points="7 23 3 19 7 15" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+  </svg>
+);
+
+export const RotateCcwIcon: React.FC<IconProps> = ({ className = '', size = 16, style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+  </svg>
+);
+
+export const YoutubeIcon: React.FC<IconProps> = ({ className = '', size = 16, style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" />
+    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" />
+  </svg>
+);
+
 
 

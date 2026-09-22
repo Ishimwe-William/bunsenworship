@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Slide } from '../../store/features/presentation';
+import React, { useEffect, useState, useRef } from 'react';
+import { Slide, VideoPlaybackState } from '../../store/features/presentation';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
+import { buildYouTubeEmbedUrl } from '../../utils/videoHelpers';
 
 export interface ProjectorPayload {
   slide: Slide | null;
@@ -11,12 +12,15 @@ export interface ProjectorPayload {
   transitionType: 'CUT' | 'FADE';
   fadeDuration: number;
   source: 'LIVE' | 'PREVIEW';
+  videoPlayback?: VideoPlaybackState;
 }
 
 const DEFAULT_GRADIENT =
   'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)';
 
 export const ProjectorWindowView: React.FC = () => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   const [state, setState] = useState<ProjectorPayload>(() => {
     try {
       const saved = localStorage.getItem('bunsenworship_projector_state');
@@ -97,12 +101,66 @@ export const ProjectorWindowView: React.FC = () => {
     };
   }, []);
 
+  const slide = state.slide;
+
+  const hasVideo = Boolean(
+    slide &&
+      (slide.videoType === 'local' ||
+        slide.videoType === 'youtube' ||
+        slide.videoUrl ||
+        slide.videoPath ||
+        slide.youtubeUrl) &&
+      slide.videoType !== 'none'
+  );
+
+  const isYouTubeVideo = Boolean(
+    slide &&
+      (slide.videoType === 'youtube' ||
+        (slide.youtubeUrl && !slide.videoPath && !slide.videoUrl))
+  );
+
+  const isLocalVideo = Boolean(
+    hasVideo && !isYouTubeVideo && (slide?.videoPath || slide?.videoUrl)
+  );
+
+  const localVideoSrc = slide?.videoPath || slide?.videoUrl || '';
+
+  // Synchronize projector local video playback with operator console
+  useEffect(() => {
+    if (!videoRef.current || !isLocalVideo) return;
+    const v = videoRef.current;
+    const pb = state.videoPlayback;
+    if (!pb) return;
+
+    if (pb.isPlaying && v.paused) {
+      v.play().catch((err) => console.log('Projector video play deferred:', err));
+    } else if (!pb.isPlaying && !v.paused) {
+      v.pause();
+    }
+
+    v.volume = pb.volume;
+    v.muted = pb.isMuted;
+
+    if (v.playbackRate !== pb.playbackRate) {
+      v.playbackRate = pb.playbackRate;
+    }
+
+    const shouldLoop = Boolean(slide?.loop ?? slide?.videoLoop ?? pb.isLooping);
+    if (v.loop !== shouldLoop) {
+      v.loop = shouldLoop;
+    }
+
+    if (Math.abs(v.currentTime - pb.currentTime) > 1.0) {
+      v.currentTime = pb.currentTime;
+    }
+  }, [isLocalVideo, state.videoPlayback, slide?.loop, slide?.videoLoop]);
+
   // Compute responsive scale factor to fit 1920x1080 stage inside any window resolution
   const scaleX = viewportSize.width / 1920;
   const scaleY = viewportSize.height / 1080;
   const scale = Math.min(scaleX, scaleY);
 
-  const lines = state.slide?.lines || [];
+  const lines = slide?.lines || [];
   const lineCount = lines.length;
   const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
 
@@ -123,6 +181,16 @@ export const ProjectorWindowView: React.FC = () => {
     lineHeight = 1.25;
   }
 
+  const youtubeUrl = isYouTubeVideo
+    ? buildYouTubeEmbedUrl(slide?.youtubeUrl || '', {
+        autoplay: slide?.autoPlay !== false,
+        loop: Boolean(slide?.loop ?? slide?.videoLoop),
+        mute: Boolean(slide?.videoMuted),
+        startTime: slide?.videoStartTime,
+        controls: false,
+      })
+    : null;
+
   return (
     <div
       style={{
@@ -142,6 +210,17 @@ export const ProjectorWindowView: React.FC = () => {
       onMouseEnter={() => setShowHud(true)}
       onMouseLeave={() => setShowHud(false)}
     >
+      <style>{`
+        @keyframes stageVideoFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes stageFadeIn {
+          from { opacity: 0; transform: translateY(12px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
+
       {/* Background Layer (Fills entire screen edge-to-edge) */}
       <div
         style={{
@@ -191,8 +270,57 @@ export const ProjectorWindowView: React.FC = () => {
           justifyContent: 'center',
         }}
       >
+        {/* Video Layer */}
+        {hasVideo && !state.isBlackout && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 5,
+              overflow: 'hidden',
+              animation:
+                state.transitionType === 'FADE'
+                  ? `stageVideoFadeIn ${state.fadeDuration}s ease-out`
+                  : 'none',
+            }}
+          >
+            {isLocalVideo && localVideoSrc && (
+              <video
+                ref={videoRef}
+                src={localVideoSrc}
+                autoPlay={slide?.autoPlay !== false}
+                loop={Boolean(slide?.loop ?? slide?.videoLoop ?? state.videoPlayback?.isLooping)}
+                muted={Boolean(state.videoPlayback?.isMuted)}
+                playsInline
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: slide?.videoFit || 'contain',
+                }}
+              />
+            )}
+
+            {isYouTubeVideo && youtubeUrl && (
+              <iframe
+                src={youtubeUrl}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                }}
+                title={slide?.videoTitle || slide?.section || 'YouTube Video'}
+              />
+            )}
+          </div>
+        )}
+
         {/* Slide Image Layer */}
-        {state.slide?.imageUrl && !state.isBlackout && (
+        {slide?.imageUrl && !state.isBlackout && !hasVideo && (
           <div
             style={{
               position: 'absolute',
@@ -205,20 +333,20 @@ export const ProjectorWindowView: React.FC = () => {
             }}
           >
             <img
-              src={state.slide.imageUrl}
-              alt={state.slide.section || 'Slide Graphic'}
+              src={slide.imageUrl}
+              alt={slide.section || 'Slide Graphic'}
               style={{
                 width: '100%',
                 height: '100%',
                 objectFit:
-                  state.slide.imageFit || (lines.length > 0 ? 'cover' : 'contain'),
+                  slide.imageFit || (lines.length > 0 ? 'cover' : 'contain'),
                 filter: lines.length > 0 ? 'brightness(0.72)' : 'none',
               }}
             />
           </div>
         )}
 
-        {/* Stage Content */}
+        {/* Stage Content (Lyrics or Overrides) */}
         {state.isBlackout ? (
           <div style={{ position: 'relative', zIndex: 10 }} />
         ) : state.isLogoActive ? (
@@ -233,9 +361,9 @@ export const ProjectorWindowView: React.FC = () => {
           </div>
         ) : state.isTextCleared ? (
           <div style={{ position: 'relative', zIndex: 10 }} />
-        ) : state.slide && lines.length > 0 ? (
+        ) : slide && lines.length > 0 ? (
           <div
-            key={state.slide.id}
+            key={slide.id}
             style={{
               position: 'relative',
               zIndex: 10,
@@ -268,7 +396,7 @@ export const ProjectorWindowView: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : state.slide?.imageUrl ? null : (
+        ) : slide?.imageUrl || hasVideo ? null : (
           <div
             style={{
               position: 'relative',

@@ -73,10 +73,10 @@ export const convertImageToAsset = (img: ImageMediaRecord): ProMediaAsset => {
   };
 };
 
+import { parseYouTubeId } from './videoHelpers';
+
 export const extractYouTubeId = (url: string): string | null => {
-  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-  const match = url.match(regex);
-  return match ? match[1] : null;
+  return parseYouTubeId(url);
 };
 
 export const generateAssetId = (type: string): string => {

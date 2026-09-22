@@ -111,7 +111,6 @@ export const ServiceRundown: React.FC = () => {
 
   // 2. Automatically persist rundown changes to local DB (debounced)
   const isInitialMount = useRef(true);
-  const hasLoadedFromDb = useRef(false);
   
   useEffect(() => {
     // Skip saving during initial load

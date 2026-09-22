@@ -8,12 +8,23 @@ export interface Slide {
   background?: string;
   imageUrl?: string;
   imageFit?: 'cover' | 'contain';
+  // Video fields
   videoUrl?: string;
   videoPath?: string;
   youtubeUrl?: string;
   videoType?: 'local' | 'youtube' | 'none';
   autoPlay?: boolean;
   loop?: boolean;
+  videoLoop?: boolean;
+  videoVolume?: number; // 0.0 to 1.0, default 1.0
+  videoMuted?: boolean;
+  videoPlaybackRate?: number; // 0.5, 0.75, 1.0, 1.25, 1.5, 2.0
+  videoStartTime?: number; // in seconds
+  videoEndTime?: number; // in seconds
+  videoFit?: 'contain' | 'cover' | 'fill';
+  videoTransition?: 'CUT' | 'FADE' | 'CROSSFADE';
+  videoTransitionDuration?: number; // in seconds
+  videoTitle?: string;
 }
 
 export interface RundownItem {
@@ -41,6 +52,16 @@ export interface BackgroundTheme {
   imageUrl?: string;
 }
 
+export interface VideoPlaybackState {
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  volume: number; // 0.0 to 1.0
+  isMuted: boolean;
+  playbackRate: number; // 0.5 to 2.0
+  isLooping: boolean;
+}
+
 export interface PresentationState {
   isLive: boolean;
   isBlackout: boolean;
@@ -55,4 +76,5 @@ export interface PresentationState {
   rundown: RundownItem[];
   backgroundThemes: BackgroundTheme[];
   activeBackgroundId: string;
+  videoPlayback: VideoPlaybackState;
 }

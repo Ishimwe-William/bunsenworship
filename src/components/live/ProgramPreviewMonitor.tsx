@@ -10,6 +10,7 @@ import {
   selectIsBlackout,
   selectIsTextCleared,
   selectIsLogoActive,
+  selectVideoPlayback,
   takeLive,
   advanceSlide,
   previousSlide,
@@ -23,6 +24,7 @@ import {
 } from '../../store/features/presentation';
 import { PlayIcon, SlidersIcon, MonitorIcon } from '../common/Icons';
 import { ScaledRealityMonitor } from './ScaledRealityMonitor';
+import { VideoControlDeck } from './VideoControlDeck';
 
 export const ProgramPreviewMonitor: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -35,6 +37,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
   const isBlackout = useAppSelector(selectIsBlackout);
   const isTextCleared = useAppSelector(selectIsTextCleared);
   const isLogoActive = useAppSelector(selectIsLogoActive);
+  const videoPlayback = useAppSelector(selectVideoPlayback);
 
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [projectorSource, setProjectorSource] = useState<'LIVE' | 'PREVIEW'>('LIVE');
@@ -53,6 +56,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
       transitionType,
       fadeDuration,
       source: projectorSource,
+      videoPlayback,
     };
 
     // Save as persistent fallback
@@ -83,6 +87,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
     isLogoActive,
     transitionType,
     fadeDuration,
+    videoPlayback,
   ]);
 
   // Synchronize on state changes
@@ -212,6 +217,8 @@ export const ProgramPreviewMonitor: React.FC = () => {
           emptyLabel="[No Active Live Slide]"
           isLive={true}
         />
+
+        <VideoControlDeck slide={liveSlide} isLive={true} />
       </div>
 
       {/* 2. NEXT PREVIEW MONITOR */}

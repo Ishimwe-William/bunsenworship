@@ -26,6 +26,7 @@ export const PRO_MEDIA_ASSETS: ProMediaAsset[] = [
     resolution: '4K',
     durationOrSlides: '0:30',
     sourceCategory: 'VIDEO',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     thumbnailUrl: svgToDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
         <defs>
@@ -89,6 +90,7 @@ export const PRO_MEDIA_ASSETS: ProMediaAsset[] = [
     resolution: '1080p',
     durationOrSlides: '1:00',
     sourceCategory: 'VIDEO',
+    youtubeUrl: 'https://www.youtube.com/watch?v=nQWFzMvCfLE',
     thumbnailUrl: svgToDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
         <defs>

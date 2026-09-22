@@ -1,4 +1,4 @@
-import { PresentationState, RundownItem, Slide, BackgroundTheme } from './types';
+import { PresentationState, RundownItem, Slide, BackgroundTheme, VideoPlaybackState } from './types';
 
 export interface HasPresentationState {
   presentation: PresentationState;
@@ -72,3 +72,6 @@ export const selectActiveBackground = (state: HasPresentationState): BackgroundT
     themes[0]
   );
 };
+
+export const selectVideoPlayback = (state: HasPresentationState): VideoPlaybackState =>
+  state.presentation.videoPlayback;

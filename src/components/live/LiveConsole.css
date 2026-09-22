@@ -947,6 +947,19 @@
   }
 }
 
+.stage-video-layer.is-video-fade {
+  animation: stageVideoFadeIn ease-out forwards;
+}
+
+@keyframes stageVideoFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .stage-lyrics-text {
   max-width: 1780px;
   width: 100%;
