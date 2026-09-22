@@ -11,7 +11,7 @@ import {
 } from '../../store';
 import { useLanguage } from '../language';
 import { GoogleSignInButton } from './GoogleSignInButton';
-import { AlertCircleIcon, EyeIcon, EyeOffIcon, LightbulbIcon } from '../common/Icons';
+import { AlertCircleIcon, EyeIcon, EyeOffIcon } from '../common/Icons';
 
 export const LoginForm: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -74,19 +74,6 @@ export const LoginForm: React.FC = () => {
 
   const handleForgotPassword = () => {
     dispatch(setAuthScreen('forgot-password'));
-  };
-
-  const handleQuickDemo = () => {
-    dispatch(
-      loginSuccess({
-        id: 'demo_user',
-        name: 'Pastor Jean-Claude',
-        email: 'pastor.jc@outlook.com',
-        role: 'Senior Worship Director',
-        authProvider: 'email',
-        churchName: 'Grace Chapel Kigali',
-      }),
-    );
   };
 
   return (
