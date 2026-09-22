@@ -4,6 +4,7 @@ import { navigationReducer } from './features/navigation';
 import { languageReducer } from './features/language';
 import { authReducer } from './features/auth';
 import { presentationReducer } from './features/presentation';
+import { notificationsReducer } from './features/notifications';
 
 /**
  * Root reducer combining all modular feature reducers.
@@ -15,6 +16,7 @@ export const rootReducer = combineReducers({
   language: languageReducer,
   auth: authReducer,
   presentation: presentationReducer,
+  notifications: notificationsReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

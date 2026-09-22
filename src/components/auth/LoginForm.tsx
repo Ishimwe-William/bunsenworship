@@ -7,8 +7,8 @@ import {
   setAuthScreen,
   setError,
   setLoading,
-} from '../../store/features/auth';
-import { isValidEmail } from '../../store/features/auth/authService';
+  isValidEmail,
+} from '../../store';
 import { useLanguage } from '../language';
 import { GoogleSignInButton } from './GoogleSignInButton';
 import { AlertCircleIcon, EyeIcon, EyeOffIcon, LightbulbIcon } from '../common/Icons';
@@ -121,9 +121,6 @@ export const LoginForm: React.FC = () => {
               required
             />
           </div>
-          <span className="auth-hint">
-            Accepts any email provider (Gmail, Outlook, Yahoo, Proton, or custom domain)
-          </span>
         </div>
 
         {/* Password Field */}
@@ -206,24 +203,6 @@ export const LoginForm: React.FC = () => {
         >
           {t.auth.createOne}
         </button>
-      </div>
-
-      {/* One-click quick demo login helper */}
-      <div className="auth-demo-hint">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '4px' }}>
-          <LightbulbIcon size={14} />
-          <span>{t.auth.demoHint}</span>
-        </div>
-        <div>
-          <button
-            type="button"
-            className="auth-link"
-            onClick={handleQuickDemo}
-            style={{ textDecoration: 'underline' }}
-          >
-            &rarr; Click here for 1-Click Demo Login
-          </button>
-        </div>
       </div>
     </div>
   );

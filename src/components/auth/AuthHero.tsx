@@ -2,6 +2,7 @@ import React from 'react';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
 import { useLanguage } from '../language';
 import { useTheme } from '../theme';
+import pkg from '../../../package.json';
 
 export const AuthHero: React.FC = () => {
   const { language, t } = useLanguage();
@@ -57,7 +58,7 @@ export const AuthHero: React.FC = () => {
             <div className="dominant-badge-strip">
               <span className="dominant-pro-badge">{t.common.consoleSubtitle}</span>
               <span className="dominant-dot-separator">&bull;</span>
-              <span className="dominant-version-tag">PRO PRESENTER v1.0.0</span>
+              <span className="dominant-version-tag">PRO PRESENTER v{pkg.version}</span>
             </div>
             <p className="dominant-brand-lead">
               {language === 'rw'
@@ -83,20 +84,23 @@ export const AuthHero: React.FC = () => {
               <BunsenWorshipLogo size={88} />
             </div>
             <span className="screen-card-song-title">
-              {language === 'rw' ? 'INDIRIMBO YA 124' : 'AMAZING GRACE'}
+              {language === 'rw' ? 'INDIRIMBO YA 361' : 'AMAZING GRACE'}
             </span>
             <p className="screen-card-lyrics">
               {language === 'rw' ? (
                 <>
-                  &ldquo;Ubuntu bw&apos;Imana buratangaje cyane,<br />
-                  Bwancunguye ubwo nari mu mwijima;<br />
-                  Nari impumyi none ubu ndareba...&rdquo;
+                  &ldquo;Mbeg&apos; ubuntu butangaje cyane!<br />
+                  Umutindi nkanjye gukizwa!<br />
+                  Ntabwo nabonaga, none ndabona.<br />
+                  Nakijijw&apos; ibyaha byanjye.&rdquo;
                 </>
               ) : (
                 <>
-                  &ldquo;My chains are gone, I&apos;ve been set free<br />
-                  My God, my Savior has ransomed me<br />
-                  And like a flood His mercy reigns...&rdquo;
+
+                  &ldquo;Amazing grace how sweet the sound,<br />
+                  That saved a wretch like me!<br />
+                  I once was lost, but now I&apos;m found;<br />
+                  Was blind but now I see.&rdquo;
                 </>
               )}
             </p>

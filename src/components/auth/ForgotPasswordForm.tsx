@@ -86,9 +86,6 @@ export const ForgotPasswordForm: React.FC = () => {
               required
             />
           </div>
-          <span className="auth-hint">
-            Accepts any email provider (Gmail, Outlook, Yahoo, Proton, or custom domain)
-          </span>
         </div>
 
         <button

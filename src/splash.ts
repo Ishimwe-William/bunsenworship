@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 
 export const createSplashScreen = (): BrowserWindow => {
   const splashWindow = new BrowserWindow({
@@ -195,7 +195,7 @@ export const createSplashScreen = (): BrowserWindow => {
       </div>
       <div class="splash-status-row">
         <span class="status-text" id="statusLabel">Initializing presentation engine...</span>
-        <span class="version-text">v1.0.0</span>
+        <span class="version-text">v${app.getVersion()}</span>
       </div>
     </div>
   </div>

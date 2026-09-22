@@ -7,6 +7,7 @@ import { ThemeToggle } from './components/theme';
 import { LanguageToggle, useLanguage } from './components/language';
 import { AuthContainer } from './components/auth';
 import { BroadcastControls } from './components/broadcast';
+import { NotificationBell } from './components/notifications';
 import {
   LiveShowScreen,
   MediaLibraryScreen,
@@ -75,6 +76,9 @@ export const App: React.FC = () => {
           </div>
 
           <div className="topbar-actions">
+            {/* Notification Bell (Release updates, alerts, future FCM) */}
+            <NotificationBell />
+
             {/* Language Switcher (EN / RW) */}
             <LanguageToggle variant="segmented" />
 

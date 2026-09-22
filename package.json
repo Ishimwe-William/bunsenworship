@@ -1,8 +1,8 @@
 {
   "name": "bunsenworship",
-  "productName": "Bunsen Worship",
+  "productName": "BunsenWorship",
   "version": "1.0.3",
-  "description": "Bunsen Worship is an Electron application for managing worship presentations.",
+  "description": "BunsenWorship is an Electron application for managing worship presentations.",
   "main": "dist/main/main.js",
   "package": "com.bunsenplus.worship",
   "private": true,
@@ -31,7 +31,7 @@
   },
   "build": {
     "appId": "com.bunsenplus.worship",
-    "productName": "Bunsen Worship",
+    "productName": "BunsenWorship",
     "files": [
       "dist/**/*",
       "src/assets/**/*",
@@ -55,7 +55,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Bunsen Worship",
+      "shortcutName": "BunsenWorship",
       "deleteAppDataOnUninstall": false,
       "installerSidebar": "buildResources/installerSidebar.bmp",
       "uninstallerSidebar": "buildResources/installerSidebar.bmp"

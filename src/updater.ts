@@ -1,16 +1,40 @@
-import { app } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 
 /**
  * Initializes automatic background updates for BunsenWorship via electron-updater.
  * Directly communicates with GitHub Releases (Ishimwe-William/bunsenworship).
- * When a new release is detected and downloaded, the update is applied cleanly.
+ * Dispatches live IPC events to the UI so users receive notifications via the notification bell.
  */
 export function setupAutoUpdater(): void {
-  // In development mode, skip autoUpdater
+  // Always register IPC handlers for renderer communication
+  ipcMain.handle('app:get-version', () => {
+    return app.getVersion();
+  });
+
+  ipcMain.on('updater:check-for-updates', () => {
+    if (!app.isPackaged) {
+      console.log('[AutoUpdater] In dev mode, check-for-updates simulated.');
+      return;
+    }
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error('[AutoUpdater] Manual check error:', err);
+    });
+  });
+
+  ipcMain.on('updater:restart-and-install', () => {
+    if (app.isPackaged) {
+      console.log('[AutoUpdater] User triggered restart & install.');
+      autoUpdater.quitAndInstall(false, true);
+    } else {
+      console.log('[AutoUpdater] Dev mode: restart & install acknowledged.');
+    }
+  });
+
+  // In development mode, skip electron-updater network polling
   if (!app.isPackaged) {
-    console.log('[AutoUpdater] Development mode detected; skipping background update service.');
+    console.log('[AutoUpdater] Development mode detected; skipping background update polling.');
     return;
   }
 
@@ -39,6 +63,16 @@ export function setupAutoUpdater(): void {
 
     autoUpdater.on('update-available', (info) => {
       console.log(`[AutoUpdater] Update available: v${info.version}`);
+      // Notify all open windows so the notification bell updates
+      BrowserWindow.getAllWindows().forEach((win) => {
+        if (!win.isDestroyed()) {
+          win.webContents.send('updater:update-available', {
+            version: info.version,
+            releaseDate: info.releaseDate,
+            releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined,
+          });
+        }
+      });
     });
 
     autoUpdater.on('update-not-available', () => {
@@ -51,8 +85,14 @@ export function setupAutoUpdater(): void {
 
     autoUpdater.on('update-downloaded', (info) => {
       console.log(`[AutoUpdater] Update v${info.version} downloaded successfully.`);
-      // Silently installs update without blocking user
-      autoUpdater.quitAndInstall(true, true);
+      // Notify all open windows so user can see notification and choose when to restart
+      BrowserWindow.getAllWindows().forEach((win) => {
+        if (!win.isDestroyed()) {
+          win.webContents.send('updater:update-downloaded', {
+            version: info.version,
+          });
+        }
+      });
     });
 
     // Check on startup
