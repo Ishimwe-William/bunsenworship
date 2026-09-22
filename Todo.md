@@ -1,3 +1,3 @@
 - Auth
 - FCM
-- Link to github issues
+- Link to GitHub issues

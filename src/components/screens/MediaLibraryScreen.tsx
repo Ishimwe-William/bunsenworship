@@ -92,17 +92,24 @@ export const MediaLibraryScreen: React.FC = () => {
   const [videoDuration, setVideoDuration] = useState('0:30');
   const [videoCategory, setVideoCategory] = useState<MediaSourceCategory>('VIDEO');
   const [videoDataUrl, setVideoDataUrl] = useState('');
+  const [videoFilePath, setVideoFilePath] = useState('');
+  const [videoYoutubeUrl, setVideoYoutubeUrl] = useState('');
+  const [videoSourceType, setVideoSourceType] = useState<'file' | 'youtube'>('file');
 
   // Form states - PPT
   const [pptTitle, setPptTitle] = useState('');
   const [pptFilePath, setPptFilePath] = useState('');
   const [pptSlideCount, setPptSlideCount] = useState(16);
   const [pptCategory, setPptCategory] = useState<MediaSourceCategory>('SPEAKER_DECK');
+  const [pptSourceType, setPptSourceType] = useState<'file' | 'url'>('file');
+  const [pptUrl, setPptUrl] = useState('');
 
   // Form states - Image
   const [imgTitle, setImgTitle] = useState('');
   const [imgDataUrl, setImgDataUrl] = useState('');
   const [imgCategory, setImgCategory] = useState<MediaSourceCategory>('ANNOUNCEMENTS');
+  const [imgSourceType, setImgSourceType] = useState<'file' | 'url'>('file');
+  const [imgUrl, setImgUrl] = useState('');
 
   // Form states - Canva
   const [canvaTitle, setCanvaTitle] = useState('');
@@ -116,6 +123,7 @@ export const MediaLibraryScreen: React.FC = () => {
   const [songLyrics, setSongLyrics] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
   const pptFileInputRef = useRef<HTMLInputElement>(null);
   const imgFileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
@@ -594,6 +602,15 @@ export const MediaLibraryScreen: React.FC = () => {
 
     if (modalTab === 'VIDEO') {
       if (!videoTitle.trim()) return;
+      if (videoSourceType === 'file' && !videoFilePath.trim()) {
+        showFeedback('Please select a video file or provide file path', 'error');
+        return;
+      }
+      if (videoSourceType === 'youtube' && !videoYoutubeUrl.trim()) {
+        showFeedback('Please provide a YouTube URL', 'error');
+        return;
+      }
+
       const newAsset: ProMediaAsset = {
         id: `asset-video-${Date.now()}`,
         title: videoTitle.trim(),
@@ -602,6 +619,8 @@ export const MediaLibraryScreen: React.FC = () => {
         durationOrSlides: videoDuration || '0:30',
         sourceCategory: videoCategory,
         thumbnailUrl: videoDataUrl || PRO_MEDIA_ASSETS[0].thumbnailUrl,
+        filePath: videoSourceType === 'file' ? videoFilePath.trim() : undefined,
+        youtubeUrl: videoSourceType === 'youtube' ? videoYoutubeUrl.trim() : undefined,
       };
 
       const updated = [newAsset, ...customAssets];
@@ -610,15 +629,27 @@ export const MediaLibraryScreen: React.FC = () => {
       setShowUploadModal(false);
       setVideoTitle('');
       setVideoDataUrl('');
+      setVideoFilePath('');
+      setVideoYoutubeUrl('');
+      setVideoSourceType('file');
       showFeedback(`Video loop "${newAsset.title}" uploaded!`);
     } else if (modalTab === 'PPT') {
       if (!pptTitle.trim()) return;
+      if (pptSourceType === 'file' && !pptFilePath.trim()) {
+        showFeedback('Please select a PowerPoint file or provide file path', 'error');
+        return;
+      }
+      if (pptSourceType === 'url' && !pptUrl.trim()) {
+        showFeedback('Please provide a PowerPoint URL', 'error');
+        return;
+      }
+
       const count = Number(pptSlideCount) || 12;
       const pptRecord: ExternalPresentationRecord = {
         id: `ppt-${Date.now()}`,
         title: pptTitle.trim(),
         type: 'PPT',
-        filePath: pptFilePath.trim() || undefined,
+        filePath: pptSourceType === 'file' ? pptFilePath.trim() : pptUrl.trim(),
         slideCount: count,
         slides: Array.from({ length: count }, (_, i) => ({
           id: `s-${Date.now()}-${i + 1}`,
@@ -633,17 +664,28 @@ export const MediaLibraryScreen: React.FC = () => {
       setShowUploadModal(false);
       setPptTitle('');
       setPptFilePath('');
+      setPptUrl('');
+      setPptSourceType('file');
       showFeedback(`PowerPoint "${pptRecord.title}" linked successfully!`);
     } else if (modalTab === 'IMAGE') {
-      if (!imgTitle.trim() || !imgDataUrl) {
-        showFeedback('Please provide a title and select an image', 'error');
+      if (!imgTitle.trim()) {
+        showFeedback('Please provide a title', 'error');
         return;
       }
+      if (imgSourceType === 'file' && !imgDataUrl) {
+        showFeedback('Please select an image file', 'error');
+        return;
+      }
+      if (imgSourceType === 'url' && !imgUrl.trim()) {
+        showFeedback('Please provide an image URL', 'error');
+        return;
+      }
+
       const newImg: ImageMediaRecord = {
         id: `img-${Date.now()}`,
         title: imgTitle.trim(),
-        category: 'BACKGROUND',
-        dataUrl: imgDataUrl,
+        category: imgCategory === 'ANNOUNCEMENTS' ? 'ANNOUNCEMENT' : imgCategory === 'SPEAKER_DECK' ? 'SERMON' : 'BACKGROUND',
+        dataUrl: imgSourceType === 'file' ? imgDataUrl : imgUrl.trim(),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -652,6 +694,8 @@ export const MediaLibraryScreen: React.FC = () => {
       setShowUploadModal(false);
       setImgTitle('');
       setImgDataUrl('');
+      setImgUrl('');
+      setImgSourceType('file');
       showFeedback(`Image "${newImg.title}" uploaded to library!`);
     } else if (modalTab === 'CANVA') {
       if (!canvaTitle.trim() || !canvaUrl.trim()) return;
@@ -1167,8 +1211,8 @@ export const MediaLibraryScreen: React.FC = () => {
             {/* TAB: Video / Motion */}
             {modalTab === 'VIDEO' && (
               <form onSubmit={handleSaveUpload} className="modal-body">
-                <div className="medialib-form-group">
-                  <label className="medialib-form-label">Video / Motion Loop Title *</label>
+                <div className="form-group">
+                  <label className="form-label">Video / Motion Loop Title *</label>
                   <input
                     type="text"
                     className="auth-input"
@@ -1179,6 +1223,76 @@ export const MediaLibraryScreen: React.FC = () => {
                     autoFocus
                   />
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label">Video Source</label>
+                  <div className="source-type-toggle">
+                    <button
+                      type="button"
+                      className={`source-type-btn ${videoSourceType === 'file' ? 'active' : ''}`}
+                      onClick={() => setVideoSourceType('file')}
+                    >
+                      Browse File
+                    </button>
+                    <button
+                      type="button"
+                      className={`source-type-btn ${videoSourceType === 'youtube' ? 'active' : ''}`}
+                      onClick={() => setVideoSourceType('youtube')}
+                    >
+                      YouTube URL
+                    </button>
+                  </div>
+                </div>
+
+                {videoSourceType === 'file' ? (
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Video File (.mp4, .mov, .avi)</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        className="auth-input"
+                        placeholder="Select video file or paste file path..."
+                        value={videoFilePath}
+                        onChange={(e) => setVideoFilePath(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      <input
+                        type="file"
+                        ref={videoFileInputRef}
+                        accept="video/*"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const path = (file as unknown as { path?: string }).path || file.name;
+                            setVideoFilePath(path);
+                            if (!videoTitle) {
+                              setVideoTitle(file.name.replace(/\.[^/.]+$/, ''));
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => videoFileInputRef.current?.click()}
+                      >
+                        Browse...
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">YouTube URL</label>
+                    <input
+                      type="url"
+                      className="auth-input"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      value={videoYoutubeUrl}
+                      onChange={(e) => setVideoYoutubeUrl(e.target.value)}
+                    />
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                   <div className="medialib-form-group">
@@ -1295,41 +1409,74 @@ export const MediaLibraryScreen: React.FC = () => {
                 </div>
 
                 <div className="medialib-form-group">
-                  <label className="medialib-form-label">PowerPoint File (.pptx / .ppt)</label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input
-                      type="text"
-                      className="auth-input"
-                      placeholder="Select file or paste file path..."
-                      value={pptFilePath}
-                      onChange={(e) => setPptFilePath(e.target.value)}
-                      style={{ flex: 1 }}
-                    />
-                    <input
-                      type="file"
-                      ref={pptFileInputRef}
-                      accept=".ppt,.pptx"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const path = (file as unknown as { path?: string }).path || file.name;
-                          setPptFilePath(path);
-                          if (!pptTitle) {
-                            setPptTitle(file.name.replace(/\.[^/.]+$/, ''));
-                          }
-                        }
-                      }}
-                    />
+                  <label className="medialib-form-label">PowerPoint Source</label>
+                  <div className="medialib-source-type-toggle">
                     <button
                       type="button"
-                      className="btn-secondary"
-                      onClick={() => pptFileInputRef.current?.click()}
+                      className={`medialib-source-type-btn ${pptSourceType === 'file' ? 'active' : ''}`}
+                      onClick={() => setPptSourceType('file')}
                     >
-                      Browse...
+                      Browse File
+                    </button>
+                    <button
+                      type="button"
+                      className={`medialib-source-type-btn ${pptSourceType === 'url' ? 'active' : ''}`}
+                      onClick={() => setPptSourceType('url')}
+                    >
+                      File URL
                     </button>
                   </div>
                 </div>
+
+                {pptSourceType === 'file' ? (
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">PowerPoint File (.pptx / .ppt)</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        className="auth-input"
+                        placeholder="Select file or paste file path..."
+                        value={pptFilePath}
+                        onChange={(e) => setPptFilePath(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      <input
+                        type="file"
+                        ref={pptFileInputRef}
+                        accept=".ppt,.pptx"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const path = (file as unknown as { path?: string }).path || file.name;
+                            setPptFilePath(path);
+                            if (!pptTitle) {
+                              setPptTitle(file.name.replace(/\.[^/.]+$/, ''));
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => pptFileInputRef.current?.click()}
+                      >
+                        Browse...
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">PowerPoint URL</label>
+                    <input
+                      type="url"
+                      className="auth-input"
+                      placeholder="https://example.com/presentation.pptx"
+                      value={pptUrl}
+                      onChange={(e) => setPptUrl(e.target.value)}
+                    />
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="medialib-form-group">
@@ -1376,60 +1523,96 @@ export const MediaLibraryScreen: React.FC = () => {
             {/* TAB: Image */}
             {modalTab === 'IMAGE' && (
               <form onSubmit={handleSaveUpload} className="modal-body">
-                <input
-                  type="file"
-                  ref={imgFileInputRef}
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (ev) => {
-                        setImgDataUrl(ev.target?.result as string);
-                        if (!imgTitle) {
-                          setImgTitle(file.name.replace(/\.[^/.]+$/, ''));
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                />
-
-                {imgDataUrl ? (
-                  <div className="medialib-upload-preview-box">
-                    <img
-                      src={imgDataUrl}
-                      alt="Preview"
-                      className="medialib-upload-preview-img"
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="medialib-dropzone"
-                    onClick={() => imgFileInputRef.current?.click()}
-                  >
-                    <ImageIcon size={36} />
-                    <p style={{ margin: '0.5rem 0 0.25rem 0', fontWeight: 600, color: '#ffffff' }}>
-                      Click to choose an image
-                    </p>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
-                      Supports PNG, JPG, JPEG, WEBP, SVG (Offline stored)
-                    </p>
-                  </div>
-                )}
-
-                <div className="medialib-form-group" style={{ marginTop: '0.75rem' }}>
-                  <label className="medialib-form-label">Graphic Title *</label>
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Image Title *</label>
                   <input
                     type="text"
                     className="auth-input"
-                    placeholder="e.g. Sunday Morning Opening BG"
+                    placeholder="e.g. Church Building Photo"
                     value={imgTitle}
                     onChange={(e) => setImgTitle(e.target.value)}
                     required
+                    autoFocus
                   />
                 </div>
+
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Image Source</label>
+                  <div className="medialib-source-type-toggle">
+                    <button
+                      type="button"
+                      className={`medialib-source-type-btn ${imgSourceType === 'file' ? 'active' : ''}`}
+                      onClick={() => setImgSourceType('file')}
+                    >
+                      Browse File
+                    </button>
+                    <button
+                      type="button"
+                      className={`medialib-source-type-btn ${imgSourceType === 'url' ? 'active' : ''}`}
+                      onClick={() => setImgSourceType('url')}
+                    >
+                      Image URL
+                    </button>
+                  </div>
+                </div>
+
+                {imgSourceType === 'file' ? (
+                  <>
+                    <input
+                      type="file"
+                      ref={imgFileInputRef}
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            setImgDataUrl(ev.target?.result as string);
+                            if (!imgTitle) {
+                              setImgTitle(file.name.replace(/\.[^/.]+$/, ''));
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+
+                    {imgDataUrl ? (
+                      <div className="medialib-upload-preview-box">
+                        <img
+                          src={imgDataUrl}
+                          alt="Preview"
+                          className="medialib-upload-preview-img"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="medialib-dropzone"
+                        onClick={() => imgFileInputRef.current?.click()}
+                      >
+                        <ImageIcon size={36} />
+                        <p style={{ margin: '0.5rem 0 0.25rem 0', fontWeight: 600, color: '#ffffff' }}>
+                          Click to choose an image
+                        </p>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                          Supports PNG, JPG, JPEG, WEBP, SVG (Offline stored)
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Image URL</label>
+                    <input
+                      type="url"
+                      className="auth-input"
+                      placeholder="https://example.com/image.jpg"
+                      value={imgUrl}
+                      onChange={(e) => setImgUrl(e.target.value)}
+                    />
+                  </div>
+                )}
 
                 <div className="medialib-form-group">
                   <label className="medialib-form-label">Category</label>
@@ -1452,7 +1635,7 @@ export const MediaLibraryScreen: React.FC = () => {
                   >
                     {t.mediaLibrary.cancel}
                   </button>
-                  <button type="submit" className="btn-primary" disabled={!imgDataUrl}>
+                  <button type="submit" className="btn-primary" disabled={imgSourceType === 'file' && !imgDataUrl}>
                     {t.mediaLibrary.saveGraphic}
                   </button>
                 </div>
@@ -1657,7 +1840,7 @@ export const MediaLibraryScreen: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="medialib-modal-form" style={{ padding: '1.25rem' }}>
+            <form onSubmit={handleSaveEdit} className="medialib-modal-form">
               {/* Asset Title */}
               <div className="medialib-form-group">
                 <label className="medialib-form-label">{t.mediaLibrary.titleLabel}</label>
@@ -1813,15 +1996,15 @@ export const MediaLibraryScreen: React.FC = () => {
               )}
 
               {/* Footer Buttons */}
-              <div className="medialib-modal-footer" style={{ marginTop: '1rem' }}>
+              <div className="medialib-modal-footer">
                 <button
                   type="button"
-                  className="medialib-btn-secondary"
+                  className="btn-secondary"
                   onClick={() => setShowEditModal(false)}
                 >
                   {t.mediaLibrary.cancel}
                 </button>
-                <button type="submit" className="medialib-btn-primary">
+                <button type="submit" className="btn-primary">
                   {t.mediaLibrary.updateButton}
                 </button>
               </div>

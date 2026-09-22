@@ -300,7 +300,7 @@
    ------------------------------------------------------------------------- */
 .medialib-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 390px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 1.5rem;
   overflow-y: auto;
   overflow-x: hidden;
@@ -400,6 +400,7 @@
   position: relative;
   width: 100%;
   box-sizing: border-box;
+  height: 280px;
 }
 
 .medialib-media-card:hover {
@@ -410,11 +411,12 @@
 
 .medialib-thumb-container {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 160px;
   background: #020617;
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .medialib-thumb-img {
@@ -509,6 +511,10 @@
   flex-direction: column;
   gap: 6px;
   background: var(--bg-surface);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  justify-content: space-between;
 }
 
 .medialib-card-title-row {
@@ -726,8 +732,82 @@
 }
 
 /* -------------------------------------------------------------------------
+   Source Type Toggle Buttons
+   ------------------------------------------------------------------------- */
+.source-type-toggle {
+  display: flex;
+  gap: 0.35rem;
+  background: var(--bg-subtle);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.source-type-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.source-type-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.source-type-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
+
+.source-type-btn:hover::before {
+  opacity: 1;
+}
+
+.source-type-btn.active {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover, #4338ca) 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+  transform: translateY(-1px);
+}
+
+.source-type-btn.active::before {
+  opacity: 1;
+}
+
+/* -------------------------------------------------------------------------
    Modal Form Controls
    ------------------------------------------------------------------------- */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.form-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .medialib-modal-tabs {
   display: flex;
   gap: 0.35rem;
@@ -758,21 +838,6 @@
   color: var(--color-primary);
   border-bottom-color: var(--color-primary);
   font-weight: 700;
-}
-
-.medialib-form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 0.75rem;
-}
-
-.medialib-form-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
 }
 
 .medialib-form-hint {

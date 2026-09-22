@@ -121,18 +121,57 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.875rem 1.125rem;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-subtle);
+}
+
+.rundown-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .rundown-header-title {
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
   margin: 0;
+}
+
+.rundown-stats {
+  display: flex;
+  gap: 12px;
+}
+
+.rundown-stat {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rundown-add-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rundown-add-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
 }
 
 .rundown-scroll-list {
@@ -268,11 +307,54 @@
   margin-bottom: 3px;
 }
 
+.rundown-card-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rundown-card-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .rundown-time {
   font-size: 0.7rem;
   font-weight: 600;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--text-muted);
+}
+
+.rundown-slide-count {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  background: var(--bg-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.rundown-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0;
+}
+
+.rundown-item-card:hover .rundown-delete-btn {
+  opacity: 1;
+}
+
+.rundown-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
 }
 
 .rundown-type-pill {
@@ -359,27 +441,180 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.875rem 1.25rem;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-subtle);
+}
+
+.deck-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .deck-header-title {
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.875rem;
+  font-weight: 700;
   color: var(--text-primary);
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-slide-count {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 .deck-header-actions {
   display: flex;
+  gap: 0.5rem;
+}
+
+.deck-action-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deck-action-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+/* Enhanced Slide Card Styles */
+.slide-item-info {
+  display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.slide-number {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.slide-item-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slide-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0;
+}
+
+.slide-item-card:hover .slide-delete-btn {
+  opacity: 1;
+}
+
+.slide-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.live-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: inline-block;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.slide-content-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.slide-line {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Add Slide Modal */
+.deck-add-slide-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.deck-add-slide-modal {
+  background: var(--bg-surface);
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
+}
+
+.deck-add-slide-modal h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.deck-add-slide-hint {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0 0 1rem 0;
+}
+
+.deck-add-slide-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
 }
 
 .quick-edit-btn {
@@ -635,6 +870,54 @@
   inset: 0;
   background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.16) 0%, transparent 72%);
   pointer-events: none;
+}
+
+/* Video Layer */
+.stage-video-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.stage-video-controls {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.stage-video-layer:hover .stage-video-controls {
+  opacity: 1;
+}
+
+.video-control-btn {
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.video-control-btn:hover {
+  background: rgba(0, 0, 0, 0.85);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
 }
 
 .stage-lyrics-wrap {

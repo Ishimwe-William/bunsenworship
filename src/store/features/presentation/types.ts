@@ -8,6 +8,12 @@ export interface Slide {
   background?: string;
   imageUrl?: string;
   imageFit?: 'cover' | 'contain';
+  videoUrl?: string;
+  videoPath?: string;
+  youtubeUrl?: string;
+  videoType?: 'local' | 'youtube' | 'none';
+  autoPlay?: boolean;
+  loop?: boolean;
 }
 
 export interface RundownItem {

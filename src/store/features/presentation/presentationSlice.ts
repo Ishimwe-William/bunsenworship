@@ -28,164 +28,17 @@ const defaultThemes = [
   },
 ];
 
-const initialRundown: RundownItem[] = [
-  {
-    id: 'rd-loop',
-    time: '09:00',
-    title: 'Pre-service Loop',
-    subtitle: 'Announcements v2.pptx',
-    type: 'LOOP',
-    slides: [
-      {
-        id: 's-loop-1',
-        section: 'Welcome',
-        lines: ['Welcome to Sunday Worship Service', 'Please silence your mobile devices'],
-      },
-      {
-        id: 's-loop-2',
-        section: 'Announcements',
-        lines: ['Midweek Prayer Gathering: Wednesday 7:00 PM', 'Youth Ministry: Saturday 4:00 PM'],
-      },
-    ],
-  },
-  {
-    id: 'rd-video',
-    time: '09:05',
-    title: 'Call to Worship',
-    subtitle: 'Opener_Cinematic.mp4',
-    type: 'VIDEO',
-    slides: [
-      {
-        id: 's-vid-1',
-        section: 'Video Intro',
-        lines: ['Call to Worship Video', 'Press Play to trigger NDI SDI stream'],
-      },
-    ],
-  },
-  {
-    id: 'rd-glorious-day',
-    time: '09:07',
-    title: 'Glorious Day',
-    subtitle: '4 Verses / 2 Chorus',
-    type: 'SONG',
-    slides: [
-      {
-        id: 's-gd-v1',
-        section: 'Verse 1',
-        lines: [
-          'One day when heaven was filled with His praises',
-          'One day when sin was as black as could be',
-        ],
-      },
-      {
-        id: 's-gd-v1-cont',
-        section: 'Verse 1 (cont)',
-        lines: [
-          'Jesus came forth to be born of a virgin',
-          'Dwelt among men, He was my exemplar He',
-        ],
-      },
-      {
-        id: 's-gd-chorus',
-        section: 'Chorus',
-        lines: [
-          'Living He loved me, dying He saved me',
-          'Buried He carried my sins far away',
-        ],
-      },
-      {
-        id: 's-gd-chorus-cont',
-        section: 'Chorus (cont)',
-        lines: [
-          'Rising He justified, freely forever',
-          "One day He's coming, oh glorious day!",
-        ],
-      },
-      {
-        id: 's-gd-v2',
-        section: 'Verse 2',
-        lines: [
-          "One day they led Him up Calvary's mountain",
-          'One day they nailed Him to die on the tree',
-        ],
-      },
-    ],
-  },
-  {
-    id: 'rd-living-hope',
-    time: '09:13',
-    title: 'Living Hope',
-    subtitle: 'Verse/Chorus set',
-    type: 'SONG',
-    slides: [
-      {
-        id: 's-lh-v1',
-        section: 'Verse 1',
-        lines: [
-          'How great the chasm that lay between us',
-          'How high the mountain I could not climb',
-        ],
-      },
-      {
-        id: 's-lh-ch',
-        section: 'Chorus',
-        lines: [
-          'Hallelujah, praise the One who set me free',
-          'Hallelujah, death has lost its grip on me',
-        ],
-      },
-    ],
-  },
-  {
-    id: 'rd-scripture',
-    time: '09:19',
-    title: 'Scripture Reading',
-    subtitle: 'Matthew 6:19-24',
-    type: 'SERMON',
-    slides: [
-      {
-        id: 's-sc-1',
-        section: 'Matthew 6:19-20',
-        lines: [
-          'Do not store up for yourselves treasures on earth,',
-          'where moths and vermin destroy, and where thieves break in and steal.',
-        ],
-      },
-      {
-        id: 's-sc-2',
-        section: 'Matthew 6:21',
-        lines: [
-          'For where your treasure is,',
-          'there your heart will be also.',
-        ],
-      },
-    ],
-  },
-  {
-    id: 'rd-generosity',
-    time: '09:21',
-    title: 'Generosity Unlocked',
-    subtitle: 'Sermon_Slides.pptx',
-    type: 'SERMON',
-    slides: [
-      {
-        id: 's-gen-1',
-        section: 'Title Slide',
-        lines: ['Generosity Unlocked: Kingdom Stewards', 'Senior Pastor Jean-Claude'],
-      },
-    ],
-  },
-];
+const initialRundown: RundownItem[] = [];
 
 const initialState: PresentationState = {
   isLive: true,
   isBlackout: false,
   isTextCleared: false,
   isLogoActive: false,
-  selectedRundownId: 'rd-glorious-day',
-  liveRundownId: 'rd-glorious-day',
-  liveSlideId: 's-gd-v1',
-  previewSlideId: 's-gd-chorus',
+  selectedRundownId: '',
+  liveRundownId: null,
+  liveSlideId: null,
+  previewSlideId: null,
   transitionType: 'FADE',
   fadeDuration: 1.0,
   rundown: initialRundown,
@@ -331,6 +184,10 @@ export const presentationSlice = createSlice({
         lines: string[];
         imageUrl?: string;
         imageFit?: 'cover' | 'contain';
+        videoUrl?: string;
+        videoPath?: string;
+        youtubeUrl?: string;
+        videoType?: 'local' | 'youtube' | 'none';
       }>
     ) => {
       const item = state.rundown.find((r) => r.id === action.payload.rundownId);
@@ -344,6 +201,18 @@ export const presentationSlice = createSlice({
           }
           if (action.payload.imageFit !== undefined) {
             slide.imageFit = action.payload.imageFit;
+          }
+          if (action.payload.videoUrl !== undefined) {
+            slide.videoUrl = action.payload.videoUrl;
+          }
+          if (action.payload.videoPath !== undefined) {
+            slide.videoPath = action.payload.videoPath;
+          }
+          if (action.payload.youtubeUrl !== undefined) {
+            slide.youtubeUrl = action.payload.youtubeUrl;
+          }
+          if (action.payload.videoType !== undefined) {
+            slide.videoType = action.payload.videoType;
           }
         }
       }
@@ -423,6 +292,21 @@ export const presentationSlice = createSlice({
       const [movedSlide] = item.slides.splice(sourceIndex, 1);
       item.slides.splice(targetIndex, 0, movedSlide);
     },
+    deleteRundownItem: (state, action: PayloadAction<string>) => {
+      const itemId = action.payload;
+      const index = state.rundown.findIndex((r) => r.id === itemId);
+      if (index >= 0) {
+        state.rundown.splice(index, 1);
+        if (state.selectedRundownId === itemId) {
+          state.selectedRundownId = state.rundown[0]?.id || '';
+          state.previewSlideId = state.rundown[0]?.slides[0]?.id || null;
+        }
+        if (state.liveRundownId === itemId) {
+          state.liveRundownId = null;
+          state.liveSlideId = null;
+        }
+      }
+    },
     setLoadedRundown: (state, action: PayloadAction<RundownItem[]>) => {
       state.rundown = action.payload;
       if (action.payload.length > 0) {
@@ -457,6 +341,7 @@ export const {
   addSlide,
   deleteSlide,
   addRundownItem,
+  deleteRundownItem,
   reorderRundown,
   reorderSlides,
   setLoadedRundown,

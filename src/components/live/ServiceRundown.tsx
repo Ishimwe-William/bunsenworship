@@ -6,12 +6,63 @@ import {
   selectLiveRundownId,
   setSelectedRundownId,
   addRundownItem,
+  deleteRundownItem,
   reorderRundown,
   setLoadedRundown,
   RundownItemType,
 } from '../../store/features/presentation';
-import { PlusIcon, GripVerticalIcon } from '../common/Icons';
+import { RundownItem } from '../../store/features/presentation/types';
+import { PlusIcon, GripVerticalIcon, ClockIcon, TrashIcon } from '../common/Icons';
 import { bunsenDb } from '../../db';
+import { createNewRundownItem } from '../../utils/liveShowHelpers';
+
+// Default seed data for first-time users
+const DEFAULT_RUNDOWN: RundownItem[] = [
+  {
+    id: 'rd-loop',
+    time: '09:00',
+    title: 'Pre-service Loop',
+    subtitle: 'Announcements v2.pptx',
+    type: 'LOOP',
+    slides: [
+      {
+        id: 's-loop-1',
+        section: 'Welcome',
+        lines: ['Welcome to Sunday Worship Service', 'Please silence your mobile devices'],
+      },
+      {
+        id: 's-loop-2',
+        section: 'Announcements',
+        lines: ['Midweek Prayer Gathering: Wednesday 7:00 PM', 'Youth Ministry: Saturday 4:00 PM'],
+      },
+    ],
+  },
+  {
+    id: 'rd-glorious-day',
+    time: '09:07',
+    title: 'Glorious Day',
+    subtitle: '4 Verses / 2 Chorus',
+    type: 'SONG',
+    slides: [
+      {
+        id: 's-gd-v1',
+        section: 'Verse 1',
+        lines: [
+          'One day when heaven was filled with His praises',
+          'One day when sin was as black as could be',
+        ],
+      },
+      {
+        id: 's-gd-chorus',
+        section: 'Chorus',
+        lines: [
+          'Living He loved me, dying He saved me',
+          'Buried He carried my sins far away',
+        ],
+      },
+    ],
+  },
+];
 
 export const ServiceRundown: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -33,15 +84,24 @@ export const ServiceRundown: React.FC = () => {
   // 1. Hydrate rundown from local DB on startup
   useEffect(() => {
     let isMounted = true;
+    console.log('Attempting to load service from DB...');
     bunsenDb
       .getCurrentService()
       .then((savedService) => {
-        if (isMounted && savedService && savedService.items && savedService.items.length > 0) {
-          dispatch(setLoadedRundown(savedService.items));
+        if (isMounted) {
+          if (savedService && savedService.items && savedService.items.length > 0) {
+            console.log('✓ Loaded saved service from DB:', savedService.items.length, 'items');
+            dispatch(setLoadedRundown(savedService.items));
+          } else {
+            console.log('No saved service found, loading default rundown');
+            dispatch(setLoadedRundown(DEFAULT_RUNDOWN));
+          }
         }
       })
       .catch((err) => {
-        console.warn('Could not hydrate service from local DB:', err);
+        console.error('✗ Failed to load service from DB:', err);
+        console.log('Loading default rundown as fallback');
+        dispatch(setLoadedRundown(DEFAULT_RUNDOWN));
       });
 
     return () => {
@@ -51,13 +111,17 @@ export const ServiceRundown: React.FC = () => {
 
   // 2. Automatically persist rundown changes to local DB (debounced)
   const isInitialMount = useRef(true);
+  const hasLoadedFromDb = useRef(false);
+  
   useEffect(() => {
+    // Skip saving during initial load
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
     }
 
     const timer = setTimeout(() => {
+      console.log('Auto-saving service to DB:', rundown.length, 'items');
       bunsenDb
         .saveService({
           id: 'service-current',
@@ -68,11 +132,35 @@ export const ServiceRundown: React.FC = () => {
           createdAt: 1710000000000,
           updatedAt: Date.now(),
         })
-        .catch((err) => console.warn('Auto-save to local DB failed:', err));
+        .then(() => console.log('Service saved successfully'))
+        .catch((err) => console.error('Auto-save to local DB failed:', err));
     }, 700);
 
     return () => clearTimeout(timer);
   }, [rundown]);
+
+  // Keyboard shortcuts for rundown navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      const currentIndex = rundown.findIndex(item => item.id === selectedRundownId);
+      
+      if (e.key === 'ArrowLeft' && currentIndex > 0) {
+        e.preventDefault();
+        dispatch(setSelectedRundownId(rundown[currentIndex - 1].id));
+      } else if (e.key === 'ArrowRight' && currentIndex < rundown.length - 1) {
+        e.preventDefault();
+        dispatch(setSelectedRundownId(rundown[currentIndex + 1].id));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [rundown, selectedRundownId, dispatch]);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -127,25 +215,41 @@ export const ServiceRundown: React.FC = () => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    dispatch(
-      addRundownItem({
-        title: newTitle.trim(),
-        subtitle: newSubtitle.trim() || 'Custom worship item',
-        time: newTime || '09:30',
-        type: newType,
-        slides: [
-          {
-            id: `s-${Date.now()}-1`,
-            section: newType === 'PPT' ? 'Slide 1' : newType === 'CANVA' ? 'Page 1' : 'Verse 1',
-            lines: [`${newTitle.trim()} - Line 1`, 'Lyric line 2'],
-          },
-        ],
-      })
-    );
+    const newItem = createNewRundownItem(newTitle.trim(), newType, newTime || '09:30');
+    newItem.subtitle = newSubtitle.trim() || 'Custom worship item';
+
+    dispatch(addRundownItem(newItem));
 
     setNewTitle('');
     setNewSubtitle('');
     setShowAddModal(false);
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    if (rundown.length <= 1) {
+      alert('Cannot delete the last item. Add a new item first.');
+      return;
+    }
+    if (confirm('Are you sure you want to delete this item from the service rundown?')) {
+      dispatch(deleteRundownItem(itemId));
+    }
+  };
+
+  const calculateTotalSlides = () => {
+    return rundown.reduce((total, item) => total + item.slides.length, 0);
+  };
+
+  const calculateEstimatedDuration = () => {
+    return rundown.reduce((minutes, item) => {
+      switch (item.type) {
+        case 'SONG':
+          return minutes + 4;
+        case 'SERMON':
+          return minutes + 15;
+        default:
+          return minutes + 2;
+      }
+    }, 0);
   };
 
   const getTypeClass = (type: RundownItemType) => {
@@ -172,16 +276,25 @@ export const ServiceRundown: React.FC = () => {
   return (
     <aside className="service-rundown-col">
       <div className="rundown-header">
-        <h3 className="rundown-header-title">Service Rundown</h3>
+        <div className="rundown-header-left">
+          <h3 className="rundown-header-title">Service Rundown</h3>
+          <div className="rundown-stats">
+            <span className="rundown-stat">
+              <ClockIcon size={12} />
+              {calculateEstimatedDuration()}min
+            </span>
+            <span className="rundown-stat">
+              {calculateTotalSlides()} slides
+            </span>
+          </div>
+        </div>
         <button
           type="button"
-          className="quick-edit-btn"
+          className="rundown-add-btn"
           onClick={() => setShowAddModal(true)}
           title="Add Item to Rundown"
-          style={{ padding: '3px 8px', fontSize: '0.7rem' }}
         >
           <PlusIcon size={13} />
-          <span>Add</span>
         </button>
       </div>
 
@@ -211,15 +324,31 @@ export const ServiceRundown: React.FC = () => {
             >
               <div className="rundown-accent-bar" />
               <div className="rundown-card-top">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div className="rundown-card-left">
                   <span className="card-drag-handle" title="Drag to rearrange order">
                     <GripVerticalIcon size={13} />
                   </span>
                   <span className="rundown-time">{item.time}</span>
+                  <span className="rundown-slide-count">
+                    {item.slides.length} {item.slides.length === 1 ? 'slide' : 'slides'}
+                  </span>
                 </div>
-                <span className={`rundown-type-pill ${getTypeClass(item.type)}`}>
-                  {item.type}
-                </span>
+                <div className="rundown-card-right">
+                  <span className={`rundown-type-pill ${getTypeClass(item.type)}`}>
+                    {item.type}
+                  </span>
+                  <button
+                    type="button"
+                    className="rundown-delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteItem(item.id);
+                    }}
+                    title="Delete item"
+                  >
+                    <TrashIcon size={11} />
+                  </button>
+                </div>
               </div>
               <h4 className="rundown-item-title">{item.title}</h4>
               <p className="rundown-item-subtitle">{item.subtitle}</p>

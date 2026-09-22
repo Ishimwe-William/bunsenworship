@@ -14,7 +14,12 @@ import {
   advanceSlide,
   previousSlide,
   setTransitionType,
+  setFadeDuration,
   setActiveBackground,
+  toggleBlackout,
+  toggleClearText,
+  toggleLogo,
+  clearAllOverrides,
 } from '../../store/features/presentation';
 import { PlayIcon, SlidersIcon, MonitorIcon } from '../common/Icons';
 import { ScaledRealityMonitor } from './ScaledRealityMonitor';
@@ -96,7 +101,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
     return () => channel.close();
   }, [broadcastProjectorState]);
 
-  // Global hotkeys for worship console operator: Enter (Go Live), Space/ArrowDown (Next), ArrowUp (Prev)
+  // Global hotkeys for worship console operator
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Avoid hotkeys when typing in inputs or textareas
@@ -105,6 +110,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
         return;
       }
 
+      // Live control shortcuts
       if (e.key === 'Enter') {
         e.preventDefault();
         dispatch(takeLive());
@@ -114,12 +120,34 @@ export const ProgramPreviewMonitor: React.FC = () => {
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         dispatch(previousSlide());
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        dispatch(clearAllOverrides());
+      } else if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault();
+        dispatch(toggleBlackout());
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        dispatch(toggleClearText());
+      } else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        dispatch(toggleLogo());
+      } else if (e.key === '1') {
+        e.preventDefault();
+        dispatch(setTransitionType('CUT'));
+      } else if (e.key === '2') {
+        e.preventDefault();
+        dispatch(setTransitionType('FADE'));
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        const newDuration = fadeDuration >= 2.0 ? 0.5 : fadeDuration + 0.5;
+        dispatch(setFadeDuration(newDuration));
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch]);
+  }, [dispatch, fadeDuration]);
 
   const handleGoLive = () => {
     dispatch(takeLive());
@@ -313,6 +341,46 @@ export const ProgramPreviewMonitor: React.FC = () => {
           >
             Next Slide &darr;
           </button>
+        </div>
+
+        {/* Keyboard shortcuts reference */}
+        <div
+          style={{
+            marginTop: '8px',
+            padding: '8px',
+            background: 'var(--bg-subtle)',
+            borderRadius: '6px',
+            border: '1px solid var(--border-subtle)',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '0.65rem',
+              color: 'var(--text-secondary)',
+              fontWeight: 700,
+              marginBottom: '4px',
+            }}
+          >
+            KEYBOARD SHORTCUTS
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '4px',
+              fontSize: '0.625rem',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>Enter</span> Go Live</div>
+            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>Space</span> Next</div>
+            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>&uarr;</span> Prev</div>
+            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>Esc</span> Clear</div>
+            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>B</span> Blackout</div>
+            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>C</span> Clear Text</div>
+            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>L</span> Logo</div>
+            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>F</span> Fade Time</div>
+          </div>
         </div>
 
         {/* Pop-out Sanctuary Projector Display with Live/Preview Source Selector */}

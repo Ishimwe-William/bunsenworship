@@ -8,6 +8,7 @@ export interface ProMediaAsset {
   thumbnailUrl: string;
   filePath?: string;
   canvaUrl?: string;
+  youtubeUrl?: string;
   videoUrl?: string;
   slidesCount?: number;
   tags?: string[];
