@@ -3,9 +3,10 @@
    ========================================================================== */
 
 .live-console-container {
-  display: grid;
-  grid-template-columns: 290px 1fr 360px;
-  gap: 1.25rem;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
   flex: 1;
   height: 100%;
   min-height: 0;
@@ -13,6 +14,81 @@
   box-sizing: border-box;
   animation: fadeInConsole 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
+  position: relative;
+}
+
+.live-console-container.is-resizing {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
+.live-console-container.is-resizing * {
+  user-select: none !important;
+}
+
+.live-console-section {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* ==========================================================================
+   Resizable Gutter Dividers between sections
+   ========================================================================== */
+.console-resizer-gutter {
+  position: relative;
+  width: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 20;
+  transition: background 0.15s ease;
+  margin: 0 1px;
+}
+
+.console-resizer-gutter::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--border-subtle);
+  border-radius: 2px;
+  transition: background 0.2s ease, width 0.2s ease, box-shadow 0.2s ease;
+}
+
+.console-resizer-gutter:hover::before,
+.console-resizer-gutter.is-active::before {
+  background: #38bdf8;
+  width: 2.5px;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+}
+
+.resizer-pill-grip {
+  position: relative;
+  z-index: 2;
+  width: 4px;
+  height: 36px;
+  border-radius: 9999px;
+  background: var(--border-medium, #4b5563);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.console-resizer-gutter:hover .resizer-pill-grip,
+.console-resizer-gutter.is-active .resizer-pill-grip {
+  background: #38bdf8;
+  height: 48px;
+  width: 5px;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
 }
 
 @keyframes fadeInConsole {
@@ -33,6 +109,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -78,6 +156,77 @@
   cursor: pointer;
   transition: all 0.18s ease;
   user-select: none;
+}
+
+/* Card Drag Handle & Dragging states */
+.card-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  opacity: 0.45;
+  cursor: grab;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.card-drag-handle:hover {
+  opacity: 1;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.card-drag-handle:active {
+  cursor: grabbing;
+}
+
+.rundown-item-card.is-dragging,
+.slide-item-card.is-dragging {
+  opacity: 0.35 !important;
+  transform: scale(0.98);
+  border: 1.5px dashed #38bdf8 !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3) !important;
+}
+
+.rundown-item-card.drop-target-above::before,
+.slide-item-card.drop-target-above::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 6px;
+  right: 6px;
+  height: 3px;
+  border-radius: 2px;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+  z-index: 15;
+  animation: pulseIndicator 0.6s infinite alternate;
+}
+
+.rundown-item-card.drop-target-below::after,
+.slide-item-card.drop-target-below::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 6px;
+  right: 6px;
+  height: 3px;
+  border-radius: 2px;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+  z-index: 15;
+  animation: pulseIndicator 0.6s infinite alternate;
+}
+
+@keyframes pulseIndicator {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .rundown-item-card:hover {
@@ -180,6 +329,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -336,6 +487,8 @@
   flex-direction: column;
   gap: 0.875rem;
   height: 100%;
+  width: 100%;
+  box-sizing: border-box;
   overflow-y: auto;
 }
 

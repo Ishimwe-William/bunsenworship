@@ -504,3 +504,20 @@ export const SlidersIcon: React.FC<IconProps> = ({ className = '', size = 16 }) 
   </svg>
 );
 
+export const GripVerticalIcon: React.FC<IconProps> = ({ className = '', size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+  >
+    <circle cx="9" cy="12" r="1.5" />
+    <circle cx="9" cy="6" r="1.5" />
+    <circle cx="9" cy="18" r="1.5" />
+    <circle cx="15" cy="12" r="1.5" />
+    <circle cx="15" cy="6" r="1.5" />
+    <circle cx="15" cy="18" r="1.5" />
+  </svg>
+);
+

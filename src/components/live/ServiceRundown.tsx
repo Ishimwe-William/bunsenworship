@@ -6,9 +6,10 @@ import {
   selectLiveRundownId,
   setSelectedRundownId,
   addRundownItem,
+  reorderRundown,
   RundownItemType,
 } from '../../store/features/presentation';
-import { PlusIcon } from '../common/Icons';
+import { PlusIcon, GripVerticalIcon } from '../common/Icons';
 
 export const ServiceRundown: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -21,6 +22,61 @@ export const ServiceRundown: React.FC = () => {
   const [newSubtitle, setNewSubtitle] = useState('');
   const [newTime, setNewTime] = useState('09:30');
   const [newType, setNewType] = useState<RundownItemType>('SONG');
+
+  // Drag and drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [dropPosition, setDropPosition] = useState<'above' | 'below' | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const targetElement = e.currentTarget as HTMLElement;
+    const rect = targetElement.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const isAbove = e.clientY < midY;
+    setDropPosition(isAbove ? 'above' : 'below');
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only reset if leaving the current target element entirely
+    const related = e.relatedTarget as Node | null;
+    if (!e.currentTarget.contains(related)) {
+      setDragOverIndex(null);
+      setDropPosition(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== targetIndex) {
+      let finalTarget = targetIndex;
+      if (dropPosition === 'below' && draggedIndex < targetIndex) {
+        finalTarget = targetIndex;
+      } else if (dropPosition === 'above' && draggedIndex > targetIndex) {
+        finalTarget = targetIndex;
+      }
+      dispatch(reorderRundown({ sourceIndex: draggedIndex, targetIndex: finalTarget }));
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDropPosition(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDropPosition(null);
+  };
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,21 +135,37 @@ export const ServiceRundown: React.FC = () => {
       </div>
 
       <div className="rundown-scroll-list">
-        {rundown.map((item) => {
+        {rundown.map((item, index) => {
           const isSelected = item.id === selectedRundownId;
           const hasLive = item.id === liveRundownId;
+          const isDragging = draggedIndex === index;
+          const isOver = dragOverIndex === index;
 
           return (
             <div
               key={item.id}
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, index)}
+              onDragEnd={handleDragEnd}
               className={`rundown-item-card ${isSelected ? 'selected' : ''} ${
                 hasLive ? 'has-live' : ''
+              } ${isDragging ? 'is-dragging' : ''} ${
+                isOver && dropPosition ? `drop-target-${dropPosition}` : ''
               }`}
               onClick={() => dispatch(setSelectedRundownId(item.id))}
+              title="Click to select &bull; Drag to rearrange order"
             >
               <div className="rundown-accent-bar" />
               <div className="rundown-card-top">
-                <span className="rundown-time">{item.time}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="card-drag-handle" title="Drag to rearrange order">
+                    <GripVerticalIcon size={13} />
+                  </span>
+                  <span className="rundown-time">{item.time}</span>
+                </div>
                 <span className={`rundown-type-pill ${getTypeClass(item.type)}`}>
                   {item.type}
                 </span>

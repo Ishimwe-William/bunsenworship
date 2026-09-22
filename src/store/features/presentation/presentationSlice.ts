@@ -366,6 +366,46 @@ export const presentationSlice = createSlice({
       };
       state.rundown.push(newItem);
     },
+    reorderRundown: (
+      state,
+      action: PayloadAction<{ sourceIndex: number; targetIndex: number }>
+    ) => {
+      const { sourceIndex, targetIndex } = action.payload;
+      if (
+        sourceIndex < 0 ||
+        sourceIndex >= state.rundown.length ||
+        targetIndex < 0 ||
+        targetIndex >= state.rundown.length ||
+        sourceIndex === targetIndex
+      ) {
+        return;
+      }
+      const [movedItem] = state.rundown.splice(sourceIndex, 1);
+      state.rundown.splice(targetIndex, 0, movedItem);
+    },
+    reorderSlides: (
+      state,
+      action: PayloadAction<{
+        rundownId: string;
+        sourceIndex: number;
+        targetIndex: number;
+      }>
+    ) => {
+      const item = state.rundown.find((r) => r.id === action.payload.rundownId);
+      if (!item) return;
+      const { sourceIndex, targetIndex } = action.payload;
+      if (
+        sourceIndex < 0 ||
+        sourceIndex >= item.slides.length ||
+        targetIndex < 0 ||
+        targetIndex >= item.slides.length ||
+        sourceIndex === targetIndex
+      ) {
+        return;
+      }
+      const [movedSlide] = item.slides.splice(sourceIndex, 1);
+      item.slides.splice(targetIndex, 0, movedSlide);
+    },
   },
 });
 
@@ -392,6 +432,8 @@ export const {
   addSlide,
   deleteSlide,
   addRundownItem,
+  reorderRundown,
+  reorderSlides,
 } = presentationSlice.actions;
 
 export const presentationReducer = presentationSlice.reducer;
