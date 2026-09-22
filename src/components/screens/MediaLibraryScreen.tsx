@@ -2,47 +2,54 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppDispatch } from '../../store/hooks';
 import {
   addRundownItem,
-  setLoadedRundown,
   addCustomBackgroundTheme,
 } from '../../store/features/presentation';
 import {
   bunsenDb,
   SongRecord,
   ExternalPresentationRecord,
-  ServiceRecord,
   ImageMediaRecord,
   SEED_SONGS,
   SEED_EXTERNAL_PRESENTATIONS,
   SEED_IMAGES,
 } from '../../db';
 import {
+  PRO_MEDIA_ASSETS,
+  ProMediaAsset,
+} from './mediaLibraryData';
+import {
   SearchIcon,
   PlusIcon,
-  TrashIcon,
-  PencilIcon,
-  DatabaseIcon,
-  FileTextIcon,
   LinkIcon,
   DownloadIcon,
   UploadIcon,
   CheckIcon,
   RefreshCwIcon,
-  PresentationIcon,
   FolderIcon,
   ImageIcon,
 } from '../common/Icons';
 import './MediaLibraryScreen.css';
 
-type LibraryTab = 'songs' | 'images' | 'decks' | 'rundowns' | 'backup';
-type ImageCategoryFilter = 'ALL' | 'BACKGROUND' | 'SERMON' | 'ANNOUNCEMENT' | 'PHOTO' | 'SCRIPTURE';
+type MediaSourceCategory =
+  | 'ALL'
+  | 'POWERPOINT'
+  | 'VIDEO'
+  | 'SPEAKER_DECK'
+  | 'ANNOUNCEMENTS'
+  | 'SONGS'
+  | 'CANVA';
+
+type FormatFilter = 'ALL' | 'VIDEOS' | 'POWERPOINTS' | 'IMAGES' | 'CANVA' | 'SONGS';
+
+type ModalTab = 'VIDEO' | 'PPT' | 'IMAGE' | 'CANVA' | 'SONG' | 'BACKUP';
 
 export const MediaLibraryScreen: React.FC = () => {
   const dispatch = useAppDispatch();
 
-  // Active state
-  const [activeTab, setActiveTab] = useState<LibraryTab>('songs');
+  // Navigation & filter state
+  const [selectedSource, setSelectedSource] = useState<MediaSourceCategory>('VIDEO');
+  const [activeFilter, setActiveFilter] = useState<FormatFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedImageCategory, setSelectedImageCategory] = useState<ImageCategoryFilter>('ALL');
   const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [addedItemIds, setAddedItemIds] = useState<Record<string, boolean>>({});
 
@@ -50,69 +57,66 @@ export const MediaLibraryScreen: React.FC = () => {
   const [songs, setSongs] = useState<SongRecord[]>([]);
   const [images, setImages] = useState<ImageMediaRecord[]>([]);
   const [externalDecks, setExternalDecks] = useState<ExternalPresentationRecord[]>([]);
-  const [services, setServices] = useState<ServiceRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [customAssets, setCustomAssets] = useState<ProMediaAsset[]>([]);
 
-  // Modals state
-  const [showAddSongModal, setShowAddSongModal] = useState(false);
-  const [showAddImageModal, setShowAddImageModal] = useState(false);
-  const [showLinkPptModal, setShowLinkPptModal] = useState(false);
-  const [showLinkCanvaModal, setShowLinkCanvaModal] = useState(false);
-  const [editingSongId, setEditingSongId] = useState<string | null>(null);
+  // Modal states
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [modalTab, setModalTab] = useState<ModalTab>('VIDEO');
+
+  // Form states - Video / Motion Loop
+  const [videoTitle, setVideoTitle] = useState('');
+  const [videoFormat, setVideoFormat] = useState<'MOV' | 'MP4'>('MOV');
+  const [videoRes, setVideoRes] = useState('4K');
+  const [videoDuration, setVideoDuration] = useState('0:30');
+  const [videoCategory, setVideoCategory] = useState<MediaSourceCategory>('VIDEO');
+  const [videoDataUrl, setVideoDataUrl] = useState('');
+
+  // Form states - PPT
+  const [pptTitle, setPptTitle] = useState('');
+  const [pptFilePath, setPptFilePath] = useState('');
+  const [pptSlideCount, setPptSlideCount] = useState(16);
+  const [pptCategory, setPptCategory] = useState<MediaSourceCategory>('SPEAKER_DECK');
+
+  // Form states - Image
+  const [imgTitle, setImgTitle] = useState('');
+  const [imgDataUrl, setImgDataUrl] = useState('');
+  const [imgCategory, setImgCategory] = useState<MediaSourceCategory>('ANNOUNCEMENTS');
+
+  // Form states - Canva
+  const [canvaTitle, setCanvaTitle] = useState('');
+  const [canvaUrl, setCanvaUrl] = useState('');
+  const [canvaSlideCount, setCanvaSlideCount] = useState(8);
 
   // Form states - Song
   const [songTitle, setSongTitle] = useState('');
   const [songArtist, setSongArtist] = useState('');
   const [songKey, setSongKey] = useState('G');
-  const [songTempo, setSongTempo] = useState('72 BPM');
-  const [songCcli, setSongCcli] = useState('');
-  const [songTags, setSongTags] = useState('Worship, Praise');
   const [songLyrics, setSongLyrics] = useState('');
 
-  // Form states - Image Upload
-  const [imageTitle, setImageTitle] = useState('');
-  const [imageCategory, setImageCategory] = useState<'BACKGROUND' | 'SERMON' | 'ANNOUNCEMENT' | 'PHOTO' | 'SCRIPTURE'>('BACKGROUND');
-  const [imageDataUrl, setImageDataUrl] = useState('');
-  const [imageOverlayText, setImageOverlayText] = useState('');
-  const [imageFit, setImageFit] = useState<'cover' | 'contain'>('contain');
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
-
-  // Form states - PPT
-  const [pptTitle, setPptTitle] = useState('');
-  const [pptFilePath, setPptFilePath] = useState('');
-  const [pptSlideCount, setPptSlideCount] = useState(12);
-  const [pptNotes, setPptNotes] = useState('');
-
-  // Form states - Canva
-  const [canvaTitle, setCanvaTitle] = useState('');
-  const [canvaUrl, setCanvaUrl] = useState('');
-  const [canvaEmbedUrl, setCanvaEmbedUrl] = useState('');
-  const [canvaSlideCount, setCanvaSlideCount] = useState(6);
-  const [canvaNotes, setCanvaNotes] = useState('');
-
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pptFileInputRef = useRef<HTMLInputElement>(null);
+  const imgFileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   // Load records from local DB
   const loadDatabaseRecords = async () => {
     try {
-      setIsLoading(true);
-      const [allSongs, allImages, allDecks, allServices] = await Promise.all([
+      const [allSongs, allImages, allDecks] = await Promise.all([
         bunsenDb.getAllSongs(),
         bunsenDb.getAllImages(),
         bunsenDb.getAllExternalPresentations(),
-        bunsenDb.getAllServices(),
       ]);
       setSongs(allSongs);
       setImages(allImages);
       setExternalDecks(allDecks);
-      setServices(allServices);
+
+      // Restore custom uploaded assets from local DB settings store
+      const savedCustom = await bunsenDb.getSetting<ProMediaAsset[]>('pro_media_custom_assets', []);
+      if (savedCustom) {
+        setCustomAssets(savedCustom);
+      }
     } catch (err) {
       console.error('Failed to load records from BunsenWorshipDB:', err);
-      showFeedback('Could not read from local database', 'error');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -124,10 +128,9 @@ export const MediaLibraryScreen: React.FC = () => {
     setFeedbackMessage({ text, type });
     setTimeout(() => {
       setFeedbackMessage(null);
-    }, 4000);
+    }, 3500);
   };
 
-  // Trigger feedback animation for "Add to Rundown"
   const markAddedFeedback = (id: string) => {
     setAddedItemIds((prev) => ({ ...prev, [id]: true }));
     setTimeout(() => {
@@ -139,372 +142,374 @@ export const MediaLibraryScreen: React.FC = () => {
     }, 1800);
   };
 
-  // 1. Add song to current presentation rundown
-  const handleAddSongToRundown = (song: SongRecord) => {
-    dispatch(
-      addRundownItem({
-        title: song.title,
-        subtitle: `${song.artist || 'Worship'} • Key of ${song.key || 'C'}`,
-        time: '09:15',
-        type: 'SONG',
-        slides: song.slides,
-      })
-    );
-    markAddedFeedback(song.id);
-    showFeedback(`"${song.title}" added to service rundown!`);
-  };
+  // Combine baseline Pro Assets with DB items & custom assets
+  const allMediaItems = useMemo<ProMediaAsset[]>(() => {
+    const list: ProMediaAsset[] = [...PRO_MEDIA_ASSETS, ...customAssets];
 
-  // 2. Add Image to current presentation rundown
-  const handleAddImageToRundown = (image: ImageMediaRecord) => {
-    dispatch(
-      addRundownItem({
-        title: image.title,
-        subtitle: `${image.category} Image Slide`,
-        time: '09:00',
-        type: 'IMAGE',
-        slides: [
-          {
-            id: `s-img-${Date.now()}`,
-            section: image.title,
-            lines: image.overlayLines || [],
-            imageUrl: image.dataUrl,
-            imageFit: image.category === 'BACKGROUND' ? 'cover' : 'contain',
-          },
-        ],
-      })
-    );
-    markAddedFeedback(image.id);
-    showFeedback(`Image "${image.title}" added to service rundown!`);
-  };
+    // Add user's DB songs as assets
+    songs.forEach((song) => {
+      const exists = list.some((item) => item.id === `song-${song.id}`);
+      if (!exists) {
+        list.push({
+          id: `song-${song.id}`,
+          title: song.title,
+          format: 'SONG',
+          resolution: song.key ? `Key of ${song.key}` : 'Worship',
+          durationOrSlides: `${song.slides.length} Slides`,
+          sourceCategory: 'SONGS',
+          thumbnailUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+              <defs>
+                <linearGradient id="sGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#1e1b4b"/>
+                  <stop offset="60%" stop-color="#312e81"/>
+                  <stop offset="100%" stop-color="#0f172a"/>
+                </linearGradient>
+              </defs>
+              <rect width="960" height="540" fill="url(#sGrad)"/>
+              <circle cx="480" cy="220" r="70" fill="none" stroke="#818cf8" stroke-width="3" opacity="0.6"/>
+              <text x="480" y="235" font-family="-apple-system, sans-serif" font-size="54" fill="#a5b4fc" text-anchor="middle">♪</text>
+              <text x="480" y="340" font-family="-apple-system, sans-serif" font-size="34" font-weight="800" fill="#ffffff" text-anchor="middle">${song.title}</text>
+              <text x="480" y="385" font-family="-apple-system, sans-serif" font-size="18" fill="#cbd5e1" text-anchor="middle">${song.artist || 'Worship Track'}</text>
+            </svg>
+          `.trim())}`,
+          slidesCount: song.slides.length,
+          tags: song.tags,
+        });
+      }
+    });
 
-  // 3. Set image as active background theme
-  const handleSetImageAsBackground = (image: ImageMediaRecord) => {
-    dispatch(
-      addCustomBackgroundTheme({
-        id: `bg-img-${image.id}`,
-        name: image.title,
-        gradient: image.dataUrl,
-        accent: '#f472b6',
-        imageUrl: image.dataUrl,
-      })
-    );
-    showFeedback(`"${image.title}" set as active live background!`);
-  };
-
-  // 4. Add external deck (PPT or Canva) to current presentation rundown
-  const handleAddDeckToRundown = (deck: ExternalPresentationRecord) => {
-    dispatch(
-      addRundownItem({
-        title: deck.title,
-        subtitle:
-          deck.type === 'PPT'
-            ? `PowerPoint: ${deck.filePath ? deck.filePath.split(/[/\\]/).pop() : 'Presentation.pptx'}`
-            : `Canva Design: ${deck.canvaUrl ? 'Cloud Presentation' : 'Graphics Deck'}`,
-        time: deck.type === 'PPT' ? '09:45' : '09:05',
-        type: deck.type,
-        slides: deck.slides,
-        externalMeta: {
-          type: deck.type,
+    // Add external presentations from DB
+    externalDecks.forEach((deck) => {
+      const exists = list.some((item) => item.id === `deck-${deck.id}`);
+      if (!exists) {
+        list.push({
+          id: `deck-${deck.id}`,
+          title: deck.title,
+          format: deck.type === 'PPT' ? 'PPTX' : 'CANVA',
+          resolution: deck.type === 'PPT' ? '16:9' : 'Cloud',
+          durationOrSlides: `${deck.slideCount || deck.slides.length} Slides`,
+          sourceCategory: deck.type === 'PPT' ? 'POWERPOINT' : 'CANVA',
+          thumbnailUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+              <rect width="960" height="540" fill="${deck.type === 'PPT' ? '#1c1917' : '#083344'}"/>
+              <rect x="40" y="40" width="880" height="460" rx="8" fill="none" stroke="${deck.type === 'PPT' ? '#ea580c' : '#06b6d4'}" stroke-width="2" opacity="0.5"/>
+              <text x="480" y="240" font-family="-apple-system, sans-serif" font-size="36" font-weight="800" fill="#ffffff" text-anchor="middle">${deck.title}</text>
+              <text x="480" y="295" font-family="-apple-system, sans-serif" font-size="18" fill="${deck.type === 'PPT' ? '#fdba74' : '#67e8f9'}" text-anchor="middle">${deck.type === 'PPT' ? 'PowerPoint Presentation' : 'Canva Visual Deck'}</text>
+            </svg>
+          `.trim())}`,
           filePath: deck.filePath,
           canvaUrl: deck.canvaUrl,
-          embedUrl: deck.embedUrl,
-        },
-      })
-    );
-    markAddedFeedback(deck.id);
-    showFeedback(`"${deck.title}" added to service rundown!`);
-  };
-
-  // Handle local image file selection
-  const processImageFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      showFeedback('Please select a valid image file (.png, .jpg, .webp, .svg)', 'error');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      setImageDataUrl(dataUrl);
-      if (!imageTitle) {
-        setImageTitle(file.name.replace(/\.[^/.]+$/, ''));
+          slidesCount: deck.slideCount || deck.slides.length,
+        });
       }
+    });
+
+    // Add user images from DB
+    images.forEach((img) => {
+      const exists = list.some((item) => item.id === `img-${img.id}`);
+      if (!exists) {
+        list.push({
+          id: `img-${img.id}`,
+          title: img.title,
+          format: 'PNG',
+          resolution: '4K',
+          durationOrSlides: 'Static',
+          sourceCategory:
+            img.category === 'ANNOUNCEMENT'
+              ? 'ANNOUNCEMENTS'
+              : img.category === 'SERMON'
+              ? 'SPEAKER_DECK'
+              : 'VIDEO',
+          thumbnailUrl: img.dataUrl,
+        });
+      }
+    });
+
+    return list;
+  }, [songs, externalDecks, images, customAssets]);
+
+  // Compute counts for sidebar categories
+  const sourceCounts = useMemo(() => {
+    return {
+      ALL: allMediaItems.length,
+      POWERPOINT: allMediaItems.filter((i) => i.format === 'PPTX' || i.sourceCategory === 'POWERPOINT').length,
+      VIDEO: allMediaItems.filter((i) => i.format === 'MOV' || i.format === 'MP4' || i.sourceCategory === 'VIDEO').length,
+      SPEAKER_DECK: allMediaItems.filter((i) => i.sourceCategory === 'SPEAKER_DECK').length,
+      ANNOUNCEMENTS: allMediaItems.filter((i) => i.sourceCategory === 'ANNOUNCEMENTS').length,
+      SONGS: allMediaItems.filter((i) => i.format === 'SONG' || i.sourceCategory === 'SONGS').length,
+      CANVA: allMediaItems.filter((i) => i.format === 'CANVA' || i.sourceCategory === 'CANVA').length,
     };
-    reader.readAsDataURL(file);
-  };
+  }, [allMediaItems]);
 
-  // Save new Image into local DB
-  const handleSaveImage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!imageTitle.trim() || !imageDataUrl) {
-      showFeedback('Please provide a title and select an image file', 'error');
-      return;
+  // Filter cards based on selected source, search query, and format filter
+  const displayedItems = useMemo(() => {
+    let list = allMediaItems;
+
+    // Filter by Media Source (left sidebar)
+    if (selectedSource !== 'ALL') {
+      list = list.filter((item) => {
+        if (selectedSource === 'POWERPOINT') return item.format === 'PPTX' || item.sourceCategory === 'POWERPOINT';
+        if (selectedSource === 'VIDEO') return item.format === 'MOV' || item.format === 'MP4' || item.sourceCategory === 'VIDEO';
+        if (selectedSource === 'SPEAKER_DECK') return item.sourceCategory === 'SPEAKER_DECK';
+        if (selectedSource === 'ANNOUNCEMENTS') return item.sourceCategory === 'ANNOUNCEMENTS';
+        if (selectedSource === 'SONGS') return item.format === 'SONG' || item.sourceCategory === 'SONGS';
+        if (selectedSource === 'CANVA') return item.format === 'CANVA' || item.sourceCategory === 'CANVA';
+        return true;
+      });
     }
 
-    const lines = imageOverlayText
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-
-    const newImage: ImageMediaRecord = {
-      id: `img-${Date.now()}`,
-      title: imageTitle.trim(),
-      category: imageCategory,
-      dataUrl: imageDataUrl,
-      width: 1920,
-      height: 1080,
-      overlayLines: lines.length > 0 ? lines : undefined,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    try {
-      await bunsenDb.saveImage(newImage);
-      await loadDatabaseRecords();
-      setShowAddImageModal(false);
-      resetImageForm();
-      showFeedback(`Image "${newImage.title}" saved to local database!`);
-    } catch (err) {
-      console.error('Error saving image:', err);
-      showFeedback('Could not save image to database', 'error');
+    // Filter by format pill (top right)
+    if (activeFilter !== 'ALL') {
+      list = list.filter((item) => {
+        if (activeFilter === 'VIDEOS') return item.format === 'MOV' || item.format === 'MP4';
+        if (activeFilter === 'POWERPOINTS') return item.format === 'PPTX';
+        if (activeFilter === 'IMAGES') return item.format === 'PNG' || item.format === 'JPG';
+        if (activeFilter === 'CANVA') return item.format === 'CANVA';
+        if (activeFilter === 'SONGS') return item.format === 'SONG';
+        return true;
+      });
     }
-  };
 
-  const handleDeleteImage = async (id: string, title: string) => {
-    if (!window.confirm(`Delete "${title}" from the image library?`)) {
-      return;
+    // Search query filter
+    const q = searchQuery.toLowerCase().trim();
+    if (q) {
+      list = list.filter(
+        (item) =>
+          item.title.toLowerCase().includes(q) ||
+          item.format.toLowerCase().includes(q) ||
+          (item.resolution && item.resolution.toLowerCase().includes(q)) ||
+          (item.tags && item.tags.some((t) => t.toLowerCase().includes(q)))
+      );
     }
-    try {
-      await bunsenDb.deleteImage(id);
-      await loadDatabaseRecords();
-      showFeedback(`Deleted "${title}" from image library.`);
-    } catch (err) {
-      console.error('Failed to delete image:', err);
-      showFeedback('Could not delete image', 'error');
-    }
-  };
 
-  const resetImageForm = () => {
-    setImageTitle('');
-    setImageCategory('BACKGROUND');
-    setImageDataUrl('');
-    setImageOverlayText('');
-    setImageFit('contain');
-  };
+    return list;
+  }, [allMediaItems, selectedSource, activeFilter, searchQuery]);
 
-  // Save / Update Song in local DB
-  const handleSaveSong = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!songTitle.trim()) return;
-
-    const rawBlocks = songLyrics.split(/\n\s*\n/).filter((b) => b.trim().length > 0);
-    const generatedSlides =
-      rawBlocks.length > 0
-        ? rawBlocks.map((block, idx) => {
-            const lines = block
-              .split('\n')
-              .map((l) => l.trim())
-              .filter(Boolean);
-            const firstLine = lines[0] || '';
-            let sectionName = `Slide ${idx + 1}`;
-            if (firstLine.startsWith('[') && firstLine.endsWith(']')) {
-              sectionName = firstLine.slice(1, -1);
-              lines.shift();
-            } else if (idx === 0) {
-              sectionName = 'Verse 1';
-            } else if (idx === 1) {
-              sectionName = 'Chorus';
-            }
-            return {
-              id: `s-${Date.now()}-${idx + 1}`,
-              section: sectionName,
-              lines: lines.length > 0 ? lines : ['(Instrumental)'],
-            };
-          })
-        : [
+  // Action: Add item to current active Presentation Rundown
+  const handleAddToRundown = (asset: ProMediaAsset) => {
+    if (asset.format === 'SONG') {
+      const matchedSong = songs.find((s) => `song-${s.id}` === asset.id);
+      dispatch(
+        addRundownItem({
+          title: asset.title,
+          subtitle: `${asset.resolution} • ${asset.durationOrSlides}`,
+          time: '09:15',
+          type: 'SONG',
+          slides: matchedSong?.slides || [
             {
               id: `s-${Date.now()}-1`,
               section: 'Verse 1',
-              lines: [songTitle.trim(), 'Worship line 1'],
+              lines: [asset.title, 'Worship Lyric line 1'],
             },
-          ];
-
-    const songRecord: SongRecord = {
-      id: editingSongId || `song-${Date.now()}`,
-      title: songTitle.trim(),
-      artist: songArtist.trim() || undefined,
-      key: songKey.trim() || undefined,
-      tempo: songTempo.trim() || undefined,
-      ccli: songCcli.trim() || undefined,
-      tags: songTags
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean),
-      slides: generatedSlides,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    try {
-      await bunsenDb.saveSong(songRecord);
-      await loadDatabaseRecords();
-      setShowAddSongModal(false);
-      setEditingSongId(null);
-      resetSongForm();
-      showFeedback(`Song "${songRecord.title}" successfully saved to local DB!`);
-    } catch (err) {
-      console.error('Error saving song:', err);
-      showFeedback('Failed to save song to local database', 'error');
+          ],
+        })
+      );
+    } else if (asset.format === 'PPTX') {
+      const count = asset.slidesCount || 12;
+      dispatch(
+        addRundownItem({
+          title: asset.title,
+          subtitle: `PowerPoint Deck • ${asset.durationOrSlides}`,
+          time: '09:45',
+          type: 'PPT',
+          externalMeta: {
+            type: 'PPT',
+            filePath: asset.filePath,
+            slideCount: count,
+          },
+          slides: Array.from({ length: count }, (_, i) => ({
+            id: `s-ppt-${Date.now()}-${i + 1}`,
+            section: i === 0 ? 'Title Slide' : `Slide ${i + 1}`,
+            lines: [i === 0 ? asset.title : `Key Point ${i}`, 'Presentation Point'],
+            imageUrl: asset.thumbnailUrl,
+            imageFit: 'contain',
+          })),
+        })
+      );
+    } else if (asset.format === 'CANVA') {
+      const count = asset.slidesCount || 8;
+      dispatch(
+        addRundownItem({
+          title: asset.title,
+          subtitle: 'Canva Cloud Visual Presentation',
+          time: '10:00',
+          type: 'CANVA',
+          externalMeta: {
+            type: 'CANVA',
+            canvaUrl: asset.canvaUrl,
+          },
+          slides: Array.from({ length: count }, (_, i) => ({
+            id: `s-canva-${Date.now()}-${i + 1}`,
+            section: `Page ${i + 1}`,
+            lines: [`Canva Slide ${i + 1}`, 'Visual Content'],
+            imageUrl: asset.thumbnailUrl,
+            imageFit: 'contain',
+          })),
+        })
+      );
+    } else {
+      // Video / Still image
+      dispatch(
+        addRundownItem({
+          title: asset.title,
+          subtitle: `${asset.format} ${asset.resolution || 'Media'} • ${asset.durationOrSlides}`,
+          time: '09:00',
+          type: asset.format === 'MOV' || asset.format === 'MP4' ? 'LOOP' : 'IMAGE',
+          slides: [
+            {
+              id: `s-media-${Date.now()}`,
+              section: asset.title,
+              lines: [],
+              imageUrl: asset.thumbnailUrl,
+              imageFit: 'cover',
+            },
+          ],
+        })
+      );
     }
+
+    markAddedFeedback(asset.id);
+    showFeedback(`"${asset.title}" added to service rundown!`);
   };
 
-  const handleEditSong = (song: SongRecord) => {
-    setEditingSongId(song.id);
-    setSongTitle(song.title);
-    setSongArtist(song.artist || '');
-    setSongKey(song.key || 'G');
-    setSongTempo(song.tempo || '72 BPM');
-    setSongCcli(song.ccli || '');
-    setSongTags(song.tags ? song.tags.join(', ') : '');
-    const reconstructedLyrics = song.slides
-      .map((s) => `[${s.section}]\n${s.lines.join('\n')}`)
-      .join('\n\n');
-    setSongLyrics(reconstructedLyrics);
-    setShowAddSongModal(true);
+  // Action: Set as active live presentation background
+  const handleSetBackground = (asset: ProMediaAsset) => {
+    dispatch(
+      addCustomBackgroundTheme({
+        id: `bg-asset-${asset.id}`,
+        name: asset.title,
+        gradient: asset.thumbnailUrl,
+        accent: '#38bdf8',
+        imageUrl: asset.thumbnailUrl,
+      })
+    );
+    showFeedback(`"${asset.title}" set as active live background!`);
   };
 
-  const handleDeleteSong = async (id: string, title: string) => {
-    if (!window.confirm(`Are you sure you want to delete "${title}" from the local database?`)) {
-      return;
-    }
-    try {
-      await bunsenDb.deleteSong(id);
-      await loadDatabaseRecords();
-      showFeedback(`Deleted "${title}" from local DB.`);
-    } catch (err) {
-      console.error('Failed to delete song:', err);
-      showFeedback('Could not delete song', 'error');
-    }
-  };
-
-  const resetSongForm = () => {
-    setSongTitle('');
-    setSongArtist('');
-    setSongKey('G');
-    setSongTempo('72 BPM');
-    setSongCcli('');
-    setSongTags('Worship, Praise');
-    setSongLyrics('');
-    setEditingSongId(null);
-  };
-
-  // Save PPT presentation link to local DB
-  const handleSavePpt = async (e: React.FormEvent) => {
+  // Handle uploading and saving new assets
+  const handleSaveUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pptTitle.trim()) return;
 
-    const outlineLines = pptNotes
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const count = Math.max(1, Number(pptSlideCount) || 1);
-
-    const slides = Array.from({ length: count }, (_, i) => {
-      const pointText = outlineLines[i] || `Slide ${i + 1} Content`;
-      return {
-        id: `s-ppt-${Date.now()}-${i + 1}`,
-        section: i === 0 ? 'Title Slide' : `Slide ${i + 1}`,
-        lines: [pointText, i === 0 ? (pptFilePath ? pptFilePath.split(/[/\\]/).pop() || '' : '') : ''],
+    if (modalTab === 'VIDEO') {
+      if (!videoTitle.trim()) return;
+      const newAsset: ProMediaAsset = {
+        id: `asset-video-${Date.now()}`,
+        title: videoTitle.trim(),
+        format: videoFormat,
+        resolution: videoRes,
+        durationOrSlides: videoDuration || '0:30',
+        sourceCategory: videoCategory,
+        thumbnailUrl: videoDataUrl || PRO_MEDIA_ASSETS[0].thumbnailUrl,
       };
-    });
 
-    const pptRecord: ExternalPresentationRecord = {
-      id: `ppt-${Date.now()}`,
-      title: pptTitle.trim(),
-      type: 'PPT',
-      filePath: pptFilePath.trim() || undefined,
-      slideCount: count,
-      slides,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    try {
+      const updated = [newAsset, ...customAssets];
+      setCustomAssets(updated);
+      await bunsenDb.setSetting('pro_media_custom_assets', updated);
+      setShowUploadModal(false);
+      setVideoTitle('');
+      setVideoDataUrl('');
+      showFeedback(`Video loop "${newAsset.title}" uploaded!`);
+    } else if (modalTab === 'PPT') {
+      if (!pptTitle.trim()) return;
+      const count = Number(pptSlideCount) || 12;
+      const pptRecord: ExternalPresentationRecord = {
+        id: `ppt-${Date.now()}`,
+        title: pptTitle.trim(),
+        type: 'PPT',
+        filePath: pptFilePath.trim() || undefined,
+        slideCount: count,
+        slides: Array.from({ length: count }, (_, i) => ({
+          id: `s-${Date.now()}-${i + 1}`,
+          section: i === 0 ? 'Title Slide' : `Slide ${i + 1}`,
+          lines: [i === 0 ? pptTitle.trim() : `Point ${i}`, 'Presentation Note'],
+        })),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
       await bunsenDb.saveExternalPresentation(pptRecord);
       await loadDatabaseRecords();
-      setShowLinkPptModal(false);
+      setShowUploadModal(false);
       setPptTitle('');
       setPptFilePath('');
-      setPptNotes('');
-      showFeedback(`Linked PowerPoint "${pptRecord.title}" in local DB!`);
-    } catch (err) {
-      console.error('Error saving PPT link:', err);
-      showFeedback('Could not link PowerPoint file', 'error');
-    }
-  };
-
-  // Save Canva presentation link to local DB
-  const handleSaveCanva = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canvaTitle.trim() || !canvaUrl.trim()) return;
-
-    const count = Math.max(1, Number(canvaSlideCount) || 1);
-    const noteLines = canvaNotes
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-
-    const slides = Array.from({ length: count }, (_, i) => {
-      const pageText = noteLines[i] || `Canva Page ${i + 1}`;
-      return {
-        id: `s-canva-${Date.now()}-${i + 1}`,
-        section: `Page ${i + 1}`,
-        lines: [pageText, 'Canva Cloud Deck'],
+      showFeedback(`PowerPoint "${pptRecord.title}" linked successfully!`);
+    } else if (modalTab === 'IMAGE') {
+      if (!imgTitle.trim() || !imgDataUrl) {
+        showFeedback('Please provide a title and select an image', 'error');
+        return;
+      }
+      const newImg: ImageMediaRecord = {
+        id: `img-${Date.now()}`,
+        title: imgTitle.trim(),
+        category: 'BACKGROUND',
+        dataUrl: imgDataUrl,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
-    });
-
-    let embed = canvaEmbedUrl.trim();
-    if (!embed && canvaUrl.includes('canva.com/design')) {
-      embed = canvaUrl.split('?')[0] + '/view?embed';
-    }
-
-    const canvaRecord: ExternalPresentationRecord = {
-      id: `canva-${Date.now()}`,
-      title: canvaTitle.trim(),
-      type: 'CANVA',
-      canvaUrl: canvaUrl.trim(),
-      embedUrl: embed || undefined,
-      slideCount: count,
-      slides,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    try {
+      await bunsenDb.saveImage(newImg);
+      await loadDatabaseRecords();
+      setShowUploadModal(false);
+      setImgTitle('');
+      setImgDataUrl('');
+      showFeedback(`Image "${newImg.title}" uploaded to library!`);
+    } else if (modalTab === 'CANVA') {
+      if (!canvaTitle.trim() || !canvaUrl.trim()) return;
+      const count = Number(canvaSlideCount) || 8;
+      const canvaRecord: ExternalPresentationRecord = {
+        id: `canva-${Date.now()}`,
+        title: canvaTitle.trim(),
+        type: 'CANVA',
+        canvaUrl: canvaUrl.trim(),
+        slideCount: count,
+        slides: Array.from({ length: count }, (_, i) => ({
+          id: `s-canva-${Date.now()}-${i + 1}`,
+          section: `Page ${i + 1}`,
+          lines: [`Canva Slide ${i + 1}`, 'Visual Slide Content'],
+        })),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
       await bunsenDb.saveExternalPresentation(canvaRecord);
       await loadDatabaseRecords();
-      setShowLinkCanvaModal(false);
+      setShowUploadModal(false);
       setCanvaTitle('');
       setCanvaUrl('');
-      setCanvaEmbedUrl('');
-      setCanvaNotes('');
-      showFeedback(`Linked Canva deck "${canvaRecord.title}" in local DB!`);
-    } catch (err) {
-      console.error('Error saving Canva link:', err);
-      showFeedback('Could not link Canva presentation', 'error');
-    }
-  };
+      showFeedback(`Canva presentation "${canvaRecord.title}" linked!`);
+    } else if (modalTab === 'SONG') {
+      if (!songTitle.trim()) return;
+      const rawBlocks = songLyrics.split(/\n\s*\n/).filter((b) => b.trim().length > 0);
+      const generatedSlides =
+        rawBlocks.length > 0
+          ? rawBlocks.map((block, idx) => ({
+              id: `s-${Date.now()}-${idx + 1}`,
+              section: idx === 0 ? 'Verse 1' : idx === 1 ? 'Chorus' : `Slide ${idx + 1}`,
+              lines: block.split('\n').map((l) => l.trim()).filter(Boolean),
+            }))
+          : [
+              {
+                id: `s-${Date.now()}-1`,
+                section: 'Verse 1',
+                lines: [songTitle.trim(), 'Worship lyric line'],
+              },
+            ];
 
-  const handleDeleteDeck = async (id: string, title: string) => {
-    if (!window.confirm(`Delete "${title}" from linked presentations?`)) {
-      return;
-    }
-    try {
-      await bunsenDb.deleteExternalPresentation(id);
+      const newSong: SongRecord = {
+        id: `song-${Date.now()}`,
+        title: songTitle.trim(),
+        artist: songArtist.trim() || undefined,
+        key: songKey.trim() || undefined,
+        tags: ['Worship', 'Praise'],
+        slides: generatedSlides,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await bunsenDb.saveSong(newSong);
       await loadDatabaseRecords();
-      showFeedback(`Removed "${title}" from local DB.`);
-    } catch (err) {
-      console.error('Failed to delete deck:', err);
-      showFeedback('Could not remove presentation', 'error');
+      setShowUploadModal(false);
+      setSongTitle('');
+      setSongArtist('');
+      setSongLyrics('');
+      showFeedback(`Worship Song "${newSong.title}" added to library!`);
     }
   };
 
@@ -547,9 +552,8 @@ export const MediaLibraryScreen: React.FC = () => {
     }
   };
 
-  // Restore Seed Data
   const handleRestoreSeedData = async () => {
-    if (!window.confirm('Reset local database with standard worship songs, images, and sample decks?')) {
+    if (!window.confirm('Reset local database with standard worship songs and sample decks?')) {
       return;
     }
     try {
@@ -570,113 +574,30 @@ export const MediaLibraryScreen: React.FC = () => {
     }
   };
 
-  // Filtered lists
-  const filteredSongs = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return songs;
-    return songs.filter(
-      (s) =>
-        s.title.toLowerCase().includes(q) ||
-        (s.artist && s.artist.toLowerCase().includes(q)) ||
-        (s.key && s.key.toLowerCase().includes(q)) ||
-        (s.tags && s.tags.some((t) => t.toLowerCase().includes(q)))
-    );
-  }, [songs, searchQuery]);
-
-  const filteredImages = useMemo(() => {
-    let list = images;
-    if (selectedImageCategory !== 'ALL') {
-      list = list.filter((img) => img.category === selectedImageCategory);
-    }
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return list;
-    return list.filter(
-      (img) =>
-        img.title.toLowerCase().includes(q) ||
-        img.category.toLowerCase().includes(q)
-    );
-  }, [images, selectedImageCategory, searchQuery]);
-
-  const filteredDecks = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return externalDecks;
-    return externalDecks.filter(
-      (d) =>
-        d.title.toLowerCase().includes(q) ||
-        (d.filePath && d.filePath.toLowerCase().includes(q)) ||
-        (d.canvaUrl && d.canvaUrl.toLowerCase().includes(q))
-    );
-  }, [externalDecks, searchQuery]);
-
-  const pptCount = useMemo(
-    () => externalDecks.filter((d) => d.type === 'PPT').length,
-    [externalDecks]
-  );
-  const canvaCount = useMemo(
-    () => externalDecks.filter((d) => d.type === 'CANVA').length,
-    [externalDecks]
-  );
-
   return (
-    <div className="screen-content medialib-container">
-      {/* Top Header */}
-      <div className="medialib-header">
-        <div>
-          <h2 className="screen-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <DatabaseIcon size={22} style={{ color: 'var(--color-primary, #6366f1)' }} />
-            <span>Media Library & Presentations</span>
-          </h2>
-          <p className="screen-description">
-            Local persistent database for worship songs, still images & graphics, PowerPoint (.pptx) slides, and Canva decks.
+    <div className="screen-content medialib-screen">
+      {/* -----------------------------------------------------------------
+          Top Header Bar
+          ----------------------------------------------------------------- */}
+      <div className="medialib-top-header">
+        <div className="medialib-header-left">
+          <h2 className="medialib-title">Presentation & Media Library</h2>
+          <p className="medialib-desc">
+            Access worship backgrounds, scripture databases, and slide decks
           </p>
         </div>
 
-        <div className="medialib-header-actions">
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => {
-              resetSongForm();
-              setShowAddSongModal(true);
-            }}
-          >
-            <PlusIcon size={15} />
-            <span>+ New Song</span>
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => {
-              resetImageForm();
-              setShowAddImageModal(true);
-            }}
-            style={{ borderColor: 'rgba(236, 72, 153, 0.4)', color: '#f472b6' }}
-          >
-            <ImageIcon size={15} />
-            <span>+ Upload Image</span>
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setShowLinkPptModal(true)}
-            style={{ borderColor: 'rgba(234, 88, 12, 0.4)', color: '#fb923c' }}
-          >
-            <FileTextIcon size={15} />
-            <span>Link PowerPoint</span>
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setShowLinkCanvaModal(true)}
-            style={{ borderColor: 'rgba(6, 182, 212, 0.4)', color: '#22d3ee' }}
-          >
-            <LinkIcon size={15} />
-            <span>Link Canva</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          className="medialib-upload-btn"
+          onClick={() => setShowUploadModal(true)}
+        >
+          <UploadIcon size={16} />
+          <span>Upload Presentation / Video</span>
+        </button>
       </div>
 
-      {/* Feedback Banner */}
+      {/* Feedback Toast */}
       {feedbackMessage && (
         <div className={`medialib-banner ${feedbackMessage.type}`}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -685,1109 +606,783 @@ export const MediaLibraryScreen: React.FC = () => {
           </div>
           <button
             type="button"
-            className="medialib-icon-btn"
+            className="medialib-filter-link"
             onClick={() => setFeedbackMessage(null)}
-            style={{ padding: '2px 6px' }}
           >
             &times;
           </button>
         </div>
       )}
 
-      {/* Quick Summary Grid */}
-      <div className="medialib-stats-grid">
-        <div
-          className={`medialib-stat-card ${activeTab === 'songs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('songs')}
-        >
-          <div className="medialib-stat-icon songs">
-            <FileTextIcon size={20} />
-          </div>
-          <div>
-            <div className="medialib-stat-label">Worship Songs</div>
-            <div className="medialib-stat-value">{songs.length} Tracks</div>
-          </div>
-        </div>
+      {/* -----------------------------------------------------------------
+          Two-Column Layout: Sidebar + Media Grid
+          ----------------------------------------------------------------- */}
+      <div className="medialib-content-layout">
+        {/* Left Column: MEDIA SOURCES */}
+        <aside className="medialib-sidebar">
+          <h3 className="medialib-sidebar-title">MEDIA SOURCES</h3>
+          <div className="medialib-sources-list">
+            <button
+              type="button"
+              className={`medialib-source-item ${selectedSource === 'ALL' ? 'active' : ''}`}
+              onClick={() => setSelectedSource('ALL')}
+            >
+              <div className="medialib-source-item-left">
+                <FolderIcon size={16} className="medialib-source-icon" />
+                <span>All Media Assets</span>
+              </div>
+              <span className="medialib-source-count">{sourceCounts.ALL}</span>
+            </button>
 
-        <div
-          className={`medialib-stat-card ${activeTab === 'images' ? 'active' : ''}`}
-          onClick={() => setActiveTab('images')}
-        >
-          <div className="medialib-stat-icon images">
-            <ImageIcon size={20} />
-          </div>
-          <div>
-            <div className="medialib-stat-label">Still Images</div>
-            <div className="medialib-stat-value">{images.length} Graphics</div>
-          </div>
-        </div>
+            <button
+              type="button"
+              className={`medialib-source-item ${selectedSource === 'POWERPOINT' ? 'active' : ''}`}
+              onClick={() => setSelectedSource('POWERPOINT')}
+            >
+              <div className="medialib-source-item-left">
+                <FolderIcon size={16} className="medialib-source-icon" />
+                <span>PowerPoint Uploads</span>
+              </div>
+              <span className="medialib-source-count">{sourceCounts.POWERPOINT}</span>
+            </button>
 
-        <div
-          className={`medialib-stat-card ${activeTab === 'decks' ? 'active' : ''}`}
-          onClick={() => setActiveTab('decks')}
-        >
-          <div className="medialib-stat-icon ppt">
-            <PresentationIcon size={20} />
-          </div>
-          <div>
-            <div className="medialib-stat-label">PowerPoint Slides</div>
-            <div className="medialib-stat-value">{pptCount} Decks</div>
-          </div>
-        </div>
+            <button
+              type="button"
+              className={`medialib-source-item ${selectedSource === 'VIDEO' ? 'active' : ''}`}
+              onClick={() => setSelectedSource('VIDEO')}
+            >
+              <div className="medialib-source-item-left">
+                <FolderIcon size={16} className="medialib-source-icon" />
+                <span>Video Backgrounds</span>
+              </div>
+              <span className="medialib-source-count">{sourceCounts.VIDEO}</span>
+            </button>
 
-        <div
-          className={`medialib-stat-card ${activeTab === 'decks' ? 'active' : ''}`}
-          onClick={() => setActiveTab('decks')}
-        >
-          <div className="medialib-stat-icon canva">
-            <LinkIcon size={20} />
-          </div>
-          <div>
-            <div className="medialib-stat-label">Canva Presentations</div>
-            <div className="medialib-stat-value">{canvaCount} Linked</div>
-          </div>
-        </div>
+            <button
+              type="button"
+              className={`medialib-source-item ${selectedSource === 'SPEAKER_DECK' ? 'active' : ''}`}
+              onClick={() => setSelectedSource('SPEAKER_DECK')}
+            >
+              <div className="medialib-source-item-left">
+                <FolderIcon size={16} className="medialib-source-icon" />
+                <span>Speaker Slide Decks</span>
+              </div>
+              <span className="medialib-source-count">{sourceCounts.SPEAKER_DECK}</span>
+            </button>
 
-        <div
-          className={`medialib-stat-card ${activeTab === 'backup' ? 'active' : ''}`}
-          onClick={() => setActiveTab('backup')}
-        >
-          <div className="medialib-stat-icon rundown">
-            <DatabaseIcon size={20} />
-          </div>
-          <div>
-            <div className="medialib-stat-label">IndexedDB Engine</div>
-            <div className="medialib-stat-value">Active &bull; Offline</div>
-          </div>
-        </div>
-      </div>
+            <button
+              type="button"
+              className={`medialib-source-item ${selectedSource === 'ANNOUNCEMENTS' ? 'active' : ''}`}
+              onClick={() => setSelectedSource('ANNOUNCEMENTS')}
+            >
+              <div className="medialib-source-item-left">
+                <FolderIcon size={16} className="medialib-source-icon" />
+                <span>Announcements Loops</span>
+              </div>
+              <span className="medialib-source-count">{sourceCounts.ANNOUNCEMENTS}</span>
+            </button>
 
-      {/* Navigation Toolbar */}
-      <div className="medialib-toolbar">
-        <div className="medialib-nav-tabs">
-          <button
-            type="button"
-            className={`medialib-nav-btn ${activeTab === 'songs' ? 'active' : ''}`}
-            onClick={() => setActiveTab('songs')}
-          >
-            <span>Worship Songs</span>
-            <span className="medialib-count-badge">{songs.length}</span>
-          </button>
-          <button
-            type="button"
-            className={`medialib-nav-btn ${activeTab === 'images' ? 'active' : ''}`}
-            onClick={() => setActiveTab('images')}
-          >
-            <ImageIcon size={14} />
-            <span>Images & Stills</span>
-            <span className="medialib-count-badge">{images.length}</span>
-          </button>
-          <button
-            type="button"
-            className={`medialib-nav-btn ${activeTab === 'decks' ? 'active' : ''}`}
-            onClick={() => setActiveTab('decks')}
-          >
-            <span>PowerPoint & Canva Decks</span>
-            <span className="medialib-count-badge">{externalDecks.length}</span>
-          </button>
-          <button
-            type="button"
-            className={`medialib-nav-btn ${activeTab === 'rundowns' ? 'active' : ''}`}
-            onClick={() => setActiveTab('rundowns')}
-          >
-            <span>Saved Services</span>
-            <span className="medialib-count-badge">{services.length}</span>
-          </button>
-          <button
-            type="button"
-            className={`medialib-nav-btn ${activeTab === 'backup' ? 'active' : ''}`}
-            onClick={() => setActiveTab('backup')}
-          >
-            <DatabaseIcon size={14} />
-            <span>Backup & Sync</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              className={`medialib-source-item ${selectedSource === 'SONGS' ? 'active' : ''}`}
+              onClick={() => setSelectedSource('SONGS')}
+            >
+              <div className="medialib-source-item-left">
+                <FolderIcon size={16} className="medialib-source-icon" />
+                <span>Worship Songs</span>
+              </div>
+              <span className="medialib-source-count">{sourceCounts.SONGS}</span>
+            </button>
 
-        {activeTab !== 'backup' && (
-          <div className="medialib-search-box">
-            <span className="medialib-search-icon">
-              <SearchIcon size={14} />
-            </span>
-            <input
-              type="text"
-              className="medialib-search-input"
-              placeholder={`Search ${
-                activeTab === 'songs'
-                  ? 'songs, keys, tags...'
-                  : activeTab === 'images'
-                  ? 'images, titles, categories...'
-                  : 'decks, paths, URLs...'
-              }`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+            <button
+              type="button"
+              className={`medialib-source-item ${selectedSource === 'CANVA' ? 'active' : ''}`}
+              onClick={() => setSelectedSource('CANVA')}
+            >
+              <div className="medialib-source-item-left">
+                <FolderIcon size={16} className="medialib-source-icon" />
+                <span>Canva Presentations</span>
+              </div>
+              <span className="medialib-source-count">{sourceCounts.CANVA}</span>
+            </button>
           </div>
-        )}
-      </div>
+        </aside>
 
-      {/* TAB 1: Worship Songs */}
-      {activeTab === 'songs' && (
-        <div>
-          {isLoading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              Loading songs from local database...
+        {/* Right Column: Search + Filters + 3-Col Card Grid */}
+        <main className="medialib-main-content">
+          {/* Top Search & Filter Bar */}
+          <div className="medialib-search-filter-row">
+            <div className="medialib-search-input-box">
+              <SearchIcon size={14} style={{ color: '#64748b' }} />
+              <input
+                type="text"
+                placeholder="Search media library..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-          ) : filteredSongs.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <p>No songs found matching your search.</p>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => {
-                  resetSongForm();
-                  setShowAddSongModal(true);
-                }}
-                style={{ marginTop: '0.75rem' }}
-              >
-                + Add First Song
-              </button>
-            </div>
-          ) : (
-            <div className="medialib-items-grid">
-              {filteredSongs.map((song) => {
-                const isAdded = addedItemIds[song.id];
-                return (
-                  <div key={song.id} className="medialib-card">
-                    <span className="medialib-card-badge badge-song">SONG</span>
-                    <div className="medialib-card-top">
-                      <h4 className="medialib-card-title">{song.title}</h4>
-                      <p className="medialib-card-sub">{song.artist || 'Traditional Worship'}</p>
-                    </div>
 
-                    <div className="medialib-card-meta">
-                      {song.key && <span className="medialib-meta-tag key">Key: {song.key}</span>}
-                      {song.tempo && <span className="medialib-meta-tag">{song.tempo}</span>}
-                      <span className="medialib-meta-tag">{song.slides.length} Slides</span>
-                      {song.ccli && <span className="medialib-meta-tag">CCLI #{song.ccli}</span>}
-                    </div>
-
-                    {song.slides.length > 0 && song.slides[0].lines && (
-                      <div className="medialib-slide-preview-box">
-                        <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '2px' }}>
-                          {song.slides[0].section}:
-                        </strong>
-                        {song.slides[0].lines.slice(0, 2).join(' / ')}
-                      </div>
-                    )}
-
-                    <div className="medialib-card-actions">
-                      <button
-                        type="button"
-                        className={`medialib-add-btn ${isAdded ? 'success' : ''}`}
-                        onClick={() => handleAddSongToRundown(song)}
-                        title="Add this song to the active presentation rundown"
-                      >
-                        {isAdded ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
-                        <span>{isAdded ? 'Added to Service' : 'Add to Rundown'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        className="medialib-icon-btn"
-                        onClick={() => handleEditSong(song)}
-                        title="Edit Song"
-                      >
-                        <PencilIcon size={14} />
-                      </button>
-
-                      <button
-                        type="button"
-                        className="medialib-icon-btn danger"
-                        onClick={() => handleDeleteSong(song.id, song.title)}
-                        title="Delete from local DB"
-                      >
-                        <TrashIcon size={14} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 2: Images & Stills */}
-      {activeTab === 'images' && (
-        <div>
-          {/* Category Filter Pills */}
-          <div className="medialib-category-pills">
-            {(
-              [
-                ['ALL', 'All Images'],
-                ['BACKGROUND', 'Worship Backgrounds'],
-                ['ANNOUNCEMENT', 'Announcements'],
-                ['SERMON', 'Sermon Graphics'],
-                ['SCRIPTURE', 'Scripture Art'],
-                ['PHOTO', 'Photography'],
-              ] as const
-            ).map(([catKey, catLabel]) => (
-              <button
-                key={catKey}
-                type="button"
-                className={`medialib-cat-pill ${selectedImageCategory === catKey ? 'active' : ''}`}
-                onClick={() => setSelectedImageCategory(catKey as ImageCategoryFilter)}
-              >
-                {catLabel}
-              </button>
-            ))}
-          </div>
-
-          {isLoading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              Loading images from local database...
-            </div>
-          ) : filteredImages.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <p>No images found in this category.</p>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => {
-                  resetImageForm();
-                  setShowAddImageModal(true);
-                }}
-                style={{ marginTop: '0.75rem' }}
-              >
-                <ImageIcon size={15} />
-                <span>+ Upload First Image</span>
-              </button>
-            </div>
-          ) : (
-            <div className="medialib-images-grid">
-              {filteredImages.map((img) => {
-                const isAdded = addedItemIds[img.id];
-                return (
-                  <div key={img.id} className="medialib-image-card">
-                    <div className="medialib-image-thumb-box">
-                      <img
-                        src={img.dataUrl}
-                        alt={img.title}
-                        className="medialib-image-thumb-img"
-                      />
-                      <span className="medialib-image-cat-badge">{img.category}</span>
-                    </div>
-
-                    <div className="medialib-image-info">
-                      <div>
-                        <h4 className="medialib-image-title">{img.title}</h4>
-                        <div className="medialib-image-meta">
-                          <span>1920 &times; 1080 &bull; Offline Stored</span>
-                        </div>
-                      </div>
-
-                      <div className="medialib-image-actions">
-                        <button
-                          type="button"
-                          className={`medialib-add-btn ${isAdded ? 'success' : ''}`}
-                          onClick={() => handleAddImageToRundown(img)}
-                          title="Project this image as a slide in the rundown"
-                        >
-                          {isAdded ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
-                          <span>{isAdded ? 'In Rundown' : 'Add to Rundown'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className="medialib-icon-btn"
-                          onClick={() => handleSetImageAsBackground(img)}
-                          title="Set as live background theme behind lyrics"
-                          style={{ color: '#f472b6', borderColor: 'rgba(236, 72, 153, 0.3)' }}
-                        >
-                          <ImageIcon size={14} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="medialib-icon-btn danger"
-                          onClick={() => handleDeleteImage(img.id, img.title)}
-                          title="Delete image from local DB"
-                        >
-                          <TrashIcon size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: PowerPoint & Canva Decks */}
-      {activeTab === 'decks' && (
-        <div>
-          {isLoading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              Loading presentations from local database...
-            </div>
-          ) : filteredDecks.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <p>No linked PowerPoint or Canva presentations found.</p>
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1rem' }}>
+            <div className="medialib-filter-row">
+              <span className="medialib-filter-label">Filter:</span>
+              <div className="medialib-filter-links">
                 <button
                   type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowLinkPptModal(true)}
+                  className={`medialib-filter-link ${activeFilter === 'ALL' ? 'active' : ''}`}
+                  onClick={() => setActiveFilter('ALL')}
                 >
-                  + Link PowerPoint (.pptx)
+                  All
                 </button>
                 <button
                   type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowLinkCanvaModal(true)}
+                  className={`medialib-filter-link ${activeFilter === 'VIDEOS' ? 'active' : ''}`}
+                  onClick={() => setActiveFilter('VIDEOS')}
                 >
-                  + Link Canva Design
+                  Videos
+                </button>
+                <button
+                  type="button"
+                  className={`medialib-filter-link ${activeFilter === 'POWERPOINTS' ? 'active' : ''}`}
+                  onClick={() => setActiveFilter('POWERPOINTS')}
+                >
+                  PowerPoints
+                </button>
+                <button
+                  type="button"
+                  className={`medialib-filter-link ${activeFilter === 'IMAGES' ? 'active' : ''}`}
+                  onClick={() => setActiveFilter('IMAGES')}
+                >
+                  Images
+                </button>
+                <button
+                  type="button"
+                  className={`medialib-filter-link ${activeFilter === 'CANVA' ? 'active' : ''}`}
+                  onClick={() => setActiveFilter('CANVA')}
+                >
+                  Canva
+                </button>
+                <button
+                  type="button"
+                  className={`medialib-filter-link ${activeFilter === 'SONGS' ? 'active' : ''}`}
+                  onClick={() => setActiveFilter('SONGS')}
+                >
+                  Songs
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="medialib-items-grid">
-              {filteredDecks.map((deck) => {
-                const isPpt = deck.type === 'PPT';
-                const isAdded = addedItemIds[deck.id];
+          </div>
 
-                return (
-                  <div key={deck.id} className="medialib-card">
-                    <span
-                      className={`medialib-card-badge ${
-                        isPpt ? 'badge-ppt' : 'badge-canva'
-                      }`}
-                    >
-                      {deck.type}
-                    </span>
+          {/* 3-Column 16:9 Media Cards Grid */}
+          <div className="medialib-cards-grid">
+            {displayedItems.map((item) => {
+              const isAdded = addedItemIds[item.id];
 
-                    <div className="medialib-card-top">
-                      <h4 className="medialib-card-title">{deck.title}</h4>
-                      <p className="medialib-card-sub">
-                        {isPpt
-                          ? 'Microsoft PowerPoint Presentation'
-                          : 'Canva Cloud Visual Presentation'}
-                      </p>
-                    </div>
+              return (
+                <div key={item.id} className="medialib-media-card">
+                  {/* 16:9 Visual Thumbnail Container */}
+                  <div className="medialib-thumb-container">
+                    <img
+                      src={item.thumbnailUrl}
+                      alt={item.title}
+                      className="medialib-thumb-img"
+                    />
 
-                    <div className="medialib-card-meta">
-                      <span className="medialib-meta-tag">
-                        {deck.slideCount || deck.slides.length} Slides
-                      </span>
-                      {deck.filePath && (
-                        <span className="medialib-meta-tag path" title={deck.filePath}>
-                          <FolderIcon size={11} />
-                          {deck.filePath.split(/[/\\]/).pop()}
-                        </span>
-                      )}
-                      {deck.canvaUrl && (
-                        <span className="medialib-meta-tag path" title={deck.canvaUrl}>
-                          <LinkIcon size={11} />
-                          canva.com/design
-                        </span>
-                      )}
-                    </div>
-
-                    {deck.slides.length > 0 && (
-                      <div className="medialib-slide-preview-box">
-                        <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '2px' }}>
-                          Slides:
-                        </strong>
-                        {deck.slides
-                          .slice(0, 3)
-                          .map((s) => s.section || s.lines[0])
-                          .join(' • ')}
-                      </div>
-                    )}
-
-                    <div className="medialib-card-actions">
+                    {/* Hover Action Overlay */}
+                    <div className="medialib-card-hover-actions">
                       <button
                         type="button"
-                        className={`medialib-add-btn ${isAdded ? 'success' : ''}`}
-                        onClick={() => handleAddDeckToRundown(deck)}
-                        title="Send this presentation directly to the live presentation rundown"
+                        className={`medialib-action-btn-primary ${isAdded ? 'is-added' : ''}`}
+                        onClick={() => handleAddToRundown(item)}
+                        title="Add to active presentation rundown"
                       >
                         {isAdded ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
-                        <span>{isAdded ? 'Added to Service' : 'Add to Rundown'}</span>
+                        <span>{isAdded ? 'In Rundown' : 'Add to Rundown'}</span>
                       </button>
 
-                      {deck.canvaUrl && (
+                      {item.format !== 'SONG' && (
+                        <button
+                          type="button"
+                          className="medialib-action-btn-icon"
+                          onClick={() => handleSetBackground(item)}
+                          title="Set as Live Background"
+                        >
+                          <ImageIcon size={14} />
+                        </button>
+                      )}
+
+                      {item.canvaUrl && (
                         <a
-                          href={deck.canvaUrl}
+                          href={item.canvaUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="medialib-icon-btn"
-                          title="Open Canva Design in Browser"
+                          className="medialib-action-btn-icon"
+                          title="Open in Canva"
                           style={{ textDecoration: 'none' }}
                         >
                           <LinkIcon size={14} />
                         </a>
                       )}
-
-                      <button
-                        type="button"
-                        className="medialib-icon-btn danger"
-                        onClick={() => handleDeleteDeck(deck.id, deck.title)}
-                        title="Delete presentation link"
-                      >
-                        <TrashIcon size={14} />
-                      </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* TAB 4: Saved Services */}
-      {activeTab === 'rundowns' && (
-        <div className="medialib-items-grid">
-          {services.map((srv) => (
-            <div key={srv.id} className="medialib-card">
-              <span className="medialib-card-badge" style={{ background: 'rgba(16, 185, 129, 0.25)', color: '#6ee7b7' }}>
-                SERVICE
-              </span>
-
-              <div className="medialib-card-top">
-                <h4 className="medialib-card-title">{srv.title}</h4>
-                <p className="medialib-card-sub">Date: {srv.date}</p>
-              </div>
-
-              <div className="medialib-card-meta">
-                <span className="medialib-meta-tag">{srv.items.length} Rundown Items</span>
-                {srv.isCurrent && (
-                  <span
-                    className="medialib-meta-tag"
-                    style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80' }}
-                  >
-                    Active in Console
-                  </span>
-                )}
-              </div>
-
-              <div className="medialib-slide-preview-box">
-                {srv.items.map((i) => i.title).join(' • ')}
-              </div>
-
-              <div className="medialib-card-actions">
-                <button
-                  type="button"
-                  className="medialib-add-btn"
-                  onClick={() => {
-                    dispatch(setLoadedRundown(srv.items));
-                    showFeedback(`Service "${srv.title}" loaded into Live Console!`);
-                  }}
-                >
-                  <span>Load into Live Console</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* TAB 5: Database Backup & Sync Hub */}
-      {activeTab === 'backup' && (
-        <div className="medialib-backup-panel">
-          <div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: '0 0 4px 0' }}>
-              BunsenWorship Local Storage Hub
-            </h3>
-            <p className="section-description">
-              All worship songs, still images, PowerPoint links, Canva attachments, and services are saved in your local
-              IndexedDB database (<code>BunsenWorshipDB</code> v2). You can backup your entire church presentation library
-              to JSON files and restore anytime.
-            </p>
+                  {/* Card Info Below Thumbnail */}
+                  <div className="medialib-card-info">
+                    <h4 className="medialib-card-title" title={item.title}>
+                      {item.title}
+                    </h4>
+                    <div className="medialib-card-meta-row">
+                      <div className="medialib-meta-left">
+                        <span className={`medialib-format-pill ${item.format.toLowerCase()}`}>
+                          {item.format}
+                        </span>
+                        {item.resolution && (
+                          <span className="medialib-res-pill">{item.resolution}</span>
+                        )}
+                      </div>
+                      <span className="medialib-duration-pill">{item.durationOrSlides}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </main>
+      </div>
 
-          <div className="medialib-backup-grid">
-            {/* Card 1: Export */}
-            <div className="medialib-backup-card">
-              <div>
-                <h4 className="medialib-backup-title">
-                  <DownloadIcon size={18} />
-                  <span>Export Database Backup</span>
-                </h4>
-                <p className="medialib-backup-desc">
-                  Download a complete backup JSON snapshot of all worship songs, still images ({images.length}), PowerPoint links, Canva links,
-                  and rundowns to your local hard drive.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleExportBackup}
-                style={{ width: '100%', justifyContent: 'center' }}
-              >
-                <DownloadIcon size={15} />
-                <span>Export to JSON File</span>
-              </button>
-            </div>
-
-            {/* Card 2: Import */}
-            <div className="medialib-backup-card">
-              <div>
-                <h4 className="medialib-backup-title">
-                  <UploadIcon size={18} />
-                  <span>Restore from Backup</span>
-                </h4>
-                <p className="medialib-backup-desc">
-                  Import a previously exported BunsenWorship JSON backup file. All songs, images, and presentation links will
-                  be safely merged into your local database.
-                </p>
-              </div>
-              <div>
-                <input
-                  type="file"
-                  ref={backupFileInputRef}
-                  accept=".json"
-                  style={{ display: 'none' }}
-                  onChange={handleImportBackup}
-                />
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => backupFileInputRef.current?.click()}
-                  style={{ width: '100%', justifyContent: 'center' }}
-                >
-                  <UploadIcon size={15} />
-                  <span>Select Backup File (.json)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Card 3: Seed reset */}
-            <div className="medialib-backup-card">
-              <div>
-                <h4 className="medialib-backup-title">
-                  <RefreshCwIcon size={18} />
-                  <span>Load Sample Worship Library</span>
-                </h4>
-                <p className="medialib-backup-desc">
-                  Populate the local database with pre-configured worship anthems (Glorious Day, Living Hope, Way Maker,
-                  10,000 Reasons), sacred graphics ({SEED_IMAGES.length} still images), and sample presentations.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={handleRestoreSeedData}
-                style={{ width: '100%', justifyContent: 'center' }}
-              >
-                <RefreshCwIcon size={15} />
-                <span>Reset to Seed Data</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Upload / Add Image */}
-      {showAddImageModal && (
-        <div className="modal-overlay" onClick={() => setShowAddImageModal(false)}>
+      {/* -----------------------------------------------------------------
+          Upload Presentation / Video Modal
+          ----------------------------------------------------------------- */}
+      {showUploadModal && (
+        <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
           <div
             className="quick-edit-modal-card"
-            style={{ maxWidth: '580px' }}
+            style={{ maxWidth: '640px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
               <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ImageIcon size={18} />
-                <span>Upload Still Image or Graphic</span>
+                <UploadIcon size={18} />
+                <span>Upload Presentation or Media</span>
               </h3>
               <button
                 type="button"
                 className="quick-edit-btn"
-                onClick={() => setShowAddImageModal(false)}
+                onClick={() => setShowUploadModal(false)}
               >
                 Close
               </button>
             </div>
 
-            <form onSubmit={handleSaveImage} className="modal-body">
-              {/* Dropzone */}
-              <input
-                type="file"
-                ref={imageFileInputRef}
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) processImageFile(file);
-                }}
-              />
+            {/* Modal Navigation Tabs */}
+            <div className="medialib-modal-tabs">
+              <button
+                type="button"
+                className={`medialib-modal-tab-btn ${modalTab === 'VIDEO' ? 'active' : ''}`}
+                onClick={() => setModalTab('VIDEO')}
+              >
+                Video / Motion
+              </button>
+              <button
+                type="button"
+                className={`medialib-modal-tab-btn ${modalTab === 'PPT' ? 'active' : ''}`}
+                onClick={() => setModalTab('PPT')}
+              >
+                PowerPoint (.pptx)
+              </button>
+              <button
+                type="button"
+                className={`medialib-modal-tab-btn ${modalTab === 'IMAGE' ? 'active' : ''}`}
+                onClick={() => setModalTab('IMAGE')}
+              >
+                Still Graphic
+              </button>
+              <button
+                type="button"
+                className={`medialib-modal-tab-btn ${modalTab === 'CANVA' ? 'active' : ''}`}
+                onClick={() => setModalTab('CANVA')}
+              >
+                Canva Deck
+              </button>
+              <button
+                type="button"
+                className={`medialib-modal-tab-btn ${modalTab === 'SONG' ? 'active' : ''}`}
+                onClick={() => setModalTab('SONG')}
+              >
+                Worship Song
+              </button>
+              <button
+                type="button"
+                className={`medialib-modal-tab-btn ${modalTab === 'BACKUP' ? 'active' : ''}`}
+                onClick={() => setModalTab('BACKUP')}
+              >
+                Backup &amp; Sync
+              </button>
+            </div>
 
-              {imageDataUrl ? (
-                <div>
-                  <div className="medialib-upload-preview-box">
-                    <img
-                      src={imageDataUrl}
-                      alt="Upload Preview"
-                      className="medialib-upload-preview-img"
+            {/* TAB: Video / Motion */}
+            {modalTab === 'VIDEO' && (
+              <form onSubmit={handleSaveUpload} className="modal-body">
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Video / Motion Loop Title *</label>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    placeholder="e.g. Cinematic Particles Blue"
+                    value={videoTitle}
+                    onChange={(e) => setVideoTitle(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Format</label>
+                    <select
+                      className="auth-input"
+                      value={videoFormat}
+                      onChange={(e) => setVideoFormat(e.target.value as 'MOV' | 'MP4')}
+                    >
+                      <option value="MOV">MOV (ProRes)</option>
+                      <option value="MP4">MP4 (H.264)</option>
+                    </select>
+                  </div>
+
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Resolution</label>
+                    <select
+                      className="auth-input"
+                      value={videoRes}
+                      onChange={(e) => setVideoRes(e.target.value)}
+                    >
+                      <option value="4K">4K UHD</option>
+                      <option value="1080p">1080p FHD</option>
+                      <option value="720p">720p HD</option>
+                    </select>
+                  </div>
+
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Duration</label>
+                    <input
+                      type="text"
+                      className="auth-input"
+                      placeholder="0:30"
+                      value={videoDuration}
+                      onChange={(e) => setVideoDuration(e.target.value)}
                     />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+                </div>
+
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Media Source Category</label>
+                  <select
+                    className="auth-input"
+                    value={videoCategory}
+                    onChange={(e) => setVideoCategory(e.target.value as MediaSourceCategory)}
+                  >
+                    <option value="VIDEO">Video Backgrounds</option>
+                    <option value="ANNOUNCEMENTS">Announcements Loops</option>
+                    <option value="SPEAKER_DECK">Speaker Slide Decks</option>
+                  </select>
+                </div>
+
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Preview Image / Poster (Optional)</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            setVideoDataUrl(ev.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
                     <button
                       type="button"
                       className="btn-secondary"
-                      onClick={() => imageFileInputRef.current?.click()}
-                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      Choose Different Image
+                      {videoDataUrl ? 'Change Thumbnail...' : 'Choose Thumbnail...'}
+                    </button>
+                    {videoDataUrl && (
+                      <span style={{ fontSize: '0.75rem', color: '#10b981' }}>Preview loaded</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowUploadModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary">
+                    Save to Media Library
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB: PowerPoint */}
+            {modalTab === 'PPT' && (
+              <form onSubmit={handleSaveUpload} className="modal-body">
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Presentation Title *</label>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    placeholder="e.g. Sermon Outline Oct 24"
+                    value={pptTitle}
+                    onChange={(e) => setPptTitle(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">PowerPoint File (.pptx / .ppt)</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="text"
+                      className="auth-input"
+                      placeholder="Select file or paste file path..."
+                      value={pptFilePath}
+                      onChange={(e) => setPptFilePath(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <input
+                      type="file"
+                      ref={pptFileInputRef}
+                      accept=".ppt,.pptx"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const path = (file as unknown as { path?: string }).path || file.name;
+                          setPptFilePath(path);
+                          if (!pptTitle) {
+                            setPptTitle(file.name.replace(/\.[^/.]+$/, ''));
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => pptFileInputRef.current?.click()}
+                    >
+                      Browse...
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div
-                  className={`medialib-dropzone ${isDraggingOver ? 'dragging' : ''}`}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDraggingOver(true);
-                  }}
-                  onDragLeave={() => setIsDraggingOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setIsDraggingOver(false);
-                    const file = e.dataTransfer.files?.[0];
-                    if (file) processImageFile(file);
-                  }}
-                  onClick={() => imageFileInputRef.current?.click()}
-                >
-                  <ImageIcon size={36} />
-                  <p style={{ margin: '0.5rem 0 0.25rem 0', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Click or drag image file here
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    Supports PNG, JPG, JPEG, WEBP, and SVG (Saved 100% offline in Local DB)
-                  </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Category</label>
+                    <select
+                      className="auth-input"
+                      value={pptCategory}
+                      onChange={(e) => setPptCategory(e.target.value as MediaSourceCategory)}
+                    >
+                      <option value="SPEAKER_DECK">Speaker Slide Decks</option>
+                      <option value="POWERPOINT">PowerPoint Uploads</option>
+                      <option value="ANNOUNCEMENTS">Announcements Loops</option>
+                    </select>
+                  </div>
+
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Slide Count</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      className="auth-input"
+                      value={pptSlideCount}
+                      onChange={(e) => setPptSlideCount(Number(e.target.value))}
+                    />
+                  </div>
                 </div>
-              )}
 
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Image Title *</label>
+                <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowUploadModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary">
+                    Save PowerPoint Deck
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB: Image */}
+            {modalTab === 'IMAGE' && (
+              <form onSubmit={handleSaveUpload} className="modal-body">
                 <input
-                  type="text"
-                  className="auth-input"
-                  placeholder="e.g. Easter Sunrise / Sunday Welcome Banner"
-                  value={imageTitle}
-                  onChange={(e) => setImageTitle(e.target.value)}
-                  required
+                  type="file"
+                  ref={imgFileInputRef}
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        setImgDataUrl(ev.target?.result as string);
+                        if (!imgTitle) {
+                          setImgTitle(file.name.replace(/\.[^/.]+$/, ''));
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
                 />
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                {imgDataUrl ? (
+                  <div className="medialib-upload-preview-box">
+                    <img
+                      src={imgDataUrl}
+                      alt="Preview"
+                      className="medialib-upload-preview-img"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="medialib-dropzone"
+                    onClick={() => imgFileInputRef.current?.click()}
+                  >
+                    <ImageIcon size={36} />
+                    <p style={{ margin: '0.5rem 0 0.25rem 0', fontWeight: 600, color: '#ffffff' }}>
+                      Click to choose an image
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                      Supports PNG, JPG, JPEG, WEBP, SVG (Offline stored)
+                    </p>
+                  </div>
+                )}
+
+                <div className="medialib-form-group" style={{ marginTop: '0.75rem' }}>
+                  <label className="medialib-form-label">Graphic Title *</label>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    placeholder="e.g. Sunday Morning Opening BG"
+                    value={imgTitle}
+                    onChange={(e) => setImgTitle(e.target.value)}
+                    required
+                  />
+                </div>
+
                 <div className="medialib-form-group">
                   <label className="medialib-form-label">Category</label>
                   <select
                     className="auth-input"
-                    value={imageCategory}
-                    onChange={(e) =>
-                      setImageCategory(
-                        e.target.value as 'BACKGROUND' | 'SERMON' | 'ANNOUNCEMENT' | 'PHOTO' | 'SCRIPTURE'
-                      )
-                    }
+                    value={imgCategory}
+                    onChange={(e) => setImgCategory(e.target.value as MediaSourceCategory)}
                   >
-                    <option value="BACKGROUND">Worship Background</option>
-                    <option value="ANNOUNCEMENT">Announcement Banner</option>
-                    <option value="SERMON">Sermon Illustration</option>
-                    <option value="SCRIPTURE">Scripture Wallpaper</option>
-                    <option value="PHOTO">Ministry Photography</option>
+                    <option value="VIDEO">Video Backgrounds / Stills</option>
+                    <option value="ANNOUNCEMENTS">Announcements Loops</option>
+                    <option value="SPEAKER_DECK">Speaker Slide Decks</option>
                   </select>
                 </div>
 
-                <div className="medialib-form-group">
-                  <label className="medialib-form-label">Projection Display Mode</label>
-                  <select
-                    className="auth-input"
-                    value={imageFit}
-                    onChange={(e) => setImageFit(e.target.value as 'cover' | 'contain')}
-                  >
-                    <option value="contain">Fit Canvas (Contain - No Crop)</option>
-                    <option value="cover">Fill Screen (Cover - Edge to Edge)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Optional Text Overlay (Scripture / Caption)</label>
-                <textarea
-                  className="auth-input"
-                  rows={3}
-                  placeholder="Optional words to overlay over the graphic on the projector screen..."
-                  value={imageOverlayText}
-                  onChange={(e) => setImageOverlayText(e.target.value)}
-                />
-              </div>
-
-              <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowAddImageModal(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={!imageDataUrl}>
-                  Save Image to Database
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 1: Add / Edit Song */}
-      {showAddSongModal && (
-        <div className="modal-overlay" onClick={() => setShowAddSongModal(false)}>
-          <div
-            className="quick-edit-modal-card"
-            style={{ maxWidth: '620px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h3 className="modal-title">
-                {editingSongId ? 'Edit Worship Song' : 'Add New Worship Song'}
-              </h3>
-              <button
-                type="button"
-                className="quick-edit-btn"
-                onClick={() => setShowAddSongModal(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveSong} className="modal-body">
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Song Title *</label>
-                <input
-                  type="text"
-                  className="auth-input"
-                  placeholder="e.g. Living Hope / Glorious Day"
-                  value={songTitle}
-                  onChange={(e) => setSongTitle(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div className="medialib-form-group">
-                  <label className="medialib-form-label">Artist / Author</label>
-                  <input
-                    type="text"
-                    className="auth-input"
-                    placeholder="e.g. Phil Wickham"
-                    value={songArtist}
-                    onChange={(e) => setSongArtist(e.target.value)}
-                  />
-                </div>
-
-                <div className="medialib-form-group">
-                  <label className="medialib-form-label">Key Signature</label>
-                  <select
-                    className="auth-input"
-                    value={songKey}
-                    onChange={(e) => setSongKey(e.target.value)}
-                  >
-                    {['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'].map((k) => (
-                      <option key={k} value={k}>
-                        Key of {k}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div className="medialib-form-group">
-                  <label className="medialib-form-label">Tempo / BPM</label>
-                  <input
-                    type="text"
-                    className="auth-input"
-                    placeholder="e.g. 72 BPM"
-                    value={songTempo}
-                    onChange={(e) => setSongTempo(e.target.value)}
-                  />
-                </div>
-
-                <div className="medialib-form-group">
-                  <label className="medialib-form-label">CCLI Song #</label>
-                  <input
-                    type="text"
-                    className="auth-input"
-                    placeholder="e.g. 7106807"
-                    value={songCcli}
-                    onChange={(e) => setSongCcli(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Tags (comma separated)</label>
-                <input
-                  type="text"
-                  className="auth-input"
-                  placeholder="e.g. Praise, Communion, Easter"
-                  value={songTags}
-                  onChange={(e) => setSongTags(e.target.value)}
-                />
-              </div>
-
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">
-                  Lyrics (Separate slides with a blank line)
-                </label>
-                <span className="medialib-form-hint">
-                  Tip: Add section headers like <code>[Verse 1]</code>, <code>[Chorus]</code>, or <code>[Bridge]</code> on the first line.
-                </span>
-                <textarea
-                  className="auth-input"
-                  rows={8}
-                  style={{ fontFamily: 'inherit', resize: 'vertical' }}
-                  placeholder={`[Verse 1]\nHow great the chasm that lay between us\nHow high the mountain I could not climb\n\n[Chorus]\nHallelujah, praise the One who set me free\nHallelujah, death has lost its grip on me`}
-                  value={songLyrics}
-                  onChange={(e) => setSongLyrics(e.target.value)}
-                />
-              </div>
-
-              <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowAddSongModal(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  {editingSongId ? 'Update Song' : 'Save Song to Database'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: Link PowerPoint */}
-      {showLinkPptModal && (
-        <div className="modal-overlay" onClick={() => setShowLinkPptModal(false)}>
-          <div
-            className="quick-edit-modal-card"
-            style={{ maxWidth: '560px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileTextIcon size={18} />
-                <span>Link PowerPoint Presentation (.pptx / .ppt)</span>
-              </h3>
-              <button
-                type="button"
-                className="quick-edit-btn"
-                onClick={() => setShowLinkPptModal(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={handleSavePpt} className="modal-body">
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Presentation Title *</label>
-                <input
-                  type="text"
-                  className="auth-input"
-                  placeholder="e.g. Sunday Sermon: Kingdom Stewardship"
-                  value={pptTitle}
-                  onChange={(e) => setPptTitle(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">PowerPoint File Location</label>
-                <div className="medialib-file-pick-row">
-                  <input
-                    type="text"
-                    className="auth-input"
-                    placeholder="e.g. C:\Presentations\Sermon_Slides.pptx"
-                    value={pptFilePath}
-                    onChange={(e) => setPptFilePath(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept=".ppt,.pptx"
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const path = (file as unknown as { path?: string }).path || file.name;
-                        setPptFilePath(path);
-                        if (!pptTitle) {
-                          setPptTitle(file.name.replace(/\.[^/.]+$/, ''));
-                        }
-                      }
-                    }}
-                  />
+                <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
                   <button
                     type="button"
                     className="btn-secondary"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => setShowUploadModal(false)}
                   >
-                    Browse...
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={!imgDataUrl}>
+                    Save Graphic to Library
                   </button>
                 </div>
-              </div>
+              </form>
+            )}
 
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Slide Count</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  className="auth-input"
-                  value={pptSlideCount}
-                  onChange={(e) => setPptSlideCount(Number(e.target.value))}
-                />
-              </div>
+            {/* TAB: Canva */}
+            {modalTab === 'CANVA' && (
+              <form onSubmit={handleSaveUpload} className="modal-body">
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Canva Presentation Title *</label>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    placeholder="e.g. Youth Night Announcements"
+                    value={canvaTitle}
+                    onChange={(e) => setCanvaTitle(e.target.value)}
+                    required
+                  />
+                </div>
 
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Slide Notes / Key Points (One per slide)</label>
-                <textarea
-                  className="auth-input"
-                  rows={5}
-                  placeholder={`Slide 1: Title & Theme Scripture\nSlide 2: Biblical Foundation - Matthew 6:19\nSlide 3: Principle 1 - Living with Open Hands\nSlide 4: Principle 2 - Trusting God in Scarcity\nSlide 5: Closing Prayer & Commitment`}
-                  value={pptNotes}
-                  onChange={(e) => setPptNotes(e.target.value)}
-                />
-              </div>
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Canva Presentation Link *</label>
+                  <input
+                    type="url"
+                    className="auth-input"
+                    placeholder="https://www.canva.com/design/.../view"
+                    value={canvaUrl}
+                    onChange={(e) => setCanvaUrl(e.target.value)}
+                    required
+                  />
+                </div>
 
-              <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Estimated Slide Count</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    className="auth-input"
+                    value={canvaSlideCount}
+                    onChange={(e) => setCanvaSlideCount(Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowUploadModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary">
+                    Link Canva Design
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB: Song */}
+            {modalTab === 'SONG' && (
+              <form onSubmit={handleSaveUpload} className="modal-body">
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Song Title *</label>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    placeholder="e.g. Way Maker / Living Hope"
+                    value={songTitle}
+                    onChange={(e) => setSongTitle(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Artist</label>
+                    <input
+                      type="text"
+                      className="auth-input"
+                      placeholder="e.g. Sinach / Phil Wickham"
+                      value={songArtist}
+                      onChange={(e) => setSongArtist(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Key</label>
+                    <select
+                      className="auth-input"
+                      value={songKey}
+                      onChange={(e) => setSongKey(e.target.value)}
+                    >
+                      {['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'].map((k) => (
+                        <option key={k} value={k}>
+                          Key of {k}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Lyrics (Separate slides with a blank line)</label>
+                  <textarea
+                    className="auth-input"
+                    rows={6}
+                    placeholder={`[Verse 1]\nYou are here, moving in our midst\nI worship You, I worship You\n\n[Chorus]\nWay maker, miracle worker\nPromise keeper, light in the darkness`}
+                    value={songLyrics}
+                    onChange={(e) => setSongLyrics(e.target.value)}
+                  />
+                </div>
+
+                <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowUploadModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary">
+                    Save Worship Song
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB: Backup & Sync */}
+            {modalTab === 'BACKUP' && (
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
+                  All media records and configurations are persisted in local IndexedDB (<code>BunsenWorshipDB</code> v2).
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handleExportBackup}
+                    style={{ justifyContent: 'center' }}
+                  >
+                    <DownloadIcon size={16} />
+                    <span>Export JSON Backup</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => backupFileInputRef.current?.click()}
+                    style={{ justifyContent: 'center' }}
+                  >
+                    <UploadIcon size={16} />
+                    <span>Restore Backup (.json)</span>
+                  </button>
+                  <input
+                    type="file"
+                    ref={backupFileInputRef}
+                    accept=".json"
+                    style={{ display: 'none' }}
+                    onChange={handleImportBackup}
+                  />
+                </div>
+
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => setShowLinkPptModal(false)}
+                  onClick={handleRestoreSeedData}
+                  style={{ justifyContent: 'center', marginTop: '0.5rem' }}
                 >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  Save PowerPoint Link
+                  <RefreshCwIcon size={14} />
+                  <span>Reset to Default Worship Assets</span>
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: Link Canva */}
-      {showLinkCanvaModal && (
-        <div className="modal-overlay" onClick={() => setShowLinkCanvaModal(false)}>
-          <div
-            className="quick-edit-modal-card"
-            style={{ maxWidth: '560px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <LinkIcon size={18} />
-                <span>Link Canva Presentation</span>
-              </h3>
-              <button
-                type="button"
-                className="quick-edit-btn"
-                onClick={() => setShowLinkCanvaModal(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCanva} className="modal-body">
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Presentation Title *</label>
-                <input
-                  type="text"
-                  className="auth-input"
-                  placeholder="e.g. Sunday Service Announcements & Events"
-                  value={canvaTitle}
-                  onChange={(e) => setCanvaTitle(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Canva Presentation URL *</label>
-                <input
-                  type="url"
-                  className="auth-input"
-                  placeholder="https://www.canva.com/design/DAF.../view"
-                  value={canvaUrl}
-                  onChange={(e) => setCanvaUrl(e.target.value)}
-                  required
-                />
-                <span className="medialib-form-hint">
-                  From Canva: Click <strong>Share &rarr; More &rarr; Embed</strong> or <strong>Public View Link</strong>.
-                </span>
-              </div>
-
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Canva Embed URL (Optional)</label>
-                <input
-                  type="url"
-                  className="auth-input"
-                  placeholder="https://www.canva.com/design/DAF.../view?embed"
-                  value={canvaEmbedUrl}
-                  onChange={(e) => setCanvaEmbedUrl(e.target.value)}
-                />
-              </div>
-
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Page / Slide Count</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  className="auth-input"
-                  value={canvaSlideCount}
-                  onChange={(e) => setCanvaSlideCount(Number(e.target.value))}
-                />
-              </div>
-
-              <div className="medialib-form-group">
-                <label className="medialib-form-label">Slide Topics / Notes (One per slide)</label>
-                <textarea
-                  className="auth-input"
-                  rows={4}
-                  placeholder={`Page 1: Welcome to Bunsen Sanctuary\nPage 2: Midweek Prayer Gathering (Wed 7PM)\nPage 3: Youth Night Fellowship (Sat 4PM)\nPage 4: Online Giving & Tithes`}
-                  value={canvaNotes}
-                  onChange={(e) => setCanvaNotes(e.target.value)}
-                />
-              </div>
-
-              <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowLinkCanvaModal(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  Save Canva Link
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}
