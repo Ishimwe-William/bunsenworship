@@ -90,6 +90,39 @@ export const NotificationBell: React.FC = () => {
       );
     });
 
+    // Check if an update was already detected during app launch before component mounted
+    window.electronAPI.getUpdateStatus().then((status) => {
+      if (status?.isUpdateDownloaded && status.cachedUpdateInfo) {
+        dispatch(
+          addNotification({
+            id: `update-ready-${status.cachedUpdateInfo.version}`,
+            title: 'Update Ready to Install',
+            message: `BunsenWorship v${status.cachedUpdateInfo.version} has finished downloading.`,
+            type: 'update',
+            timestamp: Date.now(),
+            read: false,
+            action: {
+              type: 'restart_and_install',
+              label: 'Restart & Install Now',
+            },
+          })
+        );
+      } else if (status?.cachedUpdateInfo) {
+        dispatch(
+          addNotification({
+            id: `update-avail-${status.cachedUpdateInfo.version}`,
+            title: 'New Release Available',
+            message: `BunsenWorship v${status.cachedUpdateInfo.version} is available for update.`,
+            type: 'update',
+            timestamp: Date.now(),
+            read: false,
+          })
+        );
+      }
+    }).catch(() => {
+      // Non-blocking fallback
+    });
+
     return () => {
       unsubAvailable();
       unsubDownloaded();

@@ -1,6 +1,10 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
+import { UpdateInfo } from './types/electron';
+
+let cachedUpdateInfo: UpdateInfo | null = null;
+let isUpdateDownloaded = false;
 
 /**
  * Initializes automatic background updates for BunsenWorship via electron-updater.
@@ -13,10 +17,16 @@ export function setupAutoUpdater(): void {
     return app.getVersion();
   });
 
+  ipcMain.handle('updater:get-status', () => {
+    return {
+      cachedUpdateInfo,
+      isUpdateDownloaded,
+    };
+  });
+
   ipcMain.on('updater:check-for-updates', () => {
     if (!app.isPackaged) {
-      console.log('[AutoUpdater] In dev mode, check-for-updates simulated.');
-      return;
+      console.log('[AutoUpdater] In dev mode, simulating manual update check against GitHub Releases...');
     }
     autoUpdater.checkForUpdates().catch((err) => {
       console.error('[AutoUpdater] Manual check error:', err);
@@ -32,9 +42,9 @@ export function setupAutoUpdater(): void {
     }
   });
 
-  // In development mode, skip electron-updater network polling
+  // In development mode, allow check when explicitly requested or keep service listening
   if (!app.isPackaged) {
-    console.log('[AutoUpdater] Development mode detected; skipping background update polling.');
+    console.log('[AutoUpdater] Development mode detected; background polling disabled.');
     return;
   }
 
@@ -63,14 +73,16 @@ export function setupAutoUpdater(): void {
 
     autoUpdater.on('update-available', (info) => {
       console.log(`[AutoUpdater] Update available: v${info.version}`);
+      cachedUpdateInfo = {
+        version: info.version,
+        releaseDate: info.releaseDate,
+        releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined,
+      };
+
       // Notify all open windows so the notification bell updates
       BrowserWindow.getAllWindows().forEach((win) => {
         if (!win.isDestroyed()) {
-          win.webContents.send('updater:update-available', {
-            version: info.version,
-            releaseDate: info.releaseDate,
-            releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined,
-          });
+          win.webContents.send('updater:update-available', cachedUpdateInfo);
         }
       });
     });
@@ -85,12 +97,15 @@ export function setupAutoUpdater(): void {
 
     autoUpdater.on('update-downloaded', (info) => {
       console.log(`[AutoUpdater] Update v${info.version} downloaded successfully.`);
+      isUpdateDownloaded = true;
+      cachedUpdateInfo = {
+        version: info.version,
+      };
+
       // Notify all open windows so user can see notification and choose when to restart
       BrowserWindow.getAllWindows().forEach((win) => {
         if (!win.isDestroyed()) {
-          win.webContents.send('updater:update-downloaded', {
-            version: info.version,
-          });
+          win.webContents.send('updater:update-downloaded', cachedUpdateInfo);
         }
       });
     });

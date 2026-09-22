@@ -12,6 +12,7 @@ export interface FcmPushMessage {
 
 export interface ElectronAPI {
   getAppVersion: () => Promise<string>;
+  getUpdateStatus: () => Promise<{ cachedUpdateInfo: UpdateInfo | null; isUpdateDownloaded: boolean }>;
   checkForUpdates: () => void;
   restartAndInstall: () => void;
   onUpdateAvailable: (callback: (info: UpdateInfo) => void) => () => void;

@@ -3,6 +3,7 @@ import { UpdateInfo, FcmPushMessage } from './types/electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
+  getUpdateStatus: () => ipcRenderer.invoke('updater:get-status'),
   checkForUpdates: () => {
     ipcRenderer.send('updater:check-for-updates');
   },
