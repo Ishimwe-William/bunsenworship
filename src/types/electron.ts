@@ -18,6 +18,7 @@ export interface ElectronAPI {
   onUpdateAvailable: (callback: (info: UpdateInfo) => void) => () => void;
   onUpdateDownloaded: (callback: (info: UpdateInfo) => void) => () => void;
   onFcmMessage: (callback: (msg: FcmPushMessage) => void) => () => void;
+  openProjectorWindow: () => Promise<void>;
 }
 
 declare global {

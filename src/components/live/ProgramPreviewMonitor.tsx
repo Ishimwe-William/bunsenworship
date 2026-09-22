@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectLiveSlide,
@@ -32,65 +32,69 @@ export const ProgramPreviewMonitor: React.FC = () => {
   const isLogoActive = useAppSelector(selectIsLogoActive);
 
   const [showBgPicker, setShowBgPicker] = useState(false);
-  const outputWindowRef = useRef<Window | null>(null);
+  const [projectorSource, setProjectorSource] = useState<'LIVE' | 'PREVIEW'>('LIVE');
 
-  // Synchronize secondary projector output window with live state
-  const updateOutputWindow = useCallback(() => {
-    const win = outputWindowRef.current;
-    if (!win || win.closed) return;
+  // Broadcast presentation state to any detached projector window
+  const broadcastProjectorState = useCallback(() => {
+    const isLiveSource = projectorSource === 'LIVE';
+    const targetSlide = isLiveSource ? liveSlide : previewSlide;
 
-    const bg = isBlackout ? '#000000' : activeBackground.gradient;
-    let contentHtml = '';
+    const payload = {
+      slide: targetSlide,
+      backgroundGradient: activeBackground.gradient,
+      isBlackout: isLiveSource ? isBlackout : false,
+      isTextCleared: isLiveSource ? isTextCleared : false,
+      isLogoActive: isLiveSource ? isLogoActive : false,
+      transitionType,
+      fadeDuration,
+      source: projectorSource,
+    };
 
-    if (isBlackout) {
-      contentHtml = '';
-    } else if (isLogoActive) {
-      contentHtml = `
-        <div style="filter: drop-shadow(0 14px 40px rgba(0,0,0,0.85));">
-          <svg width="240" height="240" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="46" stroke="#ffffff" stroke-width="4" opacity="0.9"/>
-            <path d="M50 20 L50 80 M30 40 L70 40" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-          </svg>
-        </div>
-      `;
-    } else if (isTextCleared) {
-      contentHtml = '';
-    } else if (liveSlide && liveSlide.lines.length > 0) {
-      const lineCount = liveSlide.lines.length;
-      const maxLen = Math.max(...liveSlide.lines.map((l) => l.length));
-      let fontSize = '4.25rem';
-      if (lineCount > 5 || maxLen > 55) {
-        fontSize = '3rem';
-      } else if (lineCount > 3 || maxLen > 42) {
-        fontSize = '3.5rem';
-      }
-
-      const linesHtml = liveSlide.lines
-        .map((l) => `<div style="margin-bottom:20px;">${l}</div>`)
-        .join('');
-
-      contentHtml = `
-        <div style="max-width:1640px; width:100%; padding:80px 140px; font-size:${fontSize}; font-weight:800; line-height:1.35; text-shadow:0 8px 32px rgba(0,0,0,0.95), 0 2px 10px rgba(0,0,0,0.9); letter-spacing:-0.015em; box-sizing:border-box;">
-          ${linesHtml}
-        </div>
-      `;
-    } else {
-      contentHtml = `<div style="font-size:3rem; font-weight:800; opacity:0.35; letter-spacing:0.08em;">BUNSENWORSHIP</div>`;
+    // Save as persistent fallback
+    try {
+      localStorage.setItem('bunsenworship_projector_state', JSON.stringify(payload));
+    } catch {
+      // ignore
     }
 
-    win.document.body.style.margin = '0';
-    win.document.body.style.backgroundColor = '#000000';
-    win.document.body.style.overflow = 'hidden';
-    win.document.body.innerHTML = `
-      <div style="width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; background:${bg}; color:#ffffff; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align:center; box-sizing:border-box;">
-        ${contentHtml}
-      </div>
-    `;
-  }, [isBlackout, isLogoActive, isTextCleared, liveSlide, activeBackground]);
+    // Broadcast message
+    try {
+      const channel = new BroadcastChannel('bunsenworship_projector_channel');
+      channel.postMessage({
+        type: 'UPDATE_PROJECTOR_STATE',
+        payload,
+      });
+      channel.close();
+    } catch {
+      // ignore
+    }
+  }, [
+    projectorSource,
+    liveSlide,
+    previewSlide,
+    activeBackground,
+    isBlackout,
+    isTextCleared,
+    isLogoActive,
+    transitionType,
+    fadeDuration,
+  ]);
 
+  // Synchronize on state changes
   useEffect(() => {
-    updateOutputWindow();
-  }, [updateOutputWindow]);
+    broadcastProjectorState();
+  }, [broadcastProjectorState]);
+
+  // Respond to projector window handshake requests
+  useEffect(() => {
+    const channel = new BroadcastChannel('bunsenworship_projector_channel');
+    channel.onmessage = (event) => {
+      if (event.data?.type === 'REQUEST_PROJECTOR_STATE') {
+        broadcastProjectorState();
+      }
+    };
+    return () => channel.close();
+  }, [broadcastProjectorState]);
 
   // Global hotkeys for worship console operator: Enter (Go Live), Space/ArrowDown (Next), ArrowUp (Prev)
   useEffect(() => {
@@ -121,17 +125,27 @@ export const ProgramPreviewMonitor: React.FC = () => {
     dispatch(takeLive());
   };
 
-  const handleOpenOutput = () => {
-    const outputWindow = window.open(
-      '',
-      'BunsenWorship_Sanctuary_Output',
+  const handleOpenOutput = async () => {
+    broadcastProjectorState();
+
+    // 1. Try native Electron IPC if running in desktop app
+    if (window.electronAPI?.openProjectorWindow) {
+      try {
+        await window.electronAPI.openProjectorWindow();
+        return;
+      } catch (err) {
+        console.warn('Native openProjectorWindow failed, falling back to window.open', err);
+      }
+    }
+
+    // 2. Fallback: window.open with ?mode=projector
+    const currentBase = window.location.href.split('?')[0].split('#')[0];
+    const projectorUrl = `${currentBase}?mode=projector`;
+    window.open(
+      projectorUrl,
+      'BunsenWorship_Projector',
       'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no'
     );
-    if (outputWindow) {
-      outputWindowRef.current = outputWindow;
-      outputWindow.document.title = 'BunsenWorship - Sanctuary Projection Output';
-      updateOutputWindow();
-    }
   };
 
   return (
@@ -301,17 +315,71 @@ export const ProgramPreviewMonitor: React.FC = () => {
           </button>
         </div>
 
-        {/* Pop-out Sanctuary Projector Display */}
-        <button
-          type="button"
-          className="console-mini-btn"
-          onClick={handleOpenOutput}
-          style={{ width: '100%', marginTop: '2px' }}
-          title="Open dedicated output window for projector or secondary screen"
+        {/* Pop-out Sanctuary Projector Display with Live/Preview Source Selector */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            marginTop: '4px',
+            paddingTop: '6px',
+            borderTop: '1px solid var(--border-subtle)',
+          }}
         >
-          <MonitorIcon size={13} />
-          <span>Open Projector Window</span>
-        </button>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.7rem',
+              color: 'var(--text-muted)',
+              fontWeight: 600,
+            }}
+          >
+            <span>Projector Target:</span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button
+                type="button"
+                className={`console-mini-btn ${projectorSource === 'LIVE' ? 'active' : ''}`}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '0.65rem',
+                  borderColor: projectorSource === 'LIVE' ? '#ef4444' : undefined,
+                  color: projectorSource === 'LIVE' ? '#ef4444' : undefined,
+                }}
+                onClick={() => setProjectorSource('LIVE')}
+                title="Send Live Program to Projector Output"
+              >
+                ● Live
+              </button>
+              <button
+                type="button"
+                className={`console-mini-btn ${projectorSource === 'PREVIEW' ? 'active' : ''}`}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '0.65rem',
+                  borderColor: projectorSource === 'PREVIEW' ? '#22c55e' : undefined,
+                  color: projectorSource === 'PREVIEW' ? '#22c55e' : undefined,
+                }}
+                onClick={() => setProjectorSource('PREVIEW')}
+                title="Send Preview to Projector Output"
+              >
+                Next Preview
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="console-mini-btn"
+            onClick={handleOpenOutput}
+            style={{ width: '100%', justifyContent: 'center', gap: '8px' }}
+            title="Open dedicated output window for projector or secondary screen"
+          >
+            <MonitorIcon size={13} />
+            <span>Open Projector Window ({projectorSource === 'LIVE' ? 'Live' : 'Preview'})</span>
+          </button>
+        </div>
       </div>
     </div>
   );

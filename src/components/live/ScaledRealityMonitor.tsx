@@ -52,18 +52,21 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
   const lineCount = lines.length;
   const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
 
-  let fontSize = 72;
-  let lineHeight = 1.35;
+  let fontSize = 104;
+  let lineHeight = 1.3;
 
   if (lineCount > 5 || maxLineLength > 55) {
-    fontSize = 48;
-    lineHeight = 1.3;
-  } else if (lineCount > 3 || maxLineLength > 42) {
-    fontSize = 58;
+    fontSize = 68;
     lineHeight = 1.32;
-  } else if (lineCount === 1 && maxLineLength <= 25) {
-    fontSize = 84;
+  } else if (lineCount > 3 || maxLineLength > 42) {
+    fontSize = 82;
     lineHeight = 1.3;
+  } else if (lineCount === 3) {
+    fontSize = 92;
+    lineHeight = 1.28;
+  } else if (lineCount === 1 && maxLineLength <= 28) {
+    fontSize = 118;
+    lineHeight = 1.25;
   }
 
   return (

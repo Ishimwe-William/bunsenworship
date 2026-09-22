@@ -32,4 +32,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('fcm:message', handler);
     };
   },
+  openProjectorWindow: () => ipcRenderer.invoke('projector:open'),
 });

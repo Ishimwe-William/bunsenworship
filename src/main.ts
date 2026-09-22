@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, Tray, ipcMain } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWindowState, manageWindowState } from './windowState';
@@ -6,6 +6,7 @@ import { createSplashScreen } from './splash';
 import { setupAutoUpdater } from './updater';
 
 let tray: Tray | null = null;
+let projectorWindow: BrowserWindow | null = null;
 
 // Helper to resolve asset paths across dev mode and packaged distribution
 const getAssetPath = (filename: string): string => {
@@ -146,6 +147,18 @@ const createWindow = () => {
     }
   });
 
+  // Allow child windows with preload
+  mainWindow.webContents.setWindowOpenHandler(() => {
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        webPreferences: {
+          preload: path.join(__dirname, '../preload/preload.js'),
+        },
+      },
+    };
+  });
+
   // Load the web app
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -153,6 +166,50 @@ const createWindow = () => {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 };
+
+const createProjectorWindow = () => {
+  if (projectorWindow && !projectorWindow.isDestroyed()) {
+    if (projectorWindow.isMinimized()) {
+      projectorWindow.restore();
+    }
+    projectorWindow.show();
+    projectorWindow.focus();
+    return;
+  }
+
+  const appIconPath = getAssetPath('AppIcon-256.png');
+  const appIcon = nativeImage.createFromPath(appIconPath);
+
+  projectorWindow = new BrowserWindow({
+    width: 1280,
+    height: 720,
+    minWidth: 800,
+    minHeight: 450,
+    title: 'BunsenWorship - Sanctuary Projection Output',
+    backgroundColor: '#000000',
+    icon: appIcon.isEmpty() ? undefined : appIcon,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js'),
+    },
+  });
+
+  if (process.env.VITE_DEV_SERVER_URL) {
+    projectorWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}?mode=projector`);
+  } else {
+    projectorWindow.loadFile(path.join(__dirname, '../renderer/index.html'), {
+      query: { mode: 'projector' },
+    });
+  }
+
+  projectorWindow.on('closed', () => {
+    projectorWindow = null;
+  });
+};
+
+ipcMain.handle('projector:open', () => {
+  createProjectorWindow();
+});
 
 // This method will be called when Electron has finished initialization
 app.on('ready', () => {

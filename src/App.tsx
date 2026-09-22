@@ -16,9 +16,19 @@ import {
   RemotesScreen,
   SettingsScreen,
 } from './components/screens';
+import { ProjectorWindowView } from './components/live';
 import './App.css';
 
 export const App: React.FC = () => {
+  const isProjectorMode =
+    typeof window !== 'undefined' &&
+    (window.location.search.includes('mode=projector') ||
+      window.location.hash.includes('projector'));
+
+  if (isProjectorMode) {
+    return <ProjectorWindowView />;
+  }
+
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const activeTab = useAppSelector(selectActiveTab);
   const { t } = useLanguage();
