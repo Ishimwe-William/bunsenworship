@@ -88,7 +88,13 @@ export const App: React.FC = () => {
         </header>
 
         {/* Dynamic Screen View */}
-        <main className="screen-scroll-container">{renderActiveScreen()}</main>
+        <main
+          className={`screen-scroll-container ${
+            activeTab === 'live-show' ? 'is-live-console' : ''
+          }`}
+        >
+          {renderActiveScreen()}
+        </main>
       </div>
     </div>
   );
