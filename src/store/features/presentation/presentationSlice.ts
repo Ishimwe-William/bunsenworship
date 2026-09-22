@@ -406,6 +406,13 @@ export const presentationSlice = createSlice({
       const [movedSlide] = item.slides.splice(sourceIndex, 1);
       item.slides.splice(targetIndex, 0, movedSlide);
     },
+    setLoadedRundown: (state, action: PayloadAction<RundownItem[]>) => {
+      state.rundown = action.payload;
+      if (action.payload.length > 0) {
+        state.selectedRundownId = action.payload[0].id;
+        state.previewSlideId = action.payload[0].slides[0]?.id || null;
+      }
+    },
   },
 });
 
@@ -434,6 +441,7 @@ export const {
   addRundownItem,
   reorderRundown,
   reorderSlides,
+  setLoadedRundown,
 } = presentationSlice.actions;
 
 export const presentationReducer = presentationSlice.reducer;

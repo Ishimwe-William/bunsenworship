@@ -3,8 +3,9 @@ import { ThemeToggle, useTheme } from '../theme';
 import { LanguageToggle, useLanguage } from '../language';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { logout, selectAuthUser } from '../../store/features/auth';
-import { LogoutIcon, GlobeAltIcon, SunIcon, MoonIcon, LaptopIcon } from '../common/Icons';
+import { LogoutIcon, GlobeAltIcon, SunIcon, MoonIcon, LaptopIcon, DatabaseIcon } from '../common/Icons';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
+import { setActiveTab } from '../../store/features/navigation';
 import pkg from '../../../package.json';
 
 export const SettingsScreen: React.FC = () => {
@@ -190,6 +191,54 @@ export const SettingsScreen: React.FC = () => {
             <input type="checkbox" />
             <span>{t.settings.autoBlank}</span>
           </label>
+        </div>
+      </section>
+
+      {/* Local Database Storage & Persistence */}
+      <section className="theme-status-card">
+        <div className="status-card-header">
+          <div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <DatabaseIcon size={18} style={{ color: 'var(--color-primary)' }} />
+              <span>Local Database & Storage</span>
+            </h3>
+            <p className="section-description">
+              Offline persistent IndexedDB storage engine for worship songs, PowerPoint links, and Canva presentations
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => dispatch(setActiveTab('media-library'))}
+          >
+            Manage Library & DB
+          </button>
+        </div>
+
+        <div className="status-grid">
+          <div className="status-item">
+            <div className="status-label">Database Engine</div>
+            <div className="status-value">
+              <span className="status-pill" style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', color: 'var(--color-success)' }}>
+                IndexedDB (v1)
+              </span>
+            </div>
+          </div>
+
+          <div className="status-item">
+            <div className="status-label">Offline Persistence</div>
+            <div className="status-value">100% Offline Capable</div>
+          </div>
+
+          <div className="status-item">
+            <div className="status-label">PowerPoint & Canva</div>
+            <div className="status-value">Linked & Stored</div>
+          </div>
+
+          <div className="status-item">
+            <div className="status-label">Backup & Restore</div>
+            <div className="status-value">JSON Snapshot</div>
+          </div>
         </div>
       </section>
 

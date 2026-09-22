@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectRundown,
@@ -7,9 +7,11 @@ import {
   setSelectedRundownId,
   addRundownItem,
   reorderRundown,
+  setLoadedRundown,
   RundownItemType,
 } from '../../store/features/presentation';
 import { PlusIcon, GripVerticalIcon } from '../common/Icons';
+import { bunsenDb } from '../../db';
 
 export const ServiceRundown: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -27,6 +29,50 @@ export const ServiceRundown: React.FC = () => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [dropPosition, setDropPosition] = useState<'above' | 'below' | null>(null);
+
+  // 1. Hydrate rundown from local DB on startup
+  useEffect(() => {
+    let isMounted = true;
+    bunsenDb
+      .getCurrentService()
+      .then((savedService) => {
+        if (isMounted && savedService && savedService.items && savedService.items.length > 0) {
+          dispatch(setLoadedRundown(savedService.items));
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not hydrate service from local DB:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch]);
+
+  // 2. Automatically persist rundown changes to local DB (debounced)
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      bunsenDb
+        .saveService({
+          id: 'service-current',
+          title: 'Sunday Morning Worship',
+          date: new Date().toISOString().split('T')[0],
+          isCurrent: true,
+          items: rundown,
+          createdAt: 1710000000000,
+          updatedAt: Date.now(),
+        })
+        .catch((err) => console.warn('Auto-save to local DB failed:', err));
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [rundown]);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -48,7 +94,6 @@ export const ServiceRundown: React.FC = () => {
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    // Only reset if leaving the current target element entirely
     const related = e.relatedTarget as Node | null;
     if (!e.currentTarget.contains(related)) {
       setDragOverIndex(null);
@@ -91,8 +136,8 @@ export const ServiceRundown: React.FC = () => {
         slides: [
           {
             id: `s-${Date.now()}-1`,
-            section: 'Verse 1',
-            lines: ['New lyric line 1', 'New lyric line 2'],
+            section: newType === 'PPT' ? 'Slide 1' : newType === 'CANVA' ? 'Page 1' : 'Verse 1',
+            lines: [`${newTitle.trim()} - Line 1`, 'Lyric line 2'],
           },
         ],
       })
@@ -113,6 +158,10 @@ export const ServiceRundown: React.FC = () => {
         return 'type-song';
       case 'SERMON':
         return 'type-sermon';
+      case 'PPT':
+        return 'type-ppt';
+      case 'CANVA':
+        return 'type-canva';
       default:
         return 'type-song';
     }
@@ -227,10 +276,12 @@ export const ServiceRundown: React.FC = () => {
                     value={newType}
                     onChange={(e) => setNewType(e.target.value as RundownItemType)}
                   >
-                    <option value="SONG">SONG</option>
-                    <option value="SERMON">SERMON</option>
-                    <option value="VIDEO">VIDEO</option>
-                    <option value="LOOP">LOOP</option>
+                    <option value="SONG">SONG (Worship)</option>
+                    <option value="SERMON">SERMON (Message)</option>
+                    <option value="PPT">PPT (PowerPoint)</option>
+                    <option value="CANVA">CANVA (Presentation)</option>
+                    <option value="VIDEO">VIDEO (Playback)</option>
+                    <option value="LOOP">LOOP (Motion)</option>
                   </select>
                 </div>
               </div>

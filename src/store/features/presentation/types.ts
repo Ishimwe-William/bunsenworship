@@ -1,4 +1,4 @@
-export type RundownItemType = 'LOOP' | 'VIDEO' | 'SONG' | 'SERMON';
+export type RundownItemType = 'LOOP' | 'VIDEO' | 'SONG' | 'SERMON' | 'PPT' | 'CANVA';
 export type TransitionType = 'CUT' | 'FADE';
 
 export interface Slide {
@@ -15,6 +15,14 @@ export interface RundownItem {
   subtitle: string;
   type: RundownItemType;
   slides: Slide[];
+  externalMeta?: {
+    type: 'PPT' | 'CANVA';
+    sourceUrl?: string;
+    canvaUrl?: string;
+    filePath?: string;
+    slideCount?: number;
+    embedUrl?: string;
+  };
 }
 
 export interface BackgroundTheme {

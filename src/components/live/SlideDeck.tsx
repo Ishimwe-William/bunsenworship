@@ -108,7 +108,16 @@ export const SlideDeck: React.FC = () => {
     <section className="slide-deck-col">
       <div className="deck-header">
         <h3 className="deck-header-title">
-          <span>{currentItem.title} - LYRICS SLIDE DECK</span>
+          <span>
+            {currentItem.title} -{' '}
+            {currentItem.type === 'PPT'
+              ? 'POWERPOINT DECK'
+              : currentItem.type === 'CANVA'
+              ? 'CANVA PRESENTATION'
+              : currentItem.type === 'SERMON'
+              ? 'SERMON SLIDES'
+              : 'LYRICS SLIDE DECK'}
+          </span>
         </h3>
         <div className="deck-header-actions">
           <button

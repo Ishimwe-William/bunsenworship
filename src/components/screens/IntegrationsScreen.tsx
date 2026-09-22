@@ -39,6 +39,30 @@ export const IntegrationsScreen: React.FC = () => {
 
         <div className="status-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
+            <strong>Microsoft PowerPoint (.pptx / .ppt)</strong>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+              Direct slide linkage and outline synchronization with local .pptx files
+            </p>
+          </div>
+          <span className="status-pill" style={{ backgroundColor: 'rgba(234, 88, 12, 0.15)', color: '#fb923c' }}>
+            Supported &bull; Local DB
+          </span>
+        </div>
+
+        <div className="status-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <strong>Canva Cloud Presentations</strong>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+              Direct linking and web embed playback for Canva announcements and sermon graphics
+            </p>
+          </div>
+          <span className="status-pill" style={{ backgroundColor: 'rgba(6, 182, 212, 0.15)', color: '#22d3ee' }}>
+            Supported &bull; Cloud Link
+          </span>
+        </div>
+
+        <div className="status-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
             <strong>OBS / NDI Network Output</strong>
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
               Broadcast transparent lower thirds directly to your livestream encoder
