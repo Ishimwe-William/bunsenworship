@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectLiveSlide,
@@ -17,7 +17,7 @@ import {
   setActiveBackground,
 } from '../../store/features/presentation';
 import { PlayIcon, SlidersIcon, MonitorIcon } from '../common/Icons';
-import { BunsenWorshipLogo } from '../sidebar/NavIcons';
+import { ScaledRealityMonitor } from './ScaledRealityMonitor';
 
 export const ProgramPreviewMonitor: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -32,6 +32,65 @@ export const ProgramPreviewMonitor: React.FC = () => {
   const isLogoActive = useAppSelector(selectIsLogoActive);
 
   const [showBgPicker, setShowBgPicker] = useState(false);
+  const outputWindowRef = useRef<Window | null>(null);
+
+  // Synchronize secondary projector output window with live state
+  const updateOutputWindow = useCallback(() => {
+    const win = outputWindowRef.current;
+    if (!win || win.closed) return;
+
+    const bg = isBlackout ? '#000000' : activeBackground.gradient;
+    let contentHtml = '';
+
+    if (isBlackout) {
+      contentHtml = '';
+    } else if (isLogoActive) {
+      contentHtml = `
+        <div style="filter: drop-shadow(0 14px 40px rgba(0,0,0,0.85));">
+          <svg width="240" height="240" viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="46" stroke="#ffffff" stroke-width="4" opacity="0.9"/>
+            <path d="M50 20 L50 80 M30 40 L70 40" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+          </svg>
+        </div>
+      `;
+    } else if (isTextCleared) {
+      contentHtml = '';
+    } else if (liveSlide && liveSlide.lines.length > 0) {
+      const lineCount = liveSlide.lines.length;
+      const maxLen = Math.max(...liveSlide.lines.map((l) => l.length));
+      let fontSize = '4.25rem';
+      if (lineCount > 5 || maxLen > 55) {
+        fontSize = '3rem';
+      } else if (lineCount > 3 || maxLen > 42) {
+        fontSize = '3.5rem';
+      }
+
+      const linesHtml = liveSlide.lines
+        .map((l) => `<div style="margin-bottom:20px;">${l}</div>`)
+        .join('');
+
+      contentHtml = `
+        <div style="max-width:1640px; width:100%; padding:80px 140px; font-size:${fontSize}; font-weight:800; line-height:1.35; text-shadow:0 8px 32px rgba(0,0,0,0.95), 0 2px 10px rgba(0,0,0,0.9); letter-spacing:-0.015em; box-sizing:border-box;">
+          ${linesHtml}
+        </div>
+      `;
+    } else {
+      contentHtml = `<div style="font-size:3rem; font-weight:800; opacity:0.35; letter-spacing:0.08em;">BUNSENWORSHIP</div>`;
+    }
+
+    win.document.body.style.margin = '0';
+    win.document.body.style.backgroundColor = '#000000';
+    win.document.body.style.overflow = 'hidden';
+    win.document.body.innerHTML = `
+      <div style="width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; background:${bg}; color:#ffffff; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align:center; box-sizing:border-box;">
+        ${contentHtml}
+      </div>
+    `;
+  }, [isBlackout, isLogoActive, isTextCleared, liveSlide, activeBackground]);
+
+  useEffect(() => {
+    updateOutputWindow();
+  }, [updateOutputWindow]);
 
   // Global hotkeys for worship console operator: Enter (Go Live), Space/ArrowDown (Next), ArrowUp (Prev)
   useEffect(() => {
@@ -63,24 +122,15 @@ export const ProgramPreviewMonitor: React.FC = () => {
   };
 
   const handleOpenOutput = () => {
-    // Open detached projection window for second monitor / projector
     const outputWindow = window.open(
       '',
       'BunsenWorship_Sanctuary_Output',
       'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no'
     );
     if (outputWindow) {
+      outputWindowRef.current = outputWindow;
       outputWindow.document.title = 'BunsenWorship - Sanctuary Projection Output';
-      outputWindow.document.body.style.margin = '0';
-      outputWindow.document.body.style.backgroundColor = '#000000';
-      outputWindow.document.body.style.overflow = 'hidden';
-      outputWindow.document.body.innerHTML = `
-        <div id="output-root" style="width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; background:${activeBackground.gradient}; color:#ffffff; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align:center; padding:3rem; box-sizing:border-box;">
-          <h1 style="font-size:3.5rem; font-weight:800; text-shadow:0 4px 20px rgba(0,0,0,0.9); line-height:1.35;">
-            ${liveSlide ? liveSlide.lines.join('<br/>') : 'BunsenWorship'}
-          </h1>
-        </div>
-      `;
+      updateOutputWindow();
     }
   };
 
@@ -109,43 +159,17 @@ export const ProgramPreviewMonitor: React.FC = () => {
           <span className="monitor-badge badge-live">Live</span>
         </div>
 
-        <div className="monitor-screen-frame is-live-frame">
-          {/* Active Background */}
-          <div
-            className="monitor-bg-canvas"
-            style={{
-              background: isBlackout ? '#000000' : activeBackground.gradient,
-            }}
-          />
-          <div className="monitor-atmosphere" />
-
-          {/* Foreground Visual / Text Layer */}
-          {isBlackout ? (
-            <div className="monitor-text-content" style={{ color: '#ef4444', opacity: 0.8, fontSize: '0.8rem', letterSpacing: '0.1em' }}>
-              &bull; BLACKOUT ACTIVE &bull;
-            </div>
-          ) : isLogoActive ? (
-            <div style={{ position: 'relative', zIndex: 2, filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.7))' }}>
-              <BunsenWorshipLogo size={64} />
-            </div>
-          ) : isTextCleared ? (
-            <div className="monitor-text-content" style={{ opacity: 0.5, fontSize: '0.75rem' }}>
-              [Background Only &bull; Text Cleared]
-            </div>
-          ) : (
-            <div className="monitor-text-content">
-              {liveSlide ? (
-                liveSlide.lines.map((line, idx) => (
-                  <div key={idx} style={{ marginBottom: idx < liveSlide.lines.length - 1 ? '4px' : 0 }}>
-                    {line}
-                  </div>
-                ))
-              ) : (
-                <div style={{ opacity: 0.5 }}>[No Active Live Slide]</div>
-              )}
-            </div>
-          )}
-        </div>
+        <ScaledRealityMonitor
+          slide={liveSlide}
+          backgroundGradient={activeBackground.gradient}
+          isBlackout={isBlackout}
+          isTextCleared={isTextCleared}
+          isLogoActive={isLogoActive}
+          transitionType={transitionType}
+          fadeDuration={fadeDuration}
+          emptyLabel="[No Active Live Slide]"
+          isLive={true}
+        />
       </div>
 
       {/* 2. NEXT PREVIEW MONITOR */}
@@ -155,29 +179,13 @@ export const ProgramPreviewMonitor: React.FC = () => {
           <span className="monitor-badge badge-preview">Preview</span>
         </div>
 
-        <div className="monitor-screen-frame is-preview-frame">
-          {/* Next Preview Background */}
-          <div
-            className="monitor-bg-canvas"
-            style={{
-              background: 'linear-gradient(160deg, #091e3a 0%, #1e293b 40%, #064e3b 80%, #059669 100%)',
-            }}
-          />
-          <div className="monitor-atmosphere" />
-
-          {/* Preview Text Layer */}
-          <div className="monitor-text-content">
-            {previewSlide ? (
-              previewSlide.lines.map((line, idx) => (
-                <div key={idx} style={{ marginBottom: idx < previewSlide.lines.length - 1 ? '4px' : 0 }}>
-                  {line}
-                </div>
-              ))
-            ) : (
-              <div style={{ opacity: 0.5 }}>[No Slide Queued]</div>
-            )}
-          </div>
-        </div>
+        <ScaledRealityMonitor
+          slide={previewSlide}
+          backgroundGradient={activeBackground.gradient}
+          transitionType="CUT"
+          emptyLabel="[No Slide Queued]"
+          isLive={false}
+        />
       </div>
 
       {/* 3. TRANSITIONS & GO LIVE CONTROLS */}
