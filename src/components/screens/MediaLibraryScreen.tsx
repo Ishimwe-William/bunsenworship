@@ -31,6 +31,7 @@ import {
   VideoIcon,
   PresentationIcon,
 } from '../common/Icons';
+import { useLanguage } from '../language';
 import './MediaLibraryScreen.css';
 
 type MediaSourceCategory =
@@ -48,6 +49,7 @@ type ModalTab = 'VIDEO' | 'PPT' | 'IMAGE' | 'CANVA' | 'SONG' | 'BACKUP';
 
 export const MediaLibraryScreen: React.FC = () => {
   const dispatch = useAppDispatch();
+  const { t } = useLanguage();
 
   // Navigation & filter state
   const [selectedSource, setSelectedSource] = useState<MediaSourceCategory>('VIDEO');
@@ -582,16 +584,14 @@ export const MediaLibraryScreen: React.FC = () => {
   };
 
   return (
-    <div className="screen-content medialib-screen">
+    <div className="medialib-screen">
       {/* -----------------------------------------------------------------
           Top Header Bar
           ----------------------------------------------------------------- */}
       <div className="medialib-top-header">
         <div className="medialib-header-left">
-          <h2 className="medialib-title">Presentation & Media Library</h2>
-          <p className="medialib-desc">
-            Access worship backgrounds, scripture databases, and slide decks
-          </p>
+          <h2 className="medialib-title">{t.mediaLibrary.title}</h2>
+          <p className="medialib-desc">{t.mediaLibrary.subtitle}</p>
         </div>
 
         <button
@@ -600,7 +600,7 @@ export const MediaLibraryScreen: React.FC = () => {
           onClick={() => setShowUploadModal(true)}
         >
           <UploadIcon size={16} />
-          <span>Upload Presentation / Video</span>
+          <span>{t.mediaLibrary.uploadButton}</span>
         </button>
       </div>
 
@@ -627,7 +627,7 @@ export const MediaLibraryScreen: React.FC = () => {
       <div className="medialib-content-layout">
         {/* Left Column: MEDIA SOURCES */}
         <aside className="medialib-sidebar">
-          <h3 className="medialib-sidebar-title">MEDIA SOURCES</h3>
+          <h3 className="medialib-sidebar-title">{t.mediaLibrary.mediaSources}</h3>
           <div className="medialib-sources-list">
             <button
               type="button"
@@ -636,7 +636,7 @@ export const MediaLibraryScreen: React.FC = () => {
             >
               <div className="medialib-source-item-left">
                 <FolderIcon size={16} className="medialib-source-icon" />
-                <span>All Media Assets</span>
+                <span>{t.mediaLibrary.allMedia}</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.ALL}</span>
             </button>
@@ -648,7 +648,7 @@ export const MediaLibraryScreen: React.FC = () => {
             >
               <div className="medialib-source-item-left">
                 <PresentationIcon size={16} className="medialib-source-icon" />
-                <span>PowerPoint Uploads</span>
+                <span>{t.mediaLibrary.powerPointUploads}</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.POWERPOINT}</span>
             </button>
@@ -660,7 +660,7 @@ export const MediaLibraryScreen: React.FC = () => {
             >
               <div className="medialib-source-item-left">
                 <VideoIcon size={16} className="medialib-source-icon" />
-                <span>Video Backgrounds</span>
+                <span>{t.mediaLibrary.videoBackgrounds}</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.VIDEO}</span>
             </button>
@@ -672,7 +672,7 @@ export const MediaLibraryScreen: React.FC = () => {
             >
               <div className="medialib-source-item-left">
                 <PresentationIcon size={16} className="medialib-source-icon" />
-                <span>Speaker Slide Decks</span>
+                <span>{t.mediaLibrary.speakerDecks}</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.SPEAKER_DECK}</span>
             </button>
@@ -684,7 +684,7 @@ export const MediaLibraryScreen: React.FC = () => {
             >
               <div className="medialib-source-item-left">
                 <ImageIcon size={16} className="medialib-source-icon" />
-                <span>Announcements Loops</span>
+                <span>{t.mediaLibrary.announcementsLoops}</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.ANNOUNCEMENTS}</span>
             </button>
@@ -696,7 +696,7 @@ export const MediaLibraryScreen: React.FC = () => {
             >
               <div className="medialib-source-item-left">
                 <MusicIcon size={16} className="medialib-source-icon" />
-                <span>Worship Songs</span>
+                <span>{t.mediaLibrary.worshipSongs}</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.SONGS}</span>
             </button>
@@ -708,14 +708,14 @@ export const MediaLibraryScreen: React.FC = () => {
             >
               <div className="medialib-source-item-left">
                 <LinkIcon size={16} className="medialib-source-icon" />
-                <span>Canva Presentations</span>
+                <span>{t.mediaLibrary.canvaPresentations}</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.CANVA}</span>
             </button>
           </div>
         </aside>
 
-        {/* Right Column: Search + Filters + 3-Col Card Grid */}
+        {/* Right Column: Search + Filters + Media Cards Grid */}
         <main className="medialib-main-content">
           {/* Top Search & Filter Bar */}
           <div className="medialib-search-filter-row">
@@ -723,134 +723,141 @@ export const MediaLibraryScreen: React.FC = () => {
               <SearchIcon size={14} style={{ color: '#64748b' }} />
               <input
                 type="text"
-                placeholder="Search media library..."
+                placeholder={t.mediaLibrary.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
             <div className="medialib-filter-row">
-              <span className="medialib-filter-label">Filter:</span>
+              <span className="medialib-filter-label">{t.mediaLibrary.filterLabel}</span>
               <div className="medialib-filter-links">
                 <button
                   type="button"
                   className={`medialib-filter-link ${activeFilter === 'ALL' ? 'active' : ''}`}
                   onClick={() => setActiveFilter('ALL')}
                 >
-                  All
+                  {t.mediaLibrary.filterAll}
                 </button>
                 <button
                   type="button"
                   className={`medialib-filter-link ${activeFilter === 'VIDEOS' ? 'active' : ''}`}
                   onClick={() => setActiveFilter('VIDEOS')}
                 >
-                  Videos
+                  {t.mediaLibrary.filterVideos}
                 </button>
                 <button
                   type="button"
                   className={`medialib-filter-link ${activeFilter === 'POWERPOINTS' ? 'active' : ''}`}
                   onClick={() => setActiveFilter('POWERPOINTS')}
                 >
-                  PowerPoints
+                  {t.mediaLibrary.filterPowerPoints}
                 </button>
                 <button
                   type="button"
                   className={`medialib-filter-link ${activeFilter === 'IMAGES' ? 'active' : ''}`}
                   onClick={() => setActiveFilter('IMAGES')}
                 >
-                  Images
+                  {t.mediaLibrary.filterImages}
                 </button>
                 <button
                   type="button"
                   className={`medialib-filter-link ${activeFilter === 'CANVA' ? 'active' : ''}`}
                   onClick={() => setActiveFilter('CANVA')}
                 >
-                  Canva
+                  {t.mediaLibrary.filterCanva}
                 </button>
                 <button
                   type="button"
                   className={`medialib-filter-link ${activeFilter === 'SONGS' ? 'active' : ''}`}
                   onClick={() => setActiveFilter('SONGS')}
                 >
-                  Songs
+                  {t.mediaLibrary.filterSongs}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* 3-Column 16:9 Media Cards Grid */}
+          {/* Media Cards Grid (Scrolls when items are many) */}
           <div className="medialib-cards-grid">
-            {displayedItems.map((item) => {
-              const isAdded = addedItemIds[item.id];
+            {displayedItems.length === 0 ? (
+              <div className="medialib-empty-state">
+                <FolderIcon size={42} className="medialib-empty-icon" />
+                <p className="medialib-empty-text">{t.mediaLibrary.noResults}</p>
+              </div>
+            ) : (
+              displayedItems.map((item) => {
+                const isAdded = addedItemIds[item.id];
 
-              return (
-                <div key={item.id} className="medialib-media-card">
-                  {/* 16:9 Visual Thumbnail Container */}
-                  <div className="medialib-thumb-container">
-                    <img
-                      src={item.thumbnailUrl}
-                      alt={item.title}
-                      className="medialib-thumb-img"
-                    />
+                return (
+                  <div key={item.id} className="medialib-media-card">
+                    {/* 16:9 Visual Thumbnail Container */}
+                    <div className="medialib-thumb-container">
+                      <img
+                        src={item.thumbnailUrl}
+                        alt={item.title}
+                        className="medialib-thumb-img"
+                      />
 
-                    {/* Hover Action Overlay */}
-                    <div className="medialib-card-hover-actions">
-                      <button
-                        type="button"
-                        className={`medialib-action-btn-primary ${isAdded ? 'is-added' : ''}`}
-                        onClick={() => handleAddToRundown(item)}
-                        title="Add to active presentation rundown"
-                      >
-                        {isAdded ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
-                        <span>{isAdded ? 'In Rundown' : 'Add to Rundown'}</span>
-                      </button>
-
-                      {item.format !== 'SONG' && (
+                      {/* Hover Action Overlay */}
+                      <div className="medialib-card-hover-actions">
                         <button
                           type="button"
-                          className="medialib-action-btn-icon"
-                          onClick={() => handleSetBackground(item)}
-                          title="Set as Live Background"
+                          className={`medialib-action-btn-primary ${isAdded ? 'is-added' : ''}`}
+                          onClick={() => handleAddToRundown(item)}
+                          title={isAdded ? t.mediaLibrary.inRundown : t.mediaLibrary.addToRundown}
                         >
-                          <ImageIcon size={14} />
+                          {isAdded ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
+                          <span>{isAdded ? t.mediaLibrary.inRundown : t.mediaLibrary.addToRundown}</span>
                         </button>
-                      )}
 
-                      {item.canvaUrl && (
-                        <a
-                          href={item.canvaUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="medialib-action-btn-icon"
-                          title="Open in Canva"
-                          style={{ textDecoration: 'none' }}
-                        >
-                          <LinkIcon size={14} />
-                        </a>
-                      )}
-                    </div>
-                  </div>
+                        {item.format !== 'SONG' && (
+                          <button
+                            type="button"
+                            className="medialib-action-btn-icon"
+                            onClick={() => handleSetBackground(item)}
+                            title={t.mediaLibrary.setBackground}
+                          >
+                            <ImageIcon size={14} />
+                          </button>
+                        )}
 
-                  {/* Card Info Below Thumbnail */}
-                  <div className="medialib-card-info">
-                    <h4 className="medialib-card-title" title={item.title}>
-                      {item.title}
-                    </h4>
-                    <div className="medialib-card-meta-row">
-                      <div className="medialib-meta-left">
-                        <span className={`medialib-format-pill ${item.format.toLowerCase()}`}>
-                          {item.format}
-                        </span>
-                        {item.resolution && (
-                          <span className="medialib-res-pill">{item.resolution}</span>
+                        {item.canvaUrl && (
+                          <a
+                            href={item.canvaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="medialib-action-btn-icon"
+                            title="Open in Canva"
+                            style={{ textDecoration: 'none' }}
+                          >
+                            <LinkIcon size={14} />
+                          </a>
                         )}
                       </div>
-                      <span className="medialib-duration-pill">{item.durationOrSlides}</span>
+                    </div>
+
+                    {/* Card Info Below Thumbnail */}
+                    <div className="medialib-card-info">
+                      <h4 className="medialib-card-title" title={item.title}>
+                        {item.title}
+                      </h4>
+                      <div className="medialib-card-meta-row">
+                        <div className="medialib-meta-left">
+                          <span className={`medialib-format-pill ${item.format.toLowerCase()}`}>
+                            {item.format}
+                          </span>
+                          {item.resolution && (
+                            <span className="medialib-res-pill">{item.resolution}</span>
+                          )}
+                        </div>
+                        <span className="medialib-duration-pill">{item.durationOrSlides}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </main>
       </div>
@@ -868,14 +875,14 @@ export const MediaLibraryScreen: React.FC = () => {
             <div className="modal-header">
               <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <UploadIcon size={18} />
-                <span>Upload Presentation or Media</span>
+                <span>{t.mediaLibrary.uploadModalTitle}</span>
               </h3>
               <button
                 type="button"
                 className="quick-edit-btn"
                 onClick={() => setShowUploadModal(false)}
               >
-                Close
+                {t.mediaLibrary.close}
               </button>
             </div>
 
@@ -886,42 +893,42 @@ export const MediaLibraryScreen: React.FC = () => {
                 className={`medialib-modal-tab-btn ${modalTab === 'VIDEO' ? 'active' : ''}`}
                 onClick={() => setModalTab('VIDEO')}
               >
-                Video / Motion
+                {t.mediaLibrary.tabVideo}
               </button>
               <button
                 type="button"
                 className={`medialib-modal-tab-btn ${modalTab === 'PPT' ? 'active' : ''}`}
                 onClick={() => setModalTab('PPT')}
               >
-                PowerPoint (.pptx)
+                {t.mediaLibrary.tabPpt}
               </button>
               <button
                 type="button"
                 className={`medialib-modal-tab-btn ${modalTab === 'IMAGE' ? 'active' : ''}`}
                 onClick={() => setModalTab('IMAGE')}
               >
-                Still Graphic
+                {t.mediaLibrary.tabImage}
               </button>
               <button
                 type="button"
                 className={`medialib-modal-tab-btn ${modalTab === 'CANVA' ? 'active' : ''}`}
                 onClick={() => setModalTab('CANVA')}
               >
-                Canva Deck
+                {t.mediaLibrary.tabCanva}
               </button>
               <button
                 type="button"
                 className={`medialib-modal-tab-btn ${modalTab === 'SONG' ? 'active' : ''}`}
                 onClick={() => setModalTab('SONG')}
               >
-                Worship Song
+                {t.mediaLibrary.tabSong}
               </button>
               <button
                 type="button"
                 className={`medialib-modal-tab-btn ${modalTab === 'BACKUP' ? 'active' : ''}`}
                 onClick={() => setModalTab('BACKUP')}
               >
-                Backup &amp; Sync
+                {t.mediaLibrary.tabBackup}
               </button>
             </div>
 
@@ -1030,10 +1037,10 @@ export const MediaLibraryScreen: React.FC = () => {
                     className="btn-secondary"
                     onClick={() => setShowUploadModal(false)}
                   >
-                    Cancel
+                    {t.mediaLibrary.cancel}
                   </button>
                   <button type="submit" className="btn-primary">
-                    Save to Media Library
+                    {t.mediaLibrary.saveToLibrary}
                   </button>
                 </div>
               </form>
@@ -1125,10 +1132,10 @@ export const MediaLibraryScreen: React.FC = () => {
                     className="btn-secondary"
                     onClick={() => setShowUploadModal(false)}
                   >
-                    Cancel
+                    {t.mediaLibrary.cancel}
                   </button>
                   <button type="submit" className="btn-primary">
-                    Save PowerPoint Deck
+                    {t.mediaLibrary.savePowerPoint}
                   </button>
                 </div>
               </form>
@@ -1211,10 +1218,10 @@ export const MediaLibraryScreen: React.FC = () => {
                     className="btn-secondary"
                     onClick={() => setShowUploadModal(false)}
                   >
-                    Cancel
+                    {t.mediaLibrary.cancel}
                   </button>
                   <button type="submit" className="btn-primary" disabled={!imgDataUrl}>
-                    Save Graphic to Library
+                    {t.mediaLibrary.saveGraphic}
                   </button>
                 </div>
               </form>
@@ -1265,10 +1272,10 @@ export const MediaLibraryScreen: React.FC = () => {
                     className="btn-secondary"
                     onClick={() => setShowUploadModal(false)}
                   >
-                    Cancel
+                    {t.mediaLibrary.cancel}
                   </button>
                   <button type="submit" className="btn-primary">
-                    Link Canva Design
+                    {t.mediaLibrary.linkCanvaDesign}
                   </button>
                 </div>
               </form>
@@ -1334,10 +1341,10 @@ export const MediaLibraryScreen: React.FC = () => {
                     className="btn-secondary"
                     onClick={() => setShowUploadModal(false)}
                   >
-                    Cancel
+                    {t.mediaLibrary.cancel}
                   </button>
                   <button type="submit" className="btn-primary">
-                    Save Worship Song
+                    {t.mediaLibrary.saveSong}
                   </button>
                 </div>
               </form>

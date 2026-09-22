@@ -124,11 +124,54 @@ export interface AuthTranslations {
   signOut: string;
 }
 
+export interface MediaLibraryTranslations {
+  title: string;
+  subtitle: string;
+  uploadButton: string;
+  mediaSources: string;
+  allMedia: string;
+  powerPointUploads: string;
+  videoBackgrounds: string;
+  speakerDecks: string;
+  announcementsLoops: string;
+  worshipSongs: string;
+  canvaPresentations: string;
+  searchPlaceholder: string;
+  filterLabel: string;
+  filterAll: string;
+  filterVideos: string;
+  filterPowerPoints: string;
+  filterImages: string;
+  filterCanva: string;
+  filterSongs: string;
+  addToRundown: string;
+  inRundown: string;
+  setBackground: string;
+  slidesCount: string;
+  staticImage: string;
+  uploadModalTitle: string;
+  tabVideo: string;
+  tabPpt: string;
+  tabImage: string;
+  tabCanva: string;
+  tabSong: string;
+  tabBackup: string;
+  close: string;
+  cancel: string;
+  saveToLibrary: string;
+  linkCanvaDesign: string;
+  savePowerPoint: string;
+  saveGraphic: string;
+  saveSong: string;
+  noResults: string;
+}
+
 export interface TranslationDictionary {
   nav: NavigationTranslations;
   common: CommonTranslations;
   theme: ThemeTranslations;
   liveShow: LiveShowTranslations;
+  mediaLibrary: MediaLibraryTranslations;
   settings: SettingsTranslations;
   auth: AuthTranslations;
 }

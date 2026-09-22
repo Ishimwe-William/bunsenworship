@@ -284,17 +284,43 @@
 }
 
 /* -------------------------------------------------------------------------
-   Media Cards Grid (Fluid Responsive Columns)
+   Media Cards Grid (Fluid Responsive Columns, Scrolls When Many)
    ------------------------------------------------------------------------- */
 .medialib-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(295px, 1fr));
-  gap: 1.15rem;
+  grid-template-columns: repeat(auto-fill, minmax(285px, 355px));
+  gap: 1.25rem;
   overflow-y: auto;
-  padding-right: 4px;
-  padding-bottom: 1.5rem;
+  overflow-x: hidden;
+  padding-right: 6px;
+  padding-bottom: 2rem;
   flex: 1;
   min-height: 0;
+  align-content: start;
+}
+
+/* Empty State */
+.medialib-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 1rem;
+  color: var(--text-muted);
+  gap: 0.85rem;
+  grid-column: 1 / -1;
+  text-align: center;
+}
+
+.medialib-empty-icon {
+  color: var(--border-strong);
+  opacity: 0.6;
+}
+
+.medialib-empty-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 /* Custom scrollbar for grid */
