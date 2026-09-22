@@ -1,7 +1,7 @@
 {
   "name": "bunsenworship",
   "productName": "BunsenWorship",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "BunsenWorship is an Electron application for managing worship presentations.",
   "main": "dist/main/main.js",
   "package": "com.bunsenplus.worship",
