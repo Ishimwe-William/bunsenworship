@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store';
 import {
   selectNotifications,
   selectUnreadNotificationsCount,
