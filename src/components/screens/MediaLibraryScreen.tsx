@@ -27,6 +27,9 @@ import {
   RefreshCwIcon,
   FolderIcon,
   ImageIcon,
+  MusicIcon,
+  VideoIcon,
+  PresentationIcon,
 } from '../common/Icons';
 import './MediaLibraryScreen.css';
 
@@ -168,7 +171,11 @@ export const MediaLibraryScreen: React.FC = () => {
               </defs>
               <rect width="960" height="540" fill="url(#sGrad)"/>
               <circle cx="480" cy="220" r="70" fill="none" stroke="#818cf8" stroke-width="3" opacity="0.6"/>
-              <text x="480" y="235" font-family="-apple-system, sans-serif" font-size="54" fill="#a5b4fc" text-anchor="middle">♪</text>
+              <g stroke="#a5b4fc" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" transform="translate(456, 192) scale(2)">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" fill="#a5b4fc"/>
+                <circle cx="18" cy="16" r="3" fill="#a5b4fc"/>
+              </g>
               <text x="480" y="340" font-family="-apple-system, sans-serif" font-size="34" font-weight="800" fill="#ffffff" text-anchor="middle">${song.title}</text>
               <text x="480" y="385" font-family="-apple-system, sans-serif" font-size="18" fill="#cbd5e1" text-anchor="middle">${song.artist || 'Worship Track'}</text>
             </svg>
@@ -640,7 +647,7 @@ export const MediaLibraryScreen: React.FC = () => {
               onClick={() => setSelectedSource('POWERPOINT')}
             >
               <div className="medialib-source-item-left">
-                <FolderIcon size={16} className="medialib-source-icon" />
+                <PresentationIcon size={16} className="medialib-source-icon" />
                 <span>PowerPoint Uploads</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.POWERPOINT}</span>
@@ -652,7 +659,7 @@ export const MediaLibraryScreen: React.FC = () => {
               onClick={() => setSelectedSource('VIDEO')}
             >
               <div className="medialib-source-item-left">
-                <FolderIcon size={16} className="medialib-source-icon" />
+                <VideoIcon size={16} className="medialib-source-icon" />
                 <span>Video Backgrounds</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.VIDEO}</span>
@@ -664,7 +671,7 @@ export const MediaLibraryScreen: React.FC = () => {
               onClick={() => setSelectedSource('SPEAKER_DECK')}
             >
               <div className="medialib-source-item-left">
-                <FolderIcon size={16} className="medialib-source-icon" />
+                <PresentationIcon size={16} className="medialib-source-icon" />
                 <span>Speaker Slide Decks</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.SPEAKER_DECK}</span>
@@ -676,7 +683,7 @@ export const MediaLibraryScreen: React.FC = () => {
               onClick={() => setSelectedSource('ANNOUNCEMENTS')}
             >
               <div className="medialib-source-item-left">
-                <FolderIcon size={16} className="medialib-source-icon" />
+                <ImageIcon size={16} className="medialib-source-icon" />
                 <span>Announcements Loops</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.ANNOUNCEMENTS}</span>
@@ -688,7 +695,7 @@ export const MediaLibraryScreen: React.FC = () => {
               onClick={() => setSelectedSource('SONGS')}
             >
               <div className="medialib-source-item-left">
-                <FolderIcon size={16} className="medialib-source-icon" />
+                <MusicIcon size={16} className="medialib-source-icon" />
                 <span>Worship Songs</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.SONGS}</span>
@@ -700,7 +707,7 @@ export const MediaLibraryScreen: React.FC = () => {
               onClick={() => setSelectedSource('CANVA')}
             >
               <div className="medialib-source-item-left">
-                <FolderIcon size={16} className="medialib-source-icon" />
+                <LinkIcon size={16} className="medialib-source-icon" />
                 <span>Canva Presentations</span>
               </div>
               <span className="medialib-source-count">{sourceCounts.CANVA}</span>
