@@ -52,7 +52,7 @@ export const MediaLibraryScreen: React.FC = () => {
   const { t } = useLanguage();
 
   // Navigation & filter state
-  const [selectedSource, setSelectedSource] = useState<MediaSourceCategory>('VIDEO');
+  const [selectedSource, setSelectedSource] = useState<MediaSourceCategory>('ALL');
   const [activeFilter, setActiveFilter] = useState<FormatFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
