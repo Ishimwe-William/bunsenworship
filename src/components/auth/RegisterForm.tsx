@@ -129,9 +129,6 @@ export const RegisterForm: React.FC = () => {
               required
             />
           </div>
-          <span className="auth-hint">
-            Accepts any email provider (e.g. @outlook.com, @gmail.com, etc.)
-          </span>
         </div>
 
         {/* Password */}
