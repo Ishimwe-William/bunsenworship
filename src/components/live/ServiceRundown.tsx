@@ -10,59 +10,12 @@ import {
   reorderRundown,
   setLoadedRundown,
   RundownItemType,
+  DEFAULT_RUNDOWN,
 } from '../../store/features/presentation';
 import { RundownItem } from '../../store/features/presentation/types';
-import { PlusIcon, GripVerticalIcon, ClockIcon, TrashIcon } from '../common/Icons';
+import { PlusIcon, GripVerticalIcon, ClockIcon, TrashIcon, VideoIcon, YoutubeIcon } from '../common/Icons';
 import { bunsenDb } from '../../db';
 import { createNewRundownItem } from '../../utils/liveShowHelpers';
-
-// Default seed data for first-time users
-const DEFAULT_RUNDOWN: RundownItem[] = [
-  {
-    id: 'rd-loop',
-    time: '09:00',
-    title: 'Pre-service Loop',
-    subtitle: 'Announcements v2.pptx',
-    type: 'LOOP',
-    slides: [
-      {
-        id: 's-loop-1',
-        section: 'Welcome',
-        lines: ['Welcome to Sunday Worship Service', 'Please silence your mobile devices'],
-      },
-      {
-        id: 's-loop-2',
-        section: 'Announcements',
-        lines: ['Midweek Prayer Gathering: Wednesday 7:00 PM', 'Youth Ministry: Saturday 4:00 PM'],
-      },
-    ],
-  },
-  {
-    id: 'rd-glorious-day',
-    time: '09:07',
-    title: 'Glorious Day',
-    subtitle: '4 Verses / 2 Chorus',
-    type: 'SONG',
-    slides: [
-      {
-        id: 's-gd-v1',
-        section: 'Verse 1',
-        lines: [
-          'One day when heaven was filled with His praises',
-          'One day when sin was as black as could be',
-        ],
-      },
-      {
-        id: 's-gd-chorus',
-        section: 'Chorus',
-        lines: [
-          'Living He loved me, dying He saved me',
-          'Buried He carried my sins far away',
-        ],
-      },
-    ],
-  },
-];
 
 export const ServiceRundown: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -74,7 +27,10 @@ export const ServiceRundown: React.FC = () => {
   const [newTitle, setNewTitle] = useState('');
   const [newSubtitle, setNewSubtitle] = useState('');
   const [newTime, setNewTime] = useState('09:30');
-  const [newType, setNewType] = useState<RundownItemType>('SONG');
+  const [newType, setNewType] = useState<RundownItemType>('VIDEO');
+  const [newVideoSource, setNewVideoSource] = useState<'local' | 'youtube'>('local');
+  const [newVideoUrl, setNewVideoUrl] = useState('');
+  const [newVideoLoop, setNewVideoLoop] = useState(true);
 
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -88,19 +44,42 @@ export const ServiceRundown: React.FC = () => {
     bunsenDb
       .getCurrentService()
       .then((savedService) => {
-        if (isMounted) {
-          if (savedService && savedService.items && savedService.items.length > 0) {
-            console.log('✓ Loaded saved service from DB:', savedService.items.length, 'items');
-            dispatch(setLoadedRundown(savedService.items));
-          } else {
-            console.log('No saved service found, loading default rundown');
+        if (!isMounted) return;
+        if (savedService && savedService.items && savedService.items.length > 0) {
+          // Check if it's the old seed without any video item
+          const hasVideoItem = savedService.items.some(
+            (item) =>
+              item.type === 'VIDEO' ||
+              item.slides.some((s) => s.videoType && s.videoType !== 'none')
+          );
+          if (!hasVideoItem && savedService.items.length <= 2) {
+            console.log('Upgrading old rundown seed with video items');
             dispatch(setLoadedRundown(DEFAULT_RUNDOWN));
+            bunsenDb.saveService({
+              ...savedService,
+              items: DEFAULT_RUNDOWN,
+              updatedAt: Date.now(),
+            }).catch(console.error);
+          } else {
+            console.log('Loaded saved service from DB:', savedService.items.length, 'items');
+            dispatch(setLoadedRundown(savedService.items));
           }
+        } else {
+          console.log('No saved service found, loading default rundown with video items');
+          dispatch(setLoadedRundown(DEFAULT_RUNDOWN));
+          bunsenDb.saveService({
+            id: 'service-current',
+            title: 'Sunday Morning Worship',
+            date: new Date().toISOString().split('T')[0],
+            isCurrent: true,
+            items: DEFAULT_RUNDOWN,
+            createdAt: 1710000000000,
+            updatedAt: Date.now(),
+          }).catch(console.error);
         }
       })
       .catch((err) => {
-        console.error('✗ Failed to load service from DB:', err);
-        console.log('Loading default rundown as fallback');
+        console.error('Failed to load service from DB:', err);
         dispatch(setLoadedRundown(DEFAULT_RUNDOWN));
       });
 
@@ -214,13 +193,70 @@ export const ServiceRundown: React.FC = () => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const newItem = createNewRundownItem(newTitle.trim(), newType, newTime || '09:30');
-    newItem.subtitle = newSubtitle.trim() || 'Custom worship item';
+    let newItem: Omit<RundownItem, 'id'>;
+
+    if (newType === 'VIDEO') {
+      const isYt = newVideoSource === 'youtube';
+      const sampleUrl = isYt
+        ? 'https://www.youtube.com/watch?v=nQWFzMvCfLE'
+        : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+      const finalUrl = newVideoUrl.trim() || sampleUrl;
+
+      newItem = {
+        title: newTitle.trim(),
+        subtitle: newSubtitle.trim() || (isYt ? 'YouTube Video Stream' : 'Local Video Playback'),
+        time: newTime || '09:30',
+        type: 'VIDEO',
+        slides: [
+          {
+            id: `s-vid-${Date.now()}`,
+            section: newTitle.trim() || (isYt ? 'YouTube Video' : 'Video Playback'),
+            lines: [],
+            videoType: isYt ? 'youtube' : 'local',
+            videoUrl: finalUrl,
+            videoPath: finalUrl,
+            youtubeUrl: isYt ? finalUrl : undefined,
+            autoPlay: true,
+            loop: newVideoLoop,
+            videoLoop: newVideoLoop,
+            videoFit: 'contain',
+            videoTitle: newTitle.trim(),
+          },
+        ],
+      };
+    } else {
+      newItem = createNewRundownItem(newTitle.trim(), newType, newTime || '09:30');
+      newItem.subtitle = newSubtitle.trim() || 'Custom worship item';
+    }
 
     dispatch(addRundownItem(newItem));
 
+    // Also persist immediately to DB
+    bunsenDb
+      .getCurrentService()
+      .then((existing) => {
+        const fullItem: RundownItem = {
+          ...newItem,
+          id: `rd-${Date.now()}`,
+        };
+        const updatedItems = [...(existing?.items || []), fullItem];
+        bunsenDb
+          .saveService({
+            id: 'service-current',
+            title: existing?.title || 'Sunday Morning Worship',
+            date: existing?.date || new Date().toISOString().split('T')[0],
+            isCurrent: true,
+            items: updatedItems,
+            createdAt: existing?.createdAt || 1710000000000,
+            updatedAt: Date.now(),
+          })
+          .catch(console.error);
+      })
+      .catch(console.error);
+
     setNewTitle('');
     setNewSubtitle('');
+    setNewVideoUrl('');
     setShowAddModal(false);
   };
 
@@ -243,7 +279,11 @@ export const ServiceRundown: React.FC = () => {
       switch (item.type) {
         case 'SONG':
           return minutes + 4;
+        case 'VIDEO':
+          return minutes + 5;
         case 'SERMON':
+          return minutes + 35;
+        case 'PPT':
           return minutes + 15;
         default:
           return minutes + 2;
@@ -303,6 +343,10 @@ export const ServiceRundown: React.FC = () => {
           const hasLive = item.id === liveRundownId;
           const isDragging = draggedIndex === index;
           const isOver = dragOverIndex === index;
+          const hasVideoSlide = item.slides.some(
+            (s) => (s.videoType && s.videoType !== 'none') || s.videoUrl || s.youtubeUrl
+          );
+          const isYouTubeItem = item.slides.some((s) => s.videoType === 'youtube' || s.youtubeUrl);
 
           return (
             <div
@@ -334,7 +378,19 @@ export const ServiceRundown: React.FC = () => {
                 </div>
                 <div className="rundown-card-right">
                   <span className={`rundown-type-pill ${getTypeClass(item.type)}`}>
-                    {item.type}
+                    {item.type === 'VIDEO' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        {isYouTubeItem ? <YoutubeIcon size={10} /> : <VideoIcon size={10} />}
+                        VIDEO
+                      </span>
+                    ) : hasVideoSlide ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <VideoIcon size={10} />
+                        {item.type}
+                      </span>
+                    ) : (
+                      item.type
+                    )}
                   </span>
                   <button
                     type="button"
@@ -377,7 +433,7 @@ export const ServiceRundown: React.FC = () => {
                 <input
                   type="text"
                   className="auth-input"
-                  placeholder="e.g. Way Maker / Pastoral Prayer"
+                  placeholder="e.g. Way Maker / Sanctuary Video Loop"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   autoFocus
@@ -406,16 +462,96 @@ export const ServiceRundown: React.FC = () => {
                     value={newType}
                     onChange={(e) => setNewType(e.target.value as RundownItemType)}
                   >
+                    <option value="VIDEO">VIDEO (Playback / YouTube)</option>
                     <option value="SONG">SONG (Worship)</option>
+                    <option value="LOOP">LOOP (Motion)</option>
                     <option value="IMAGE">IMAGE (Graphic / Slide)</option>
                     <option value="SERMON">SERMON (Message)</option>
                     <option value="PPT">PPT (PowerPoint)</option>
                     <option value="CANVA">CANVA (Presentation)</option>
-                    <option value="VIDEO">VIDEO (Playback)</option>
-                    <option value="LOOP">LOOP (Motion)</option>
                   </select>
                 </div>
               </div>
+
+              {newType === 'VIDEO' && (
+                <div
+                  style={{
+                    background: 'var(--bg-subtle)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '8px',
+                    padding: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label className="status-label" style={{ fontWeight: 700 }}>
+                      Video Source
+                    </label>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        className={`console-mini-btn ${newVideoSource === 'local' ? 'active' : ''}`}
+                        onClick={() => setNewVideoSource('local')}
+                        style={{ padding: '2px 8px', fontSize: '0.675rem' }}
+                      >
+                        <VideoIcon size={11} />
+                        <span>Local MP4</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`console-mini-btn ${newVideoSource === 'youtube' ? 'active' : ''}`}
+                        onClick={() => setNewVideoSource('youtube')}
+                        style={{ padding: '2px 8px', fontSize: '0.675rem' }}
+                      >
+                        <YoutubeIcon size={11} />
+                        <span>YouTube</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      className="status-label"
+                      style={{ display: 'block', marginBottom: '4px', fontSize: '0.68rem' }}
+                    >
+                      {newVideoSource === 'youtube'
+                        ? 'YouTube URL / Stream Link:'
+                        : 'Local Video File Path or URL:'}
+                    </label>
+                    <input
+                      type="text"
+                      className="auth-input"
+                      placeholder={
+                        newVideoSource === 'youtube'
+                          ? 'https://www.youtube.com/watch?v=... (Leave blank for sample)'
+                          : 'file:///path/to/video.mp4 or URL (Leave blank for sample)'
+                      }
+                      value={newVideoUrl}
+                      onChange={(e) => setNewVideoUrl(e.target.value)}
+                      style={{ fontSize: '0.75rem', padding: '6px' }}
+                    />
+                  </div>
+
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={newVideoLoop}
+                      onChange={(e) => setNewVideoLoop(e.target.checked)}
+                    />
+                    <span>Loop video playback continuously</span>
+                  </label>
+                </div>
+              )}
 
               <div>
                 <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
@@ -424,7 +560,7 @@ export const ServiceRundown: React.FC = () => {
                 <input
                   type="text"
                   className="auth-input"
-                  placeholder="e.g. 4 Verses / 2 Chorus"
+                  placeholder="e.g. Cinematic Motion Loop / 4K MP4"
                   value={newSubtitle}
                   onChange={(e) => setNewSubtitle(e.target.value)}
                 />

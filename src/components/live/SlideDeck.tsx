@@ -12,7 +12,7 @@ import {
   addSlide,
   deleteSlide,
 } from '../../store/features/presentation';
-import { PencilIcon, GripVerticalIcon, PlusIcon, TrashIcon } from '../common/Icons';
+import { PencilIcon, GripVerticalIcon, PlusIcon, TrashIcon, VideoIcon, YoutubeIcon } from '../common/Icons';
 import { QuickEditModal } from './QuickEditModal';
 import { createNewSlide } from '../../utils/liveShowHelpers';
 import { bunsenDb } from '../../db';
@@ -205,6 +205,22 @@ export const SlideDeck: React.FC = () => {
           const isDragging = draggedIndex === index;
           const isOver = dragOverIndex === index;
 
+          const hasVideo = Boolean(
+            (slide.videoType === 'local' ||
+              slide.videoType === 'youtube' ||
+              slide.videoUrl ||
+              slide.videoPath ||
+              slide.youtubeUrl) &&
+              slide.videoType !== 'none'
+          );
+          const isYouTube = Boolean(
+            slide.videoType === 'youtube' ||
+              (slide.youtubeUrl && !slide.videoPath && !slide.videoUrl)
+          );
+          const videoTitleText =
+            slide.videoTitle ||
+            (isYouTube ? 'YouTube Stream' : slide.videoUrl ? 'Video Playback' : '');
+
           return (
             <div
               key={slide.id}
@@ -229,7 +245,24 @@ export const SlideDeck: React.FC = () => {
                     <GripVerticalIcon size={13} />
                   </span>
                   <span className="slide-number">{index + 1}</span>
-                  <span className="slide-section-label">{slide.section}</span>
+                  <span
+                    className="slide-section-label"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    {hasVideo && (
+                      <span
+                        style={{
+                          color: isYouTube ? '#ef4444' : '#3b82f6',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                        title={isYouTube ? 'YouTube Video' : 'Local Video'}
+                      >
+                        {isYouTube ? <YoutubeIcon size={12} /> : <VideoIcon size={12} />}
+                      </span>
+                    )}
+                    <span>{slide.section}</span>
+                  </span>
                 </div>
                 <div className="slide-item-status">
                   {isPreview && !isLive && (
@@ -255,6 +288,52 @@ export const SlideDeck: React.FC = () => {
                 </div>
               </div>
 
+              {/* Video Media Banner */}
+              {hasVideo && (
+                <div
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.35)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px',
+                    padding: '8px 10px',
+                    margin: '4px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <span
+                    style={{
+                      background: isYouTube ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                      color: isYouTube ? '#ef4444' : '#3b82f6',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {isYouTube ? <YoutubeIcon size={11} /> : <VideoIcon size={11} />}
+                    <span>{isYouTube ? 'YOUTUBE' : 'VIDEO'}</span>
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.725rem',
+                      color: 'var(--text-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                    }}
+                    title={videoTitleText || slide.videoUrl || slide.youtubeUrl || ''}
+                  >
+                    {videoTitleText || (isYouTube ? 'YouTube Stream' : 'Local Video File')}
+                  </span>
+                </div>
+              )}
+
               {slide.imageUrl && (
                 <div className="slide-thumbnail-wrap">
                   <img
@@ -272,6 +351,19 @@ export const SlideDeck: React.FC = () => {
                       {line}
                     </p>
                   ))}
+                </div>
+              )}
+
+              {(!slide.lines || slide.lines.length === 0) && !slide.imageUrl && (
+                <div
+                  style={{
+                    fontSize: '0.7rem',
+                    color: 'var(--text-muted)',
+                    fontStyle: 'italic',
+                    padding: '4px 0',
+                  }}
+                >
+                  {hasVideo ? 'Video active • No lyric text overlay' : 'Empty slide content'}
                 </div>
               )}
             </div>

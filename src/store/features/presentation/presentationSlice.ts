@@ -28,20 +28,107 @@ const defaultThemes = [
   },
 ];
 
-const initialRundown: RundownItem[] = [];
+export const DEFAULT_RUNDOWN: RundownItem[] = [
+  {
+    id: 'rd-loop',
+    time: '09:00',
+    title: 'Pre-service Loop',
+    subtitle: 'Announcements & Welcome',
+    type: 'LOOP',
+    slides: [
+      {
+        id: 's-loop-1',
+        section: 'Welcome',
+        lines: ['Welcome to Sunday Worship Service', 'Please silence your mobile devices'],
+      },
+      {
+        id: 's-loop-2',
+        section: 'Announcements',
+        lines: ['Midweek Prayer Gathering: Wednesday 7:00 PM', 'Youth Ministry: Saturday 4:00 PM'],
+      },
+    ],
+  },
+  {
+    id: 'rd-video-motion',
+    time: '09:05',
+    title: 'Cinematic Particles Video',
+    subtitle: 'Motion Loop • 4K MP4 Video',
+    type: 'VIDEO',
+    slides: [
+      {
+        id: 's-vid-motion-1',
+        section: 'Motion Background',
+        lines: ['Lord You are Good and Your Mercy Endureth Forever'],
+        videoType: 'local',
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        videoPath: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        autoPlay: true,
+        loop: true,
+        videoLoop: true,
+        videoFit: 'contain',
+        videoTitle: 'Cinematic Particles Blue',
+      },
+    ],
+  },
+  {
+    id: 'rd-glorious-day',
+    time: '09:12',
+    title: 'Glorious Day',
+    subtitle: '4 Verses / 2 Chorus',
+    type: 'SONG',
+    slides: [
+      {
+        id: 's-gd-v1',
+        section: 'Verse 1',
+        lines: [
+          'One day when heaven was filled with His praises',
+          'One day when sin was as black as could be',
+        ],
+      },
+      {
+        id: 's-gd-chorus',
+        section: 'Chorus',
+        lines: [
+          'Living He loved me, dying He saved me',
+          'Buried He carried my sins far away',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'rd-youtube-stream',
+    time: '09:20',
+    title: 'Hillsong Worship Stream',
+    subtitle: 'YouTube Embed • What a Beautiful Name',
+    type: 'VIDEO',
+    slides: [
+      {
+        id: 's-yt-stream',
+        section: 'YouTube Video',
+        lines: [],
+        videoType: 'youtube',
+        youtubeUrl: 'https://www.youtube.com/watch?v=nQWFzMvCfLE',
+        autoPlay: true,
+        loop: false,
+        videoFit: 'contain',
+        videoTitle: 'Hillsong Worship - What a Beautiful Name',
+      },
+    ],
+  },
+];
 
 const initialState: PresentationState = {
   isLive: true,
   isBlackout: false,
   isTextCleared: false,
   isLogoActive: false,
-  selectedRundownId: '',
-  liveRundownId: null,
-  liveSlideId: null,
-  previewSlideId: null,
+  selectedRundownId: 'rd-video-motion',
+  liveRundownId: 'rd-video-motion',
+  liveSlideId: 's-vid-motion-1',
+  previewSlideId: 's-gd-v1',
   transitionType: 'FADE',
   fadeDuration: 1.0,
-  rundown: initialRundown,
+  rundown: DEFAULT_RUNDOWN,
   backgroundThemes: defaultThemes,
   activeBackgroundId: 'clouds-cathedral',
   videoPlayback: {
@@ -51,7 +138,7 @@ const initialState: PresentationState = {
     volume: 1.0,
     isMuted: false,
     playbackRate: 1.0,
-    isLooping: false,
+    isLooping: true,
   },
 };
 
@@ -340,6 +427,10 @@ export const presentationSlice = createSlice({
         id: `rd-${Date.now()}`,
       };
       state.rundown.push(newItem);
+      if (!state.selectedRundownId || state.rundown.length === 1) {
+        state.selectedRundownId = newItem.id;
+        state.previewSlideId = newItem.slides[0]?.id || null;
+      }
     },
     reorderRundown: (
       state,

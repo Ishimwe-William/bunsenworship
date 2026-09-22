@@ -3,6 +3,7 @@ import { useAppDispatch } from '../../store/hooks';
 import {
   addRundownItem,
   addCustomBackgroundTheme,
+  RundownItem,
 } from '../../store/features/presentation';
 import {
   bunsenDb,
@@ -328,98 +329,120 @@ export const MediaLibraryScreen: React.FC = () => {
 
   // Action: Add item to current active Presentation Rundown
   const handleAddToRundown = (asset: ProMediaAsset) => {
+    let itemToCreate: Omit<RundownItem, 'id'>;
+
     if (asset.format === 'SONG') {
       const matchedSong = songs.find((s) => `song-${s.id}` === asset.id);
-      dispatch(
-        addRundownItem({
-          title: asset.title,
-          subtitle: `${asset.resolution} • ${asset.durationOrSlides}`,
-          time: '09:15',
-          type: 'SONG',
-          slides: matchedSong?.slides || [
-            {
-              id: `s-${Date.now()}-1`,
-              section: 'Verse 1',
-              lines: [asset.title, 'Worship Lyric line 1'],
-            },
-          ],
-        })
-      );
+      itemToCreate = {
+        title: asset.title,
+        subtitle: `${asset.resolution} • ${asset.durationOrSlides}`,
+        time: '09:15',
+        type: 'SONG',
+        slides: matchedSong?.slides || [
+          {
+            id: `s-${Date.now()}-1`,
+            section: 'Verse 1',
+            lines: [asset.title, 'Worship Lyric line 1'],
+          },
+        ],
+      };
     } else if (asset.format === 'PPTX') {
       const count = asset.slidesCount || 12;
-      dispatch(
-        addRundownItem({
-          title: asset.title,
-          subtitle: `PowerPoint Deck • ${asset.durationOrSlides}`,
-          time: '09:45',
+      itemToCreate = {
+        title: asset.title,
+        subtitle: `PowerPoint Deck • ${asset.durationOrSlides}`,
+        time: '09:45',
+        type: 'PPT',
+        externalMeta: {
           type: 'PPT',
-          externalMeta: {
-            type: 'PPT',
-            filePath: asset.filePath,
-            slideCount: count,
-          },
-          slides: Array.from({ length: count }, (_, i) => ({
-            id: `s-ppt-${Date.now()}-${i + 1}`,
-            section: i === 0 ? 'Title Slide' : `Slide ${i + 1}`,
-            lines: [i === 0 ? asset.title : `Key Point ${i}`, 'Presentation Point'],
-            imageUrl: asset.thumbnailUrl,
-            imageFit: 'contain',
-          })),
-        })
-      );
+          filePath: asset.filePath,
+          slideCount: count,
+        },
+        slides: Array.from({ length: count }, (_, i) => ({
+          id: `s-ppt-${Date.now()}-${i + 1}`,
+          section: i === 0 ? 'Title Slide' : `Slide ${i + 1}`,
+          lines: [i === 0 ? asset.title : `Key Point ${i}`, 'Presentation Point'],
+          imageUrl: asset.thumbnailUrl,
+          imageFit: 'contain',
+        })),
+      };
     } else if (asset.format === 'CANVA') {
       const count = asset.slidesCount || 8;
-      dispatch(
-        addRundownItem({
-          title: asset.title,
-          subtitle: 'Canva Cloud Visual Presentation',
-          time: '10:00',
+      itemToCreate = {
+        title: asset.title,
+        subtitle: 'Canva Cloud Visual Presentation',
+        time: '10:00',
+        type: 'CANVA',
+        externalMeta: {
           type: 'CANVA',
-          externalMeta: {
-            type: 'CANVA',
-            canvaUrl: asset.canvaUrl,
-          },
-          slides: Array.from({ length: count }, (_, i) => ({
-            id: `s-canva-${Date.now()}-${i + 1}`,
-            section: `Page ${i + 1}`,
-            lines: [`Canva Slide ${i + 1}`, 'Visual Content'],
-            imageUrl: asset.thumbnailUrl,
-            imageFit: 'contain',
-          })),
-        })
-      );
+          canvaUrl: asset.canvaUrl,
+        },
+        slides: Array.from({ length: count }, (_, i) => ({
+          id: `s-canva-${Date.now()}-${i + 1}`,
+          section: `Page ${i + 1}`,
+          lines: [`Canva Slide ${i + 1}`, 'Visual Content'],
+          imageUrl: asset.thumbnailUrl,
+          imageFit: 'contain',
+        })),
+      };
     } else {
       // Video / Still image
-      const isVideoAsset = asset.format === 'MOV' || asset.format === 'MP4' || Boolean(asset.videoUrl || asset.youtubeUrl);
+      const isVideoAsset =
+        asset.format === 'MOV' ||
+        asset.format === 'MP4' ||
+        Boolean(asset.videoUrl || asset.youtubeUrl);
       const isYouTube = Boolean(asset.youtubeUrl);
 
-      dispatch(
-        addRundownItem({
-          title: asset.title,
-          subtitle: `${asset.format} ${asset.resolution || 'Media'} • ${asset.durationOrSlides}`,
-          time: '09:00',
-          type: isVideoAsset ? 'LOOP' : 'IMAGE',
-          slides: [
-            {
-              id: `s-media-${Date.now()}`,
-              section: asset.title,
-              lines: [],
-              imageUrl: asset.thumbnailUrl,
-              imageFit: 'cover',
-              videoType: isYouTube ? 'youtube' : (isVideoAsset ? 'local' : 'none'),
-              videoUrl: asset.videoUrl || asset.filePath,
-              videoPath: asset.filePath || asset.videoUrl,
-              youtubeUrl: asset.youtubeUrl,
-              autoPlay: true,
-              loop: true,
-              videoLoop: true,
-              videoFit: 'contain',
-              videoTitle: asset.title,
-            },
-          ],
-        })
-      );
+      itemToCreate = {
+        title: asset.title,
+        subtitle: `${asset.format} ${asset.resolution || 'Media'} • ${asset.durationOrSlides}`,
+        time: '09:00',
+        type: isVideoAsset ? 'VIDEO' : 'IMAGE',
+        slides: [
+          {
+            id: `s-media-${Date.now()}`,
+            section: asset.title,
+            lines: [],
+            imageUrl: asset.thumbnailUrl,
+            imageFit: 'cover',
+            videoType: isYouTube ? 'youtube' : isVideoAsset ? 'local' : 'none',
+            videoUrl: asset.videoUrl || asset.filePath,
+            videoPath: asset.filePath || asset.videoUrl,
+            youtubeUrl: asset.youtubeUrl,
+            autoPlay: true,
+            loop: true,
+            videoLoop: true,
+            videoFit: 'contain',
+            videoTitle: asset.title,
+          },
+        ],
+      };
     }
+
+    dispatch(addRundownItem(itemToCreate));
+
+    // Save immediately to DB so ServiceRundown finds it on navigation
+    bunsenDb
+      .getCurrentService()
+      .then((service) => {
+        const fullItem: RundownItem = {
+          ...itemToCreate,
+          id: `rd-media-${Date.now()}`,
+        };
+        const updatedItems = [...(service?.items || []), fullItem];
+        bunsenDb
+          .saveService({
+            id: 'service-current',
+            title: service?.title || 'Sunday Morning Worship',
+            date: service?.date || new Date().toISOString().split('T')[0],
+            isCurrent: true,
+            items: updatedItems,
+            createdAt: service?.createdAt || 1710000000000,
+            updatedAt: Date.now(),
+          })
+          .catch((err) => console.error('Failed to save service from media library:', err));
+      })
+      .catch((err) => console.error('Failed to get service from DB:', err));
 
     markAddedFeedback(asset.id);
     showFeedback(`"${asset.title}" added to service rundown!`);
