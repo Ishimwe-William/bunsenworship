@@ -300,17 +300,18 @@
    ------------------------------------------------------------------------- */
 .medialib-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 390px), 1fr));
+  gap: 1.5rem;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 6px;
-  padding-bottom: 2rem;
+  padding-right: 10px;
+  padding-bottom: 2.5rem;
   flex: 1;
   min-height: 0;
   align-content: start;
   width: 100%;
   box-sizing: border-box;
+  scroll-behavior: smooth;
 }
 
 /* Empty State */
@@ -341,23 +342,39 @@
 /* Custom scrollbar for grid */
 .medialib-cards-grid::-webkit-scrollbar,
 .medialib-sidebar::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .medialib-cards-grid::-webkit-scrollbar-track,
 .medialib-sidebar::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.04));
+  border-radius: 4px;
 }
 
 .medialib-cards-grid::-webkit-scrollbar-thumb,
 .medialib-sidebar::-webkit-scrollbar-thumb {
-  background: var(--border-strong, var(--border-subtle));
-  border-radius: 3px;
+  background: var(--border-strong, #94a3b8);
+  border-radius: 4px;
 }
 
 .medialib-cards-grid::-webkit-scrollbar-thumb:hover,
 .medialib-sidebar::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--text-secondary, #64748b);
+}
+
+[data-theme="dark"] .medialib-cards-grid::-webkit-scrollbar-track,
+[data-theme="dark"] .medialib-sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="dark"] .medialib-cards-grid::-webkit-scrollbar-thumb,
+[data-theme="dark"] .medialib-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+[data-theme="dark"] .medialib-cards-grid::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] .medialib-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.38);
 }
 
 @media (max-width: 860px) {
@@ -368,14 +385,14 @@
     width: 100%;
   }
   .medialib-cards-grid {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
 .medialib-media-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -387,7 +404,7 @@
 
 .medialib-media-card:hover {
   border-color: var(--color-primary);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
   transform: translateY(-2px);
 }
 
@@ -421,7 +438,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
@@ -438,16 +455,16 @@
   background: var(--color-primary, #4f46e5);
   color: var(--color-primary-contrast, #ffffff);
   border: none;
-  border-radius: 6px;
-  padding: 7px 14px;
-  font-size: 0.78rem;
+  border-radius: 7px;
+  padding: 9px 18px;
+  font-size: 0.84rem;
   font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   transition: all 0.12s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .medialib-action-btn-primary:hover {
@@ -463,8 +480,8 @@
   background: rgba(255, 255, 255, 0.15);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 6px;
-  padding: 6px 9px;
+  border-radius: 7px;
+  padding: 8px 12px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -487,7 +504,7 @@
    Card Info - Maximum Text Visibility
    ------------------------------------------------------------------------- */
 .medialib-card-info {
-  padding: 0.75rem 1rem 0.85rem 1rem;
+  padding: 0.85rem 1.15rem 1rem 1.15rem;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -495,7 +512,7 @@
 }
 
 .medialib-card-title {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
