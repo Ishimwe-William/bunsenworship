@@ -39,6 +39,10 @@ export const ProjectorWindowView: React.FC = () => {
   });
 
   const [showHud, setShowHud] = useState(false);
+  const [viewportSize, setViewportSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1920,
+    height: typeof window !== 'undefined' ? window.innerHeight : 1080,
+  });
 
   useEffect(() => {
     document.title = 'BunsenWorship - Sanctuary Projection Output';
@@ -46,6 +50,16 @@ export const ProjectorWindowView: React.FC = () => {
     document.body.style.padding = '0';
     document.body.style.overflow = 'hidden';
     document.body.style.backgroundColor = '#000000';
+
+    const handleResize = () => {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
 
     const channel = new BroadcastChannel('bunsenworship_projector_channel');
 
@@ -78,25 +92,34 @@ export const ProjectorWindowView: React.FC = () => {
 
     return () => {
       channel.close();
+      window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  // Compute responsive scale factor to fit 1920x1080 stage inside any window resolution
+  const scaleX = viewportSize.width / 1920;
+  const scaleY = viewportSize.height / 1080;
+  const scale = Math.min(scaleX, scaleY);
 
   const lines = state.slide?.lines || [];
   const lineCount = lines.length;
   const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
 
-  let fontSize = '4.5rem';
-  let lineHeight = 1.35;
+  let fontSize = 104;
+  let lineHeight = 1.3;
 
   if (lineCount > 5 || maxLineLength > 55) {
-    fontSize = '2.8rem';
-    lineHeight = 1.3;
-  } else if (lineCount > 3 || maxLineLength > 42) {
-    fontSize = '3.5rem';
+    fontSize = 68;
     lineHeight = 1.32;
-  } else if (lineCount === 1 && maxLineLength <= 25) {
-    fontSize = '5.5rem';
+  } else if (lineCount > 3 || maxLineLength > 42) {
+    fontSize = 82;
+    lineHeight = 1.3;
+  } else if (lineCount === 3) {
+    fontSize = 92;
+    lineHeight = 1.28;
+  } else if (lineCount === 1 && maxLineLength <= 28) {
+    fontSize = 118;
     lineHeight = 1.25;
   }
 
@@ -119,7 +142,7 @@ export const ProjectorWindowView: React.FC = () => {
       onMouseEnter={() => setShowHud(true)}
       onMouseLeave={() => setShowHud(false)}
     >
-      {/* Background Layer */}
+      {/* Background Layer (Fills entire screen edge-to-edge) */}
       <div
         style={{
           position: 'absolute',
@@ -140,65 +163,92 @@ export const ProjectorWindowView: React.FC = () => {
         }}
       />
 
-      {/* Content Rendering */}
-      {state.isBlackout ? (
-        <div style={{ position: 'relative', zIndex: 10 }} />
-      ) : state.isLogoActive ? (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 10,
-            filter: 'drop-shadow(0 16px 45px rgba(0, 0, 0, 0.9))',
-          }}
-        >
-          <BunsenWorshipLogo size={280} />
-        </div>
-      ) : state.isTextCleared ? (
-        <div style={{ position: 'relative', zIndex: 10 }} />
-      ) : state.slide && lines.length > 0 ? (
-        <div
-          key={state.slide.id}
-          style={{
-            position: 'relative',
-            zIndex: 10,
-            maxWidth: '1680px',
-            width: '100%',
-            padding: '3rem 5rem',
-            color: '#ffffff',
-            fontWeight: 800,
-            textAlign: 'center',
-            fontSize: fontSize,
-            lineHeight: lineHeight,
-            letterSpacing: '-0.015em',
-            textShadow: '0 8px 32px rgba(0, 0, 0, 0.95), 0 2px 10px rgba(0, 0, 0, 0.9)',
-            boxSizing: 'border-box',
-            animation:
-              state.transitionType === 'FADE'
-                ? `stageFadeIn ${state.fadeDuration}s ease-out`
-                : 'none',
-          }}
-        >
-          {lines.map((line, idx) => (
-            <div key={idx} style={{ marginBottom: idx < lines.length - 1 ? '1.5rem' : 0 }}>
-              {line}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 10,
-            color: '#ffffff',
-            opacity: 0.3,
-            fontSize: '3rem',
-            fontWeight: 800,
-            letterSpacing: '0.1em',
-          }}
-        >
-          BUNSENWORSHIP
-        </div>
-      )}
+      {/* 1920x1080 Scaled Reality Stage (Maintains exact 1:1 fidelity with Live Monitor) */}
+      <div
+        className="sanctuary-virtual-stage"
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          marginTop: -540,
+          marginLeft: -960,
+          width: 1920,
+          height: 1080,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          overflow: 'hidden',
+          pointerEvents: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {/* Stage Content */}
+        {state.isBlackout ? (
+          <div style={{ position: 'relative', zIndex: 10 }} />
+        ) : state.isLogoActive ? (
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 10,
+              filter: 'drop-shadow(0 16px 45px rgba(0, 0, 0, 0.9))',
+            }}
+          >
+            <BunsenWorshipLogo size={240} />
+          </div>
+        ) : state.isTextCleared ? (
+          <div style={{ position: 'relative', zIndex: 10 }} />
+        ) : state.slide && lines.length > 0 ? (
+          <div
+            key={state.slide.id}
+            style={{
+              position: 'relative',
+              zIndex: 10,
+              maxWidth: '1780px',
+              width: '100%',
+              padding: '40px 72px',
+              color: '#ffffff',
+              fontWeight: 800,
+              textAlign: 'center',
+              fontSize: `${fontSize}px`,
+              lineHeight: lineHeight,
+              letterSpacing: '-0.015em',
+              textShadow:
+                '0 8px 32px rgba(0, 0, 0, 0.95), 0 2px 10px rgba(0, 0, 0, 0.9)',
+              boxSizing: 'border-box',
+              animation:
+                state.transitionType === 'FADE'
+                  ? `stageFadeIn ${state.fadeDuration}s ease-out`
+                  : 'none',
+            }}
+          >
+            {lines.map((line, idx) => (
+              <div
+                key={idx}
+                style={{
+                  marginBottom: idx < lines.length - 1 ? '24px' : 0,
+                }}
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 10,
+              color: '#ffffff',
+              opacity: 0.3,
+              fontSize: '48px',
+              fontWeight: 800,
+              letterSpacing: '0.1em',
+            }}
+          >
+            BUNSENWORSHIP
+          </div>
+        )}
+      </div>
 
       {/* Floating HUD Indicator on hover */}
       {showHud && (
