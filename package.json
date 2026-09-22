@@ -52,13 +52,15 @@
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": true,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "BunsenWorship",
       "deleteAppDataOnUninstall": false,
       "installerSidebar": "buildResources/installerSidebar.bmp",
-      "uninstallerSidebar": "buildResources/installerSidebar.bmp"
+      "uninstallerSidebar": "buildResources/installerSidebar.bmp",
+      "include": "buildResources/installer.nsh"
     },
     "mac": {
       "target": [
