@@ -164,6 +164,15 @@ export interface MediaLibraryTranslations {
   saveGraphic: string;
   saveSong: string;
   noResults: string;
+  editAsset: string;
+  deleteAsset: string;
+  confirmDelete: string;
+  updateButton: string;
+  editModalTitle: string;
+  assetUpdated: string;
+  assetDeleted: string;
+  categoryLabel: string;
+  titleLabel: string;
 }
 
 export interface TranslationDictionary {

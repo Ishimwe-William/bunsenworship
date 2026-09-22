@@ -30,6 +30,8 @@ import {
   MusicIcon,
   VideoIcon,
   PresentationIcon,
+  PencilIcon,
+  TrashIcon,
 } from '../common/Icons';
 import { useLanguage } from '../language';
 import './MediaLibraryScreen.css';
@@ -63,10 +65,25 @@ export const MediaLibraryScreen: React.FC = () => {
   const [images, setImages] = useState<ImageMediaRecord[]>([]);
   const [externalDecks, setExternalDecks] = useState<ExternalPresentationRecord[]>([]);
   const [customAssets, setCustomAssets] = useState<ProMediaAsset[]>([]);
+  const [deletedAssetIds, setDeletedAssetIds] = useState<string[]>([]);
 
   // Modal states
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [modalTab, setModalTab] = useState<ModalTab>('VIDEO');
+
+  // Edit Modal states (Update CRUD)
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<ProMediaAsset | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editCategory, setEditCategory] = useState<MediaSourceCategory>('VIDEO');
+  const [editResolution, setEditResolution] = useState('4K');
+  const [editDuration, setEditDuration] = useState('0:30');
+  const [editFilePath, setEditFilePath] = useState('');
+  const [editCanvaUrl, setEditCanvaUrl] = useState('');
+  const [editSlideCount, setEditSlideCount] = useState<number>(10);
+  const [editArtist, setEditArtist] = useState('');
+  const [editKey, setEditKey] = useState('G');
+  const [editLyrics, setEditLyrics] = useState('');
 
   // Form states - Video / Motion Loop
   const [videoTitle, setVideoTitle] = useState('');
@@ -106,19 +123,22 @@ export const MediaLibraryScreen: React.FC = () => {
   // Load records from local DB
   const loadDatabaseRecords = async () => {
     try {
-      const [allSongs, allImages, allDecks] = await Promise.all([
+      const [allSongs, allImages, allDecks, savedCustom, savedDeleted] = await Promise.all([
         bunsenDb.getAllSongs(),
         bunsenDb.getAllImages(),
         bunsenDb.getAllExternalPresentations(),
+        bunsenDb.getSetting<ProMediaAsset[]>('pro_media_custom_assets', []),
+        bunsenDb.getSetting<string[]>('pro_media_deleted_assets', []),
       ]);
       setSongs(allSongs);
       setImages(allImages);
       setExternalDecks(allDecks);
 
-      // Restore custom uploaded assets from local DB settings store
-      const savedCustom = await bunsenDb.getSetting<ProMediaAsset[]>('pro_media_custom_assets', []);
       if (savedCustom) {
         setCustomAssets(savedCustom);
+      }
+      if (savedDeleted) {
+        setDeletedAssetIds(savedDeleted);
       }
     } catch (err) {
       console.error('Failed to load records from BunsenWorshipDB:', err);
@@ -149,12 +169,15 @@ export const MediaLibraryScreen: React.FC = () => {
 
   // Combine baseline Pro Assets with DB items & custom assets
   const allMediaItems = useMemo<ProMediaAsset[]>(() => {
-    const list: ProMediaAsset[] = [...PRO_MEDIA_ASSETS, ...customAssets];
+    const list: ProMediaAsset[] = [
+      ...PRO_MEDIA_ASSETS.filter((item) => !deletedAssetIds.includes(item.id)),
+      ...customAssets.filter((item) => !deletedAssetIds.includes(item.id)),
+    ];
 
     // Add user's DB songs as assets
     songs.forEach((song) => {
       const exists = list.some((item) => item.id === `song-${song.id}`);
-      if (!exists) {
+      if (!exists && !deletedAssetIds.includes(`song-${song.id}`)) {
         list.push({
           id: `song-${song.id}`,
           title: song.title,
@@ -191,7 +214,7 @@ export const MediaLibraryScreen: React.FC = () => {
     // Add external presentations from DB
     externalDecks.forEach((deck) => {
       const exists = list.some((item) => item.id === `deck-${deck.id}`);
-      if (!exists) {
+      if (!exists && !deletedAssetIds.includes(`deck-${deck.id}`)) {
         list.push({
           id: `deck-${deck.id}`,
           title: deck.title,
@@ -217,7 +240,7 @@ export const MediaLibraryScreen: React.FC = () => {
     // Add user images from DB
     images.forEach((img) => {
       const exists = list.some((item) => item.id === `img-${img.id}`);
-      if (!exists) {
+      if (!exists && !deletedAssetIds.includes(`img-${img.id}`)) {
         list.push({
           id: `img-${img.id}`,
           title: img.title,
@@ -236,7 +259,7 @@ export const MediaLibraryScreen: React.FC = () => {
     });
 
     return list;
-  }, [songs, externalDecks, images, customAssets]);
+  }, [songs, externalDecks, images, customAssets, deletedAssetIds]);
 
   // Compute counts for sidebar categories
   const sourceCounts = useMemo(() => {
@@ -394,6 +417,175 @@ export const MediaLibraryScreen: React.FC = () => {
       })
     );
     showFeedback(`"${asset.title}" set as active live background!`);
+  };
+
+  // Open Edit Modal for any media asset
+  const handleOpenEdit = (item: ProMediaAsset) => {
+    setEditingAsset(item);
+    setEditTitle(item.title);
+    setEditCategory(item.sourceCategory);
+    setEditResolution(item.resolution || '4K');
+    setEditDuration(item.durationOrSlides || '0:30');
+    setEditFilePath(item.filePath || '');
+    setEditCanvaUrl(item.canvaUrl || '');
+    setEditSlideCount(item.slidesCount || 10);
+
+    if (item.format === 'SONG') {
+      const rawSongId = item.id.replace('song-', '');
+      const foundSong = songs.find((s) => s.id === rawSongId || `song-${s.id}` === item.id);
+      setEditArtist(foundSong?.artist || '');
+      setEditKey(foundSong?.key || 'G');
+      if (foundSong && foundSong.slides.length > 0) {
+        setEditLyrics(foundSong.slides.map((s) => s.lines.join('\n')).join('\n\n'));
+      } else {
+        setEditLyrics('');
+      }
+    }
+
+    setShowEditModal(true);
+  };
+
+  // Save changes to edited asset
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAsset || !editTitle.trim()) return;
+
+    const title = editTitle.trim();
+
+    try {
+      if (editingAsset.format === 'SONG' || editingAsset.id.startsWith('song-')) {
+        const rawSongId = editingAsset.id.replace('song-', '');
+        const foundSong = songs.find((s) => s.id === rawSongId || `song-${s.id}` === editingAsset.id);
+        if (foundSong) {
+          let slides = foundSong.slides;
+          if (editLyrics.trim()) {
+            const lyricBlocks = editLyrics.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+            slides = lyricBlocks.map((block, idx) => ({
+              id: `s-${Date.now()}-${idx + 1}`,
+              section: idx === 0 ? 'Verse 1' : idx === 1 ? 'Chorus' : `Verse ${idx + 1}`,
+              lines: block.split('\n').map((l) => l.trim()).filter(Boolean),
+            }));
+          }
+          const updatedSong: SongRecord = {
+            ...foundSong,
+            title,
+            artist: editArtist.trim() || undefined,
+            key: editKey.trim() || undefined,
+            slides: slides.length > 0 ? slides : foundSong.slides,
+            updatedAt: Date.now(),
+          };
+          await bunsenDb.saveSong(updatedSong);
+        }
+      } else if (
+        editingAsset.format === 'PPTX' ||
+        editingAsset.format === 'CANVA' ||
+        editingAsset.id.startsWith('deck-')
+      ) {
+        const rawDeckId = editingAsset.id.replace('deck-', '');
+        const foundDeck = externalDecks.find((d) => d.id === rawDeckId || `deck-${d.id}` === editingAsset.id);
+        if (foundDeck) {
+          const updatedDeck: ExternalPresentationRecord = {
+            ...foundDeck,
+            title,
+            filePath: editFilePath.trim() || foundDeck.filePath,
+            canvaUrl: editCanvaUrl.trim() || foundDeck.canvaUrl,
+            slideCount: Number(editSlideCount) || foundDeck.slideCount,
+            updatedAt: Date.now(),
+          };
+          await bunsenDb.saveExternalPresentation(updatedDeck);
+        }
+      } else if (editingAsset.id.startsWith('img-')) {
+        const rawImgId = editingAsset.id.replace('img-', '');
+        const foundImg = images.find((i) => i.id === rawImgId || `img-${i.id}` === editingAsset.id);
+        if (foundImg) {
+          const updatedImg: ImageMediaRecord = {
+            ...foundImg,
+            title,
+            category:
+              editCategory === 'ANNOUNCEMENTS'
+                ? 'ANNOUNCEMENT'
+                : editCategory === 'SPEAKER_DECK'
+                ? 'SERMON'
+                : 'BACKGROUND',
+            updatedAt: Date.now(),
+          };
+          await bunsenDb.saveImage(updatedImg);
+        }
+      } else if (customAssets.some((a) => a.id === editingAsset.id)) {
+        const updatedCustom = customAssets.map((a) =>
+          a.id === editingAsset.id
+            ? {
+                ...a,
+                title,
+                sourceCategory: editCategory,
+                resolution: editResolution,
+                durationOrSlides: editDuration,
+              }
+            : a
+        );
+        setCustomAssets(updatedCustom);
+        await bunsenDb.setSetting('pro_media_custom_assets', updatedCustom);
+      } else {
+        // Baseline asset: mark original deleted and add customized version to customAssets
+        const newDeleted = [...deletedAssetIds, editingAsset.id];
+        const newCustomAsset: ProMediaAsset = {
+          ...editingAsset,
+          id: `asset-custom-${Date.now()}`,
+          title,
+          sourceCategory: editCategory,
+          resolution: editResolution,
+          durationOrSlides: editDuration,
+        };
+        const updatedCustom = [newCustomAsset, ...customAssets];
+        setDeletedAssetIds(newDeleted);
+        setCustomAssets(updatedCustom);
+        await bunsenDb.setSetting('pro_media_deleted_assets', newDeleted);
+        await bunsenDb.setSetting('pro_media_custom_assets', updatedCustom);
+      }
+
+      await loadDatabaseRecords();
+      setShowEditModal(false);
+      setEditingAsset(null);
+      showFeedback(t.mediaLibrary.assetUpdated || `"${title}" updated successfully!`);
+    } catch (err) {
+      console.error('Failed to update asset:', err);
+      showFeedback('Failed to update media asset', 'error');
+    }
+  };
+
+  // Delete any media asset
+  const handleDeleteAsset = async (item: ProMediaAsset) => {
+    const confirmTemplate = t.mediaLibrary.confirmDelete || 'Are you sure you want to delete "{title}" from your library?';
+    const confirmMsg = confirmTemplate.replace('{title}', item.title);
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      if (item.id.startsWith('song-')) {
+        const rawSongId = item.id.replace('song-', '');
+        await bunsenDb.deleteSong(rawSongId);
+      } else if (item.id.startsWith('deck-')) {
+        const rawDeckId = item.id.replace('deck-', '');
+        await bunsenDb.deleteExternalPresentation(rawDeckId);
+      } else if (item.id.startsWith('img-')) {
+        const rawImgId = item.id.replace('img-', '');
+        await bunsenDb.deleteImage(rawImgId);
+      } else if (customAssets.some((a) => a.id === item.id)) {
+        const updated = customAssets.filter((a) => a.id !== item.id);
+        setCustomAssets(updated);
+        await bunsenDb.setSetting('pro_media_custom_assets', updated);
+      } else {
+        // Baseline asset: persist ID in deleted list
+        const newDeleted = [...deletedAssetIds, item.id];
+        setDeletedAssetIds(newDeleted);
+        await bunsenDb.setSetting('pro_media_deleted_assets', newDeleted);
+      }
+
+      await loadDatabaseRecords();
+      showFeedback(t.mediaLibrary.assetDeleted || `"${item.title}" removed from library!`);
+    } catch (err) {
+      console.error('Failed to delete asset:', err);
+      showFeedback('Failed to delete media asset', 'error');
+    }
   };
 
   // Handle uploading and saving new assets
@@ -575,6 +767,8 @@ export const MediaLibraryScreen: React.FC = () => {
       for (const deck of SEED_EXTERNAL_PRESENTATIONS) {
         await bunsenDb.saveExternalPresentation(deck);
       }
+      await bunsenDb.setSetting('pro_media_deleted_assets', []);
+      setDeletedAssetIds([]);
       await loadDatabaseRecords();
       showFeedback('Standard worship songs, sacred images, and presentations re-populated!');
     } catch (err) {
@@ -834,14 +1028,52 @@ export const MediaLibraryScreen: React.FC = () => {
                             <LinkIcon size={14} />
                           </a>
                         )}
+
+                        <button
+                          type="button"
+                          className="medialib-action-btn-icon"
+                          onClick={() => handleOpenEdit(item)}
+                          title={t.mediaLibrary.editAsset}
+                        >
+                          <PencilIcon size={14} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="medialib-action-btn-icon danger"
+                          onClick={() => handleDeleteAsset(item)}
+                          title={t.mediaLibrary.deleteAsset}
+                        >
+                          <TrashIcon size={14} />
+                        </button>
                       </div>
                     </div>
 
                     {/* Card Info Below Thumbnail */}
                     <div className="medialib-card-info">
-                      <h4 className="medialib-card-title" title={item.title}>
-                        {item.title}
-                      </h4>
+                      <div className="medialib-card-title-row">
+                        <h4 className="medialib-card-title" title={item.title}>
+                          {item.title}
+                        </h4>
+                        <div className="medialib-card-quick-actions">
+                          <button
+                            type="button"
+                            className="medialib-card-quick-btn"
+                            onClick={() => handleOpenEdit(item)}
+                            title={t.mediaLibrary.editAsset}
+                          >
+                            <PencilIcon size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            className="medialib-card-quick-btn danger"
+                            onClick={() => handleDeleteAsset(item)}
+                            title={t.mediaLibrary.deleteAsset}
+                          >
+                            <TrashIcon size={13} />
+                          </button>
+                        </div>
+                      </div>
                       <div className="medialib-card-meta-row">
                         <div className="medialib-meta-left">
                           <span className={`medialib-format-pill ${item.format.toLowerCase()}`}>
@@ -1397,6 +1629,203 @@ export const MediaLibraryScreen: React.FC = () => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* -----------------------------------------------------------------
+          Edit Media Asset Modal (UPDATE CRUD)
+          ----------------------------------------------------------------- */}
+      {showEditModal && editingAsset && (
+        <div className="medialib-modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div
+            className="medialib-modal-dialog"
+            style={{ maxWidth: '580px', width: '90%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="medialib-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <PencilIcon size={18} style={{ color: 'var(--color-primary)' }} />
+                <h3 className="medialib-modal-title">{t.mediaLibrary.editModalTitle}</h3>
+              </div>
+              <button
+                type="button"
+                className="medialib-modal-close"
+                onClick={() => setShowEditModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="medialib-modal-form" style={{ padding: '1.25rem' }}>
+              {/* Asset Title */}
+              <div className="medialib-form-group">
+                <label className="medialib-form-label">{t.mediaLibrary.titleLabel}</label>
+                <input
+                  type="text"
+                  required
+                  className="medialib-form-input"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                />
+              </div>
+
+              {/* Category */}
+              <div className="medialib-form-group">
+                <label className="medialib-form-label">{t.mediaLibrary.categoryLabel}</label>
+                <select
+                  className="medialib-form-select"
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value as MediaSourceCategory)}
+                >
+                  <option value="VIDEO">{t.mediaLibrary.videoBackgrounds}</option>
+                  <option value="POWERPOINT">{t.mediaLibrary.powerPointUploads}</option>
+                  <option value="ANNOUNCEMENTS">{t.mediaLibrary.announcementsLoops}</option>
+                  <option value="SPEAKER_DECK">{t.mediaLibrary.speakerDecks}</option>
+                  <option value="SONGS">{t.mediaLibrary.worshipSongs}</option>
+                  <option value="CANVA">{t.mediaLibrary.canvaPresentations}</option>
+                </select>
+              </div>
+
+              {/* Video Specific Fields */}
+              {(editingAsset.format === 'MOV' || editingAsset.format === 'MP4') && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Resolution</label>
+                    <select
+                      className="medialib-form-select"
+                      value={editResolution}
+                      onChange={(e) => setEditResolution(e.target.value)}
+                    >
+                      <option value="4K">4K UHD (3840x2160)</option>
+                      <option value="1080p">1080p Full HD (1920x1080)</option>
+                      <option value="720p">720p HD (1280x720)</option>
+                    </select>
+                  </div>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Duration</label>
+                    <input
+                      type="text"
+                      className="medialib-form-input"
+                      placeholder="e.g. 0:30, 1:00"
+                      value={editDuration}
+                      onChange={(e) => setEditDuration(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* PowerPoint Specific Fields */}
+              {editingAsset.format === 'PPTX' && (
+                <>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">PowerPoint File Path</label>
+                    <input
+                      type="text"
+                      className="medialib-form-input"
+                      placeholder="e.g. C:\Presentations\Sermon.pptx"
+                      value={editFilePath}
+                      onChange={(e) => setEditFilePath(e.target.value)}
+                    />
+                  </div>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Slide Count</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="200"
+                      className="medialib-form-input"
+                      value={editSlideCount}
+                      onChange={(e) => setEditSlideCount(Number(e.target.value))}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Canva Specific Fields */}
+              {editingAsset.format === 'CANVA' && (
+                <>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Canva Project URL</label>
+                    <input
+                      type="url"
+                      required
+                      className="medialib-form-input"
+                      placeholder="https://www.canva.com/design/..."
+                      value={editCanvaUrl}
+                      onChange={(e) => setEditCanvaUrl(e.target.value)}
+                    />
+                  </div>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Slide Count</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="200"
+                      className="medialib-form-input"
+                      value={editSlideCount}
+                      onChange={(e) => setEditSlideCount(Number(e.target.value))}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Worship Song Specific Fields */}
+              {editingAsset.format === 'SONG' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.85rem' }}>
+                    <div className="medialib-form-group">
+                      <label className="medialib-form-label">Artist / Worship Leader</label>
+                      <input
+                        type="text"
+                        className="medialib-form-input"
+                        placeholder="e.g. Hillsong Worship"
+                        value={editArtist}
+                        onChange={(e) => setEditArtist(e.target.value)}
+                      />
+                    </div>
+                    <div className="medialib-form-group">
+                      <label className="medialib-form-label">Key</label>
+                      <select
+                        className="medialib-form-select"
+                        value={editKey}
+                        onChange={(e) => setEditKey(e.target.value)}
+                      >
+                        {['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'].map((k) => (
+                          <option key={k} value={k}>
+                            Key of {k}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="medialib-form-group">
+                    <label className="medialib-form-label">Lyrics & Slides (Separate slides with blank lines)</label>
+                    <textarea
+                      rows={5}
+                      className="medialib-form-textarea"
+                      placeholder="Verse 1 lyrics here...&#10;&#10;Chorus lyrics here..."
+                      value={editLyrics}
+                      onChange={(e) => setEditLyrics(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Footer Buttons */}
+              <div className="medialib-modal-footer" style={{ marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  className="medialib-btn-secondary"
+                  onClick={() => setShowEditModal(false)}
+                >
+                  {t.mediaLibrary.cancel}
+                </button>
+                <button type="submit" className="medialib-btn-primary">
+                  {t.mediaLibrary.updateButton}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

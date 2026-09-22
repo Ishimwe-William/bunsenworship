@@ -511,6 +511,13 @@
   background: var(--bg-surface);
 }
 
+.medialib-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .medialib-card-title {
   font-size: 1rem;
   font-weight: 700;
@@ -521,6 +528,40 @@
   text-overflow: ellipsis;
   line-height: 1.35;
   letter-spacing: -0.01em;
+  flex: 1;
+  min-width: 0;
+}
+
+.medialib-card-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.medialib-card-quick-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 4px 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.medialib-card-quick-btn:hover {
+  background: var(--bg-hover);
+  color: var(--color-primary);
+  border-color: var(--border-subtle);
+}
+
+.medialib-card-quick-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 .medialib-card-meta-row {
