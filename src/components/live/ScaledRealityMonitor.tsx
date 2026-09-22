@@ -84,12 +84,47 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
         <div
           className="stage-bg-layer"
           style={{
-            background: isBlackout ? '#000000' : backgroundGradient,
+            background: isBlackout
+              ? '#000000'
+              : backgroundGradient.startsWith('data:image') ||
+                backgroundGradient.startsWith('http') ||
+                backgroundGradient.startsWith('blob:')
+              ? backgroundGradient.startsWith('url(')
+                ? backgroundGradient
+                : `url("${backgroundGradient}") center center / cover no-repeat`
+              : backgroundGradient,
           }}
         />
 
         {/* Cinematic Atmospheric Lighting */}
         <div className="stage-atmosphere-layer" />
+
+        {/* Slide Image Layer */}
+        {slide?.imageUrl && !isBlackout && (
+          <div
+            className="stage-image-layer"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 5,
+              overflow: 'hidden',
+            }}
+          >
+            <img
+              src={slide.imageUrl}
+              alt={slide.section || 'Slide Graphic'}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: slide.imageFit || (lines.length > 0 ? 'cover' : 'contain'),
+                filter: lines.length > 0 ? 'brightness(0.72)' : 'none',
+              }}
+            />
+          </div>
+        )}
 
         {/* Reality Content State */}
         {isBlackout ? (
@@ -112,6 +147,8 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
             }`}
             style={{
               animationDuration: `${fadeDuration}s`,
+              zIndex: 10,
+              position: 'relative',
             }}
           >
             <div
@@ -128,7 +165,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
               ))}
             </div>
           </div>
-        ) : (
+        ) : slide?.imageUrl ? null : (
           <div className="stage-empty-state">
             <span>{emptyLabel}</span>
           </div>

@@ -147,7 +147,15 @@ export const ProjectorWindowView: React.FC = () => {
         style={{
           position: 'absolute',
           inset: 0,
-          background: state.isBlackout ? '#000000' : state.backgroundGradient,
+          background: state.isBlackout
+            ? '#000000'
+            : state.backgroundGradient.startsWith('data:image') ||
+              state.backgroundGradient.startsWith('http') ||
+              state.backgroundGradient.startsWith('blob:')
+            ? state.backgroundGradient.startsWith('url(')
+              ? state.backgroundGradient
+              : `url("${state.backgroundGradient}") center center / cover no-repeat`
+            : state.backgroundGradient,
           transition: 'background 0.5s ease',
         }}
       />
@@ -183,6 +191,33 @@ export const ProjectorWindowView: React.FC = () => {
           justifyContent: 'center',
         }}
       >
+        {/* Slide Image Layer */}
+        {state.slide?.imageUrl && !state.isBlackout && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 5,
+              overflow: 'hidden',
+            }}
+          >
+            <img
+              src={state.slide.imageUrl}
+              alt={state.slide.section || 'Slide Graphic'}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit:
+                  state.slide.imageFit || (lines.length > 0 ? 'cover' : 'contain'),
+                filter: lines.length > 0 ? 'brightness(0.72)' : 'none',
+              }}
+            />
+          </div>
+        )}
+
         {/* Stage Content */}
         {state.isBlackout ? (
           <div style={{ position: 'relative', zIndex: 10 }} />
@@ -233,7 +268,7 @@ export const ProjectorWindowView: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : (
+        ) : state.slide?.imageUrl ? null : (
           <div
             style={{
               position: 'relative',

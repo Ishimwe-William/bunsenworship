@@ -1,4 +1,9 @@
-import { ServiceRecord, SongRecord, ExternalPresentationRecord } from './types';
+import {
+  ServiceRecord,
+  SongRecord,
+  ExternalPresentationRecord,
+  ImageMediaRecord,
+} from './types';
 
 export const SEED_SONGS: SongRecord[] = [
   {
@@ -391,3 +396,171 @@ export const SEED_SERVICE: ServiceRecord = {
   createdAt: 1710000000000,
   updatedAt: 1710000000000,
 };
+
+const createSvgDataUrl = (svgContent: string): string => {
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svgContent.trim())}`;
+};
+
+export const SEED_IMAGES: ImageMediaRecord[] = [
+  {
+    id: 'img-cross-sunrise',
+    title: 'Sunrise at Calvary (Cross Silhouette)',
+    category: 'BACKGROUND',
+    dataUrl: createSvgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+        <defs>
+          <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0f172a"/>
+            <stop offset="35%" stop-color="#311042"/>
+            <stop offset="65%" stop-color="#831843"/>
+            <stop offset="85%" stop-color="#d97706"/>
+            <stop offset="100%" stop-color="#fef08a"/>
+          </linearGradient>
+          <radialGradient id="sunBurst" cx="0.5" cy="0.75" r="0.5">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+            <stop offset="30%" stop-color="#fbbf24" stop-opacity="0.6"/>
+            <stop offset="70%" stop-color="#ea580c" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1920" height="1080" fill="url(#skyGrad)"/>
+        <rect width="1920" height="1080" fill="url(#sunBurst)"/>
+        <path d="M0,840 Q480,720 960,820 T1920,800 L1920,1080 L0,1080 Z" fill="#090d16"/>
+        <path d="M0,910 Q600,840 1200,890 T1920,880 L1920,1080 L0,1080 Z" fill="#030712"/>
+        <rect x="948" y="560" width="24" height="280" rx="4" fill="#030712"/>
+        <rect x="886" y="620" width="148" height="22" rx="4" fill="#030712"/>
+        <rect x="786" y="635" width="16" height="190" rx="3" fill="#090d16"/>
+        <rect x="746" y="675" width="96" height="16" rx="3" fill="#090d16"/>
+        <rect x="1118" y="635" width="16" height="190" rx="3" fill="#090d16"/>
+        <rect x="1078" y="675" width="96" height="16" rx="3" fill="#090d16"/>
+      </svg>
+    `),
+    fileSize: 1240,
+    width: 1920,
+    height: 1080,
+    createdAt: 1710000000000,
+    updatedAt: 1710000000000,
+  },
+  {
+    id: 'img-celestial-midnight',
+    title: 'Deep Midnight Twilight (Celestial)',
+    category: 'BACKGROUND',
+    dataUrl: createSvgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+        <defs>
+          <linearGradient id="celestialGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#020617"/>
+            <stop offset="40%" stop-color="#0f172a"/>
+            <stop offset="75%" stop-color="#1e1b4b"/>
+            <stop offset="100%" stop-color="#090d16"/>
+          </linearGradient>
+          <radialGradient id="nebula1" cx="0.75" cy="0.3" r="0.45">
+            <stop offset="0%" stop-color="#818cf8" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="nebula2" cx="0.25" cy="0.75" r="0.5">
+            <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1920" height="1080" fill="url(#celestialGrad)"/>
+        <rect width="1920" height="1080" fill="url(#nebula1)"/>
+        <rect width="1920" height="1080" fill="url(#nebula2)"/>
+        <circle cx="240" cy="180" r="3.5" fill="#ffffff" opacity="0.9"/>
+        <circle cx="480" cy="290" r="2.5" fill="#ffffff" opacity="0.8"/>
+        <circle cx="820" cy="150" r="4.5" fill="#ffffff" opacity="0.95"/>
+        <circle cx="1120" cy="220" r="3" fill="#a5b4fc" opacity="0.85"/>
+        <circle cx="1450" cy="140" r="4" fill="#ffffff" opacity="0.9"/>
+        <circle cx="1720" cy="310" r="2" fill="#ffffff" opacity="0.75"/>
+        <circle cx="360" cy="620" r="2.5" fill="#ffffff" opacity="0.7"/>
+        <circle cx="700" cy="740" r="3.5" fill="#ffffff" opacity="0.85"/>
+        <circle cx="1320" cy="680" r="3" fill="#38bdf8" opacity="0.8"/>
+        <circle cx="1600" cy="780" r="3.5" fill="#ffffff" opacity="0.9"/>
+      </svg>
+    `),
+    fileSize: 1180,
+    width: 1920,
+    height: 1080,
+    createdAt: 1710000000000,
+    updatedAt: 1710000000000,
+  },
+  {
+    id: 'img-welcome-announcement',
+    title: 'Sunday Worship Welcome Banner',
+    category: 'ANNOUNCEMENT',
+    dataUrl: createSvgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+        <defs>
+          <linearGradient id="wBg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0f172a"/>
+            <stop offset="50%" stop-color="#1e293b"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+        </defs>
+        <rect width="1920" height="1080" fill="url(#wBg)"/>
+        <rect x="80" y="80" width="1760" height="920" rx="16" fill="none" stroke="#6366f1" stroke-width="4" stroke-dasharray="16,8" opacity="0.5"/>
+        <rect x="110" y="110" width="1700" height="860" rx="12" fill="none" stroke="#f59e0b" stroke-width="2" opacity="0.4"/>
+        <text x="960" y="400" font-family="-apple-system, system-ui, sans-serif" font-size="44" font-weight="700" fill="#a5b4fc" text-anchor="middle" letter-spacing="8">BUNSEN WORSHIP SANCTUARY</text>
+        <text x="960" y="550" font-family="-apple-system, system-ui, sans-serif" font-size="108" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="2">WELCOME HOME</text>
+        <text x="960" y="670" font-family="-apple-system, system-ui, sans-serif" font-size="40" font-style="italic" fill="#cbd5e1" text-anchor="middle">"Where the Spirit of the Lord is, there is freedom." — 2 Cor 3:17</text>
+      </svg>
+    `),
+    fileSize: 1350,
+    width: 1920,
+    height: 1080,
+    createdAt: 1710000000000,
+    updatedAt: 1710000000000,
+  },
+  {
+    id: 'img-communion-table',
+    title: "The Lord's Supper & Holy Communion",
+    category: 'SERMON',
+    dataUrl: createSvgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+        <defs>
+          <radialGradient id="cBg" cx="0.5" cy="0.5" r="0.6">
+            <stop offset="0%" stop-color="#450a0a"/>
+            <stop offset="60%" stop-color="#180505"/>
+            <stop offset="100%" stop-color="#000000"/>
+          </radialGradient>
+        </defs>
+        <rect width="1920" height="1080" fill="url(#cBg)"/>
+        <circle cx="960" cy="450" r="140" fill="none" stroke="#d97706" stroke-width="4" opacity="0.7"/>
+        <path d="M910,390 L1010,390 C1010,470 975,500 965,530 L965,580 L935,580 L935,600 L985,600 L925,600 L955,600 L955,580 L925,530 C915,500 910,470 910,390 Z" fill="#f59e0b" opacity="0.95"/>
+        <text x="960" y="690" font-family="-apple-system, system-ui, sans-serif" font-size="68" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="3">THE LORD'S SUPPER</text>
+        <text x="960" y="770" font-family="-apple-system, system-ui, sans-serif" font-size="36" fill="#fcd34d" text-anchor="middle">"Do this in remembrance of Me" — Luke 22:19</text>
+      </svg>
+    `),
+    fileSize: 1290,
+    width: 1920,
+    height: 1080,
+    createdAt: 1710000000000,
+    updatedAt: 1710000000000,
+  },
+  {
+    id: 'img-shepherd-psalm',
+    title: 'The Lord is My Shepherd (Psalm 23)',
+    category: 'SCRIPTURE',
+    dataUrl: createSvgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+        <defs>
+          <linearGradient id="pBg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#042f2e"/>
+            <stop offset="60%" stop-color="#134e4a"/>
+            <stop offset="100%" stop-color="#022c22"/>
+          </linearGradient>
+        </defs>
+        <rect width="1920" height="1080" fill="url(#pBg)"/>
+        <text x="960" y="440" font-family="-apple-system, system-ui, sans-serif" font-size="82" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="-1">The Lord is my shepherd;</text>
+        <text x="960" y="560" font-family="-apple-system, system-ui, sans-serif" font-size="82" font-weight="800" fill="#a7f3d0" text-anchor="middle" letter-spacing="-1">I shall not want.</text>
+        <text x="960" y="690" font-family="-apple-system, system-ui, sans-serif" font-size="40" font-weight="600" fill="#6ee7b7" text-anchor="middle" letter-spacing="4">PSALM 23:1</text>
+      </svg>
+    `),
+    fileSize: 1150,
+    width: 1920,
+    height: 1080,
+    createdAt: 1710000000000,
+    updatedAt: 1710000000000,
+  },
+];
+

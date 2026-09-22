@@ -114,6 +114,8 @@ export const SlideDeck: React.FC = () => {
               ? 'POWERPOINT DECK'
               : currentItem.type === 'CANVA'
               ? 'CANVA PRESENTATION'
+              : currentItem.type === 'IMAGE'
+              ? 'IMAGE SLIDESHOW'
               : currentItem.type === 'SERMON'
               ? 'SERMON SLIDES'
               : 'LYRICS SLIDE DECK'}
@@ -176,9 +178,21 @@ export const SlideDeck: React.FC = () => {
                 )}
               </div>
 
-              <p className="slide-lyrics-body">
-                {slide.lines.join(' / ')}
-              </p>
+              {slide.imageUrl && (
+                <div className="slide-thumbnail-wrap">
+                  <img
+                    src={slide.imageUrl}
+                    alt={slide.section || 'Slide Thumbnail'}
+                    className="slide-thumbnail-img"
+                  />
+                </div>
+              )}
+
+              {slide.lines && slide.lines.length > 0 && (
+                <p className="slide-lyrics-body">
+                  {slide.lines.join(' / ')}
+                </p>
+              )}
             </div>
           );
         })}

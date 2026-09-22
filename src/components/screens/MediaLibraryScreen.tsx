@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppDispatch } from '../../store/hooks';
-import { addRundownItem, setLoadedRundown } from '../../store/features/presentation';
+import {
+  addRundownItem,
+  setLoadedRundown,
+  addCustomBackgroundTheme,
+} from '../../store/features/presentation';
 import {
   bunsenDb,
   SongRecord,
   ExternalPresentationRecord,
   ServiceRecord,
+  ImageMediaRecord,
   SEED_SONGS,
   SEED_EXTERNAL_PRESENTATIONS,
+  SEED_IMAGES,
 } from '../../db';
 import {
   SearchIcon,
@@ -23,10 +29,12 @@ import {
   RefreshCwIcon,
   PresentationIcon,
   FolderIcon,
+  ImageIcon,
 } from '../common/Icons';
 import './MediaLibraryScreen.css';
 
-type LibraryTab = 'songs' | 'decks' | 'rundowns' | 'backup';
+type LibraryTab = 'songs' | 'images' | 'decks' | 'rundowns' | 'backup';
+type ImageCategoryFilter = 'ALL' | 'BACKGROUND' | 'SERMON' | 'ANNOUNCEMENT' | 'PHOTO' | 'SCRIPTURE';
 
 export const MediaLibraryScreen: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -34,17 +42,20 @@ export const MediaLibraryScreen: React.FC = () => {
   // Active state
   const [activeTab, setActiveTab] = useState<LibraryTab>('songs');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedImageCategory, setSelectedImageCategory] = useState<ImageCategoryFilter>('ALL');
   const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [addedItemIds, setAddedItemIds] = useState<Record<string, boolean>>({});
 
   // Loaded database data
   const [songs, setSongs] = useState<SongRecord[]>([]);
+  const [images, setImages] = useState<ImageMediaRecord[]>([]);
   const [externalDecks, setExternalDecks] = useState<ExternalPresentationRecord[]>([]);
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Modals state
   const [showAddSongModal, setShowAddSongModal] = useState(false);
+  const [showAddImageModal, setShowAddImageModal] = useState(false);
   const [showLinkPptModal, setShowLinkPptModal] = useState(false);
   const [showLinkCanvaModal, setShowLinkCanvaModal] = useState(false);
   const [editingSongId, setEditingSongId] = useState<string | null>(null);
@@ -57,6 +68,14 @@ export const MediaLibraryScreen: React.FC = () => {
   const [songCcli, setSongCcli] = useState('');
   const [songTags, setSongTags] = useState('Worship, Praise');
   const [songLyrics, setSongLyrics] = useState('');
+
+  // Form states - Image Upload
+  const [imageTitle, setImageTitle] = useState('');
+  const [imageCategory, setImageCategory] = useState<'BACKGROUND' | 'SERMON' | 'ANNOUNCEMENT' | 'PHOTO' | 'SCRIPTURE'>('BACKGROUND');
+  const [imageDataUrl, setImageDataUrl] = useState('');
+  const [imageOverlayText, setImageOverlayText] = useState('');
+  const [imageFit, setImageFit] = useState<'cover' | 'contain'>('contain');
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // Form states - PPT
   const [pptTitle, setPptTitle] = useState('');
@@ -71,6 +90,7 @@ export const MediaLibraryScreen: React.FC = () => {
   const [canvaSlideCount, setCanvaSlideCount] = useState(6);
   const [canvaNotes, setCanvaNotes] = useState('');
 
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -78,12 +98,14 @@ export const MediaLibraryScreen: React.FC = () => {
   const loadDatabaseRecords = async () => {
     try {
       setIsLoading(true);
-      const [allSongs, allDecks, allServices] = await Promise.all([
+      const [allSongs, allImages, allDecks, allServices] = await Promise.all([
         bunsenDb.getAllSongs(),
+        bunsenDb.getAllImages(),
         bunsenDb.getAllExternalPresentations(),
         bunsenDb.getAllServices(),
       ]);
       setSongs(allSongs);
+      setImages(allImages);
       setExternalDecks(allDecks);
       setServices(allServices);
     } catch (err) {
@@ -117,7 +139,7 @@ export const MediaLibraryScreen: React.FC = () => {
     }, 1800);
   };
 
-  // Add song to current presentation rundown
+  // 1. Add song to current presentation rundown
   const handleAddSongToRundown = (song: SongRecord) => {
     dispatch(
       addRundownItem({
@@ -132,7 +154,44 @@ export const MediaLibraryScreen: React.FC = () => {
     showFeedback(`"${song.title}" added to service rundown!`);
   };
 
-  // Add external deck (PPT or Canva) to current presentation rundown
+  // 2. Add Image to current presentation rundown
+  const handleAddImageToRundown = (image: ImageMediaRecord) => {
+    dispatch(
+      addRundownItem({
+        title: image.title,
+        subtitle: `${image.category} Image Slide`,
+        time: '09:00',
+        type: 'IMAGE',
+        slides: [
+          {
+            id: `s-img-${Date.now()}`,
+            section: image.title,
+            lines: image.overlayLines || [],
+            imageUrl: image.dataUrl,
+            imageFit: image.category === 'BACKGROUND' ? 'cover' : 'contain',
+          },
+        ],
+      })
+    );
+    markAddedFeedback(image.id);
+    showFeedback(`Image "${image.title}" added to service rundown!`);
+  };
+
+  // 3. Set image as active background theme
+  const handleSetImageAsBackground = (image: ImageMediaRecord) => {
+    dispatch(
+      addCustomBackgroundTheme({
+        id: `bg-img-${image.id}`,
+        name: image.title,
+        gradient: image.dataUrl,
+        accent: '#f472b6',
+        imageUrl: image.dataUrl,
+      })
+    );
+    showFeedback(`"${image.title}" set as active live background!`);
+  };
+
+  // 4. Add external deck (PPT or Canva) to current presentation rundown
   const handleAddDeckToRundown = (deck: ExternalPresentationRecord) => {
     dispatch(
       addRundownItem({
@@ -156,13 +215,87 @@ export const MediaLibraryScreen: React.FC = () => {
     showFeedback(`"${deck.title}" added to service rundown!`);
   };
 
+  // Handle local image file selection
+  const processImageFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      showFeedback('Please select a valid image file (.png, .jpg, .webp, .svg)', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setImageDataUrl(dataUrl);
+      if (!imageTitle) {
+        setImageTitle(file.name.replace(/\.[^/.]+$/, ''));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Save new Image into local DB
+  const handleSaveImage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!imageTitle.trim() || !imageDataUrl) {
+      showFeedback('Please provide a title and select an image file', 'error');
+      return;
+    }
+
+    const lines = imageOverlayText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const newImage: ImageMediaRecord = {
+      id: `img-${Date.now()}`,
+      title: imageTitle.trim(),
+      category: imageCategory,
+      dataUrl: imageDataUrl,
+      width: 1920,
+      height: 1080,
+      overlayLines: lines.length > 0 ? lines : undefined,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    try {
+      await bunsenDb.saveImage(newImage);
+      await loadDatabaseRecords();
+      setShowAddImageModal(false);
+      resetImageForm();
+      showFeedback(`Image "${newImage.title}" saved to local database!`);
+    } catch (err) {
+      console.error('Error saving image:', err);
+      showFeedback('Could not save image to database', 'error');
+    }
+  };
+
+  const handleDeleteImage = async (id: string, title: string) => {
+    if (!window.confirm(`Delete "${title}" from the image library?`)) {
+      return;
+    }
+    try {
+      await bunsenDb.deleteImage(id);
+      await loadDatabaseRecords();
+      showFeedback(`Deleted "${title}" from image library.`);
+    } catch (err) {
+      console.error('Failed to delete image:', err);
+      showFeedback('Could not delete image', 'error');
+    }
+  };
+
+  const resetImageForm = () => {
+    setImageTitle('');
+    setImageCategory('BACKGROUND');
+    setImageDataUrl('');
+    setImageOverlayText('');
+    setImageFit('contain');
+  };
+
   // Save / Update Song in local DB
   const handleSaveSong = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!songTitle.trim()) return;
 
-    // Parse lyrics into slides
-    // Double newline or section headers split slides
     const rawBlocks = songLyrics.split(/\n\s*\n/).filter((b) => b.trim().length > 0);
     const generatedSlides =
       rawBlocks.length > 0
@@ -175,7 +308,7 @@ export const MediaLibraryScreen: React.FC = () => {
             let sectionName = `Slide ${idx + 1}`;
             if (firstLine.startsWith('[') && firstLine.endsWith(']')) {
               sectionName = firstLine.slice(1, -1);
-              lines.shift(); // remove header line
+              lines.shift();
             } else if (idx === 0) {
               sectionName = 'Verse 1';
             } else if (idx === 1) {
@@ -269,7 +402,6 @@ export const MediaLibraryScreen: React.FC = () => {
     e.preventDefault();
     if (!pptTitle.trim()) return;
 
-    // Generate outline slides from notes or defaults
     const outlineLines = pptNotes
       .split('\n')
       .map((l) => l.trim())
@@ -330,7 +462,6 @@ export const MediaLibraryScreen: React.FC = () => {
       };
     });
 
-    // Auto-generate embed URL if possible
     let embed = canvaEmbedUrl.trim();
     if (!embed && canvaUrl.includes('canva.com/design')) {
       embed = canvaUrl.split('?')[0] + '/view?embed';
@@ -418,18 +549,21 @@ export const MediaLibraryScreen: React.FC = () => {
 
   // Restore Seed Data
   const handleRestoreSeedData = async () => {
-    if (!window.confirm('Reset local database with standard worship songs and sample decks?')) {
+    if (!window.confirm('Reset local database with standard worship songs, images, and sample decks?')) {
       return;
     }
     try {
       for (const song of SEED_SONGS) {
         await bunsenDb.saveSong(song);
       }
+      for (const img of SEED_IMAGES) {
+        await bunsenDb.saveImage(img);
+      }
       for (const deck of SEED_EXTERNAL_PRESENTATIONS) {
         await bunsenDb.saveExternalPresentation(deck);
       }
       await loadDatabaseRecords();
-      showFeedback('Standard worship songs and presentations re-populated!');
+      showFeedback('Standard worship songs, sacred images, and presentations re-populated!');
     } catch (err) {
       console.error('Failed to restore seed data:', err);
       showFeedback('Could not restore sample data', 'error');
@@ -448,6 +582,20 @@ export const MediaLibraryScreen: React.FC = () => {
         (s.tags && s.tags.some((t) => t.toLowerCase().includes(q)))
     );
   }, [songs, searchQuery]);
+
+  const filteredImages = useMemo(() => {
+    let list = images;
+    if (selectedImageCategory !== 'ALL') {
+      list = list.filter((img) => img.category === selectedImageCategory);
+    }
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(
+      (img) =>
+        img.title.toLowerCase().includes(q) ||
+        img.category.toLowerCase().includes(q)
+    );
+  }, [images, selectedImageCategory, searchQuery]);
 
   const filteredDecks = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -479,7 +627,7 @@ export const MediaLibraryScreen: React.FC = () => {
             <span>Media Library & Presentations</span>
           </h2>
           <p className="screen-description">
-            Local persistent database for worship songs, PowerPoint (.pptx) slide files, and Canva presentation decks.
+            Local persistent database for worship songs, still images & graphics, PowerPoint (.pptx) slides, and Canva decks.
           </p>
         </div>
 
@@ -494,6 +642,18 @@ export const MediaLibraryScreen: React.FC = () => {
           >
             <PlusIcon size={15} />
             <span>+ New Song</span>
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              resetImageForm();
+              setShowAddImageModal(true);
+            }}
+            style={{ borderColor: 'rgba(236, 72, 153, 0.4)', color: '#f472b6' }}
+          >
+            <ImageIcon size={15} />
+            <span>+ Upload Image</span>
           </button>
           <button
             type="button"
@@ -550,6 +710,19 @@ export const MediaLibraryScreen: React.FC = () => {
         </div>
 
         <div
+          className={`medialib-stat-card ${activeTab === 'images' ? 'active' : ''}`}
+          onClick={() => setActiveTab('images')}
+        >
+          <div className="medialib-stat-icon images">
+            <ImageIcon size={20} />
+          </div>
+          <div>
+            <div className="medialib-stat-label">Still Images</div>
+            <div className="medialib-stat-value">{images.length} Graphics</div>
+          </div>
+        </div>
+
+        <div
           className={`medialib-stat-card ${activeTab === 'decks' ? 'active' : ''}`}
           onClick={() => setActiveTab('decks')}
         >
@@ -602,6 +775,15 @@ export const MediaLibraryScreen: React.FC = () => {
           </button>
           <button
             type="button"
+            className={`medialib-nav-btn ${activeTab === 'images' ? 'active' : ''}`}
+            onClick={() => setActiveTab('images')}
+          >
+            <ImageIcon size={14} />
+            <span>Images & Stills</span>
+            <span className="medialib-count-badge">{images.length}</span>
+          </button>
+          <button
+            type="button"
             className={`medialib-nav-btn ${activeTab === 'decks' ? 'active' : ''}`}
             onClick={() => setActiveTab('decks')}
           >
@@ -634,7 +816,13 @@ export const MediaLibraryScreen: React.FC = () => {
             <input
               type="text"
               className="medialib-search-input"
-              placeholder={`Search ${activeTab === 'songs' ? 'songs, keys, tags...' : 'decks, paths, URLs...'}`}
+              placeholder={`Search ${
+                activeTab === 'songs'
+                  ? 'songs, keys, tags...'
+                  : activeTab === 'images'
+                  ? 'images, titles, categories...'
+                  : 'decks, paths, URLs...'
+              }`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -683,7 +871,6 @@ export const MediaLibraryScreen: React.FC = () => {
                       {song.ccli && <span className="medialib-meta-tag">CCLI #{song.ccli}</span>}
                     </div>
 
-                    {/* Preview lyric snippet */}
                     {song.slides.length > 0 && song.slides[0].lines && (
                       <div className="medialib-slide-preview-box">
                         <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '2px' }}>
@@ -730,7 +917,115 @@ export const MediaLibraryScreen: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: PowerPoint & Canva Decks */}
+      {/* TAB 2: Images & Stills */}
+      {activeTab === 'images' && (
+        <div>
+          {/* Category Filter Pills */}
+          <div className="medialib-category-pills">
+            {(
+              [
+                ['ALL', 'All Images'],
+                ['BACKGROUND', 'Worship Backgrounds'],
+                ['ANNOUNCEMENT', 'Announcements'],
+                ['SERMON', 'Sermon Graphics'],
+                ['SCRIPTURE', 'Scripture Art'],
+                ['PHOTO', 'Photography'],
+              ] as const
+            ).map(([catKey, catLabel]) => (
+              <button
+                key={catKey}
+                type="button"
+                className={`medialib-cat-pill ${selectedImageCategory === catKey ? 'active' : ''}`}
+                onClick={() => setSelectedImageCategory(catKey as ImageCategoryFilter)}
+              >
+                {catLabel}
+              </button>
+            ))}
+          </div>
+
+          {isLoading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              Loading images from local database...
+            </div>
+          ) : filteredImages.length === 0 ? (
+            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              <p>No images found in this category.</p>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  resetImageForm();
+                  setShowAddImageModal(true);
+                }}
+                style={{ marginTop: '0.75rem' }}
+              >
+                <ImageIcon size={15} />
+                <span>+ Upload First Image</span>
+              </button>
+            </div>
+          ) : (
+            <div className="medialib-images-grid">
+              {filteredImages.map((img) => {
+                const isAdded = addedItemIds[img.id];
+                return (
+                  <div key={img.id} className="medialib-image-card">
+                    <div className="medialib-image-thumb-box">
+                      <img
+                        src={img.dataUrl}
+                        alt={img.title}
+                        className="medialib-image-thumb-img"
+                      />
+                      <span className="medialib-image-cat-badge">{img.category}</span>
+                    </div>
+
+                    <div className="medialib-image-info">
+                      <div>
+                        <h4 className="medialib-image-title">{img.title}</h4>
+                        <div className="medialib-image-meta">
+                          <span>1920 &times; 1080 &bull; Offline Stored</span>
+                        </div>
+                      </div>
+
+                      <div className="medialib-image-actions">
+                        <button
+                          type="button"
+                          className={`medialib-add-btn ${isAdded ? 'success' : ''}`}
+                          onClick={() => handleAddImageToRundown(img)}
+                          title="Project this image as a slide in the rundown"
+                        >
+                          {isAdded ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
+                          <span>{isAdded ? 'In Rundown' : 'Add to Rundown'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="medialib-icon-btn"
+                          onClick={() => handleSetImageAsBackground(img)}
+                          title="Set as live background theme behind lyrics"
+                          style={{ color: '#f472b6', borderColor: 'rgba(236, 72, 153, 0.3)' }}
+                        >
+                          <ImageIcon size={14} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="medialib-icon-btn danger"
+                          onClick={() => handleDeleteImage(img.id, img.title)}
+                          title="Delete image from local DB"
+                        >
+                          <TrashIcon size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: PowerPoint & Canva Decks */}
       {activeTab === 'decks' && (
         <div>
           {isLoading ? (
@@ -788,19 +1083,18 @@ export const MediaLibraryScreen: React.FC = () => {
                       </span>
                       {deck.filePath && (
                         <span className="medialib-meta-tag path" title={deck.filePath}>
-                          <FolderIcon size={11} style={{ marginRight: '3px' }} />
+                          <FolderIcon size={11} />
                           {deck.filePath.split(/[/\\]/).pop()}
                         </span>
                       )}
                       {deck.canvaUrl && (
                         <span className="medialib-meta-tag path" title={deck.canvaUrl}>
-                          <LinkIcon size={11} style={{ marginRight: '3px' }} />
+                          <LinkIcon size={11} />
                           canva.com/design
                         </span>
                       )}
                     </div>
 
-                    {/* Preview slide topics */}
                     {deck.slides.length > 0 && (
                       <div className="medialib-slide-preview-box">
                         <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '2px' }}>
@@ -809,7 +1103,7 @@ export const MediaLibraryScreen: React.FC = () => {
                         {deck.slides
                           .slice(0, 3)
                           .map((s) => s.section || s.lines[0])
-                          .join(' &bull; ')}
+                          .join(' • ')}
                       </div>
                     )}
 
@@ -854,7 +1148,7 @@ export const MediaLibraryScreen: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: Saved Services */}
+      {/* TAB 4: Saved Services */}
       {activeTab === 'rundowns' && (
         <div className="medialib-items-grid">
           {services.map((srv) => (
@@ -881,7 +1175,7 @@ export const MediaLibraryScreen: React.FC = () => {
               </div>
 
               <div className="medialib-slide-preview-box">
-                {srv.items.map((i) => i.title).join(' &bull; ')}
+                {srv.items.map((i) => i.title).join(' • ')}
               </div>
 
               <div className="medialib-card-actions">
@@ -901,7 +1195,7 @@ export const MediaLibraryScreen: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 4: Database Backup & Sync Hub */}
+      {/* TAB 5: Database Backup & Sync Hub */}
       {activeTab === 'backup' && (
         <div className="medialib-backup-panel">
           <div>
@@ -909,8 +1203,8 @@ export const MediaLibraryScreen: React.FC = () => {
               BunsenWorship Local Storage Hub
             </h3>
             <p className="section-description">
-              All worship songs, PowerPoint links, Canva attachments, and services are saved in your local
-              IndexedDB database (<code>BunsenWorshipDB</code>). You can backup your entire church presentation library
+              All worship songs, still images, PowerPoint links, Canva attachments, and services are saved in your local
+              IndexedDB database (<code>BunsenWorshipDB</code> v2). You can backup your entire church presentation library
               to JSON files and restore anytime.
             </p>
           </div>
@@ -920,11 +1214,11 @@ export const MediaLibraryScreen: React.FC = () => {
             <div className="medialib-backup-card">
               <div>
                 <h4 className="medialib-backup-title">
-                  <DownloadIcon size={18} style={{ color: '#818cf8' }} />
+                  <DownloadIcon size={18} />
                   <span>Export Database Backup</span>
                 </h4>
                 <p className="medialib-backup-desc">
-                  Download a complete backup JSON snapshot of all worship songs, PowerPoint links, Canva links,
+                  Download a complete backup JSON snapshot of all worship songs, still images ({images.length}), PowerPoint links, Canva links,
                   and rundowns to your local hard drive.
                 </p>
               </div>
@@ -943,11 +1237,11 @@ export const MediaLibraryScreen: React.FC = () => {
             <div className="medialib-backup-card">
               <div>
                 <h4 className="medialib-backup-title">
-                  <UploadIcon size={18} style={{ color: '#34d399' }} />
+                  <UploadIcon size={18} />
                   <span>Restore from Backup</span>
                 </h4>
                 <p className="medialib-backup-desc">
-                  Import a previously exported BunsenWorship JSON backup file. All songs and presentation links will
+                  Import a previously exported BunsenWorship JSON backup file. All songs, images, and presentation links will
                   be safely merged into your local database.
                 </p>
               </div>
@@ -975,12 +1269,12 @@ export const MediaLibraryScreen: React.FC = () => {
             <div className="medialib-backup-card">
               <div>
                 <h4 className="medialib-backup-title">
-                  <RefreshCwIcon size={18} style={{ color: '#fbbf24' }} />
+                  <RefreshCwIcon size={18} />
                   <span>Load Sample Worship Library</span>
                 </h4>
                 <p className="medialib-backup-desc">
                   Populate the local database with pre-configured worship anthems (Glorious Day, Living Hope, Way Maker,
-                  10,000 Reasons) and sample PPT/Canva presentations.
+                  10,000 Reasons), sacred graphics ({SEED_IMAGES.length} still images), and sample presentations.
                 </p>
               </div>
               <button
@@ -993,6 +1287,160 @@ export const MediaLibraryScreen: React.FC = () => {
                 <span>Reset to Seed Data</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Upload / Add Image */}
+      {showAddImageModal && (
+        <div className="modal-overlay" onClick={() => setShowAddImageModal(false)}>
+          <div
+            className="quick-edit-modal-card"
+            style={{ maxWidth: '580px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ImageIcon size={18} />
+                <span>Upload Still Image or Graphic</span>
+              </h3>
+              <button
+                type="button"
+                className="quick-edit-btn"
+                onClick={() => setShowAddImageModal(false)}
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveImage} className="modal-body">
+              {/* Dropzone */}
+              <input
+                type="file"
+                ref={imageFileInputRef}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) processImageFile(file);
+                }}
+              />
+
+              {imageDataUrl ? (
+                <div>
+                  <div className="medialib-upload-preview-box">
+                    <img
+                      src={imageDataUrl}
+                      alt="Upload Preview"
+                      className="medialib-upload-preview-img"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => imageFileInputRef.current?.click()}
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                    >
+                      Choose Different Image
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={`medialib-dropzone ${isDraggingOver ? 'dragging' : ''}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDraggingOver(true);
+                  }}
+                  onDragLeave={() => setIsDraggingOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingOver(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) processImageFile(file);
+                  }}
+                  onClick={() => imageFileInputRef.current?.click()}
+                >
+                  <ImageIcon size={36} />
+                  <p style={{ margin: '0.5rem 0 0.25rem 0', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Click or drag image file here
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    Supports PNG, JPG, JPEG, WEBP, and SVG (Saved 100% offline in Local DB)
+                  </p>
+                </div>
+              )}
+
+              <div className="medialib-form-group">
+                <label className="medialib-form-label">Image Title *</label>
+                <input
+                  type="text"
+                  className="auth-input"
+                  placeholder="e.g. Easter Sunrise / Sunday Welcome Banner"
+                  value={imageTitle}
+                  onChange={(e) => setImageTitle(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Category</label>
+                  <select
+                    className="auth-input"
+                    value={imageCategory}
+                    onChange={(e) =>
+                      setImageCategory(
+                        e.target.value as 'BACKGROUND' | 'SERMON' | 'ANNOUNCEMENT' | 'PHOTO' | 'SCRIPTURE'
+                      )
+                    }
+                  >
+                    <option value="BACKGROUND">Worship Background</option>
+                    <option value="ANNOUNCEMENT">Announcement Banner</option>
+                    <option value="SERMON">Sermon Illustration</option>
+                    <option value="SCRIPTURE">Scripture Wallpaper</option>
+                    <option value="PHOTO">Ministry Photography</option>
+                  </select>
+                </div>
+
+                <div className="medialib-form-group">
+                  <label className="medialib-form-label">Projection Display Mode</label>
+                  <select
+                    className="auth-input"
+                    value={imageFit}
+                    onChange={(e) => setImageFit(e.target.value as 'cover' | 'contain')}
+                  >
+                    <option value="contain">Fit Canvas (Contain - No Crop)</option>
+                    <option value="cover">Fill Screen (Cover - Edge to Edge)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="medialib-form-group">
+                <label className="medialib-form-label">Optional Text Overlay (Scripture / Caption)</label>
+                <textarea
+                  className="auth-input"
+                  rows={3}
+                  placeholder="Optional words to overlay over the graphic on the projector screen..."
+                  value={imageOverlayText}
+                  onChange={(e) => setImageOverlayText(e.target.value)}
+                />
+              </div>
+
+              <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowAddImageModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={!imageDataUrl}>
+                  Save Image to Database
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1139,7 +1587,7 @@ export const MediaLibraryScreen: React.FC = () => {
           >
             <div className="modal-header">
               <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileTextIcon size={18} style={{ color: '#fb923c' }} />
+                <FileTextIcon size={18} />
                 <span>Link PowerPoint Presentation (.pptx / .ppt)</span>
               </h3>
               <button
@@ -1252,7 +1700,7 @@ export const MediaLibraryScreen: React.FC = () => {
           >
             <div className="modal-header">
               <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <LinkIcon size={18} style={{ color: '#22d3ee' }} />
+                <LinkIcon size={18} />
                 <span>Link Canva Presentation</span>
               </h3>
               <button

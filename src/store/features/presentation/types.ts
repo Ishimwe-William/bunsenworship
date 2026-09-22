@@ -1,4 +1,4 @@
-export type RundownItemType = 'LOOP' | 'VIDEO' | 'SONG' | 'SERMON' | 'PPT' | 'CANVA';
+export type RundownItemType = 'LOOP' | 'VIDEO' | 'SONG' | 'SERMON' | 'PPT' | 'CANVA' | 'IMAGE';
 export type TransitionType = 'CUT' | 'FADE';
 
 export interface Slide {
@@ -6,6 +6,8 @@ export interface Slide {
   section: string;
   lines: string[];
   background?: string;
+  imageUrl?: string;
+  imageFit?: 'cover' | 'contain';
 }
 
 export interface RundownItem {
@@ -30,6 +32,7 @@ export interface BackgroundTheme {
   name: string;
   gradient: string;
   accent: string;
+  imageUrl?: string;
 }
 
 export interface PresentationState {

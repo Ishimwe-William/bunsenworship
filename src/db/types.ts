@@ -43,6 +43,20 @@ export interface ExternalPresentationRecord {
   updatedAt: number;
 }
 
+export interface ImageMediaRecord {
+  id: string;
+  title: string;
+  category: 'BACKGROUND' | 'SERMON' | 'ANNOUNCEMENT' | 'PHOTO' | 'SCRIPTURE';
+  dataUrl: string; // Base64 data URL, image path, or web URL
+  thumbnailUrl?: string;
+  fileSize?: number;
+  width?: number;
+  height?: number;
+  overlayLines?: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface MediaRecord {
   id: string;
   name: string;
@@ -63,5 +77,7 @@ export interface DatabaseBackup {
   services: ServiceRecord[];
   songs: SongRecord[];
   externalPresentations: ExternalPresentationRecord[];
+  images?: ImageMediaRecord[];
   settings: SettingRecord[];
 }
+

@@ -2,6 +2,7 @@ import {
   ServiceRecord,
   SongRecord,
   ExternalPresentationRecord,
+  ImageMediaRecord,
   SettingRecord,
   DatabaseBackup,
 } from './types';
@@ -9,10 +10,11 @@ import {
   SEED_SONGS,
   SEED_EXTERNAL_PRESENTATIONS,
   SEED_SERVICE,
+  SEED_IMAGES,
 } from './seedData';
 
 const DB_NAME = 'BunsenWorshipDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class BunsenDatabase {
   private dbPromise: Promise<IDBDatabase> | null = null;
@@ -63,16 +65,25 @@ class BunsenDatabase {
           extStore.createIndex('updatedAt', 'updatedAt', { unique: false });
         }
 
+        // Store: images (Sacred Backgrounds, Announcements, Sermon Graphics, Photos)
+        if (!db.objectStoreNames.contains('images')) {
+          const imgStore = db.createObjectStore('images', { keyPath: 'id' });
+          imgStore.createIndex('title', 'title', { unique: false });
+          imgStore.createIndex('category', 'category', { unique: false });
+          imgStore.createIndex('createdAt', 'createdAt', { unique: false });
+          imgStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+        }
+
         // Store: settings (Preferences, active themes, etc.)
         if (!db.objectStoreNames.contains('settings')) {
           const settingsStore = db.createObjectStore('settings', { keyPath: 'key' });
           settingsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
         }
 
-        // Seed initial data if newly created
-        if (oldVersion === 0) {
-          const tx = request.transaction;
-          if (tx) {
+        // Seed initial data
+        const tx = request.transaction;
+        if (tx) {
+          if (oldVersion === 0) {
             const serviceStore = tx.objectStore('services');
             serviceStore.put(SEED_SERVICE);
 
@@ -81,6 +92,11 @@ class BunsenDatabase {
 
             const extStore = tx.objectStore('external_presentations');
             SEED_EXTERNAL_PRESENTATIONS.forEach((ext) => extStore.put(ext));
+          }
+
+          if (oldVersion < 2) {
+            const imgStore = tx.objectStore('images');
+            SEED_IMAGES.forEach((img) => imgStore.put(img));
           }
         }
       };
@@ -267,6 +283,55 @@ class BunsenDatabase {
   }
 
   // =========================================================================
+  // Images & Visual Assets Store
+  // =========================================================================
+
+  async getAllImages(): Promise<ImageMediaRecord[]> {
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readonly');
+      const store = tx.objectStore('images');
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async getImageById(id: string): Promise<ImageMediaRecord | null> {
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readonly');
+      const store = tx.objectStore('images');
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async saveImage(image: ImageMediaRecord): Promise<void> {
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readwrite');
+      const store = tx.objectStore('images');
+      const toSave = { ...image, updatedAt: Date.now() };
+      const req = store.put(toSave);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async deleteImage(id: string): Promise<void> {
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readwrite');
+      const store = tx.objectStore('images');
+      const req = store.delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // =========================================================================
   // Settings & Configuration Store
   // =========================================================================
 
@@ -308,10 +373,11 @@ class BunsenDatabase {
   // =========================================================================
 
   async exportDatabase(): Promise<string> {
-    const [services, songs, externalPresentations] = await Promise.all([
+    const [services, songs, externalPresentations, images] = await Promise.all([
       this.getAllServices(),
       this.getAllSongs(),
       this.getAllExternalPresentations(),
+      this.getAllImages(),
     ]);
 
     const backup: DatabaseBackup = {
@@ -320,6 +386,7 @@ class BunsenDatabase {
       services,
       songs,
       externalPresentations,
+      images,
       settings: [],
     };
 
@@ -335,7 +402,7 @@ class BunsenDatabase {
     const db = await this.getDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(
-        ['services', 'songs', 'external_presentations'],
+        ['services', 'songs', 'external_presentations', 'images'],
         'readwrite'
       );
 
@@ -361,6 +428,14 @@ class BunsenDatabase {
         const extStore = tx.objectStore('external_presentations');
         backup.externalPresentations.forEach((p) => {
           extStore.put(p);
+          count++;
+        });
+      }
+
+      if (backup.images && Array.isArray(backup.images)) {
+        const imgStore = tx.objectStore('images');
+        backup.images.forEach((img) => {
+          imgStore.put(img);
           count++;
         });
       }

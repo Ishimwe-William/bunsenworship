@@ -47,6 +47,8 @@ export const QuickEditModal: React.FC<QuickEditModalProps> = ({ currentItem, onC
           slideId: s.id,
           section: s.section,
           lines: s.lines,
+          imageUrl: s.imageUrl,
+          imageFit: s.imageFit,
         })
       );
     });

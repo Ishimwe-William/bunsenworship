@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PresentationState, RundownItem, Slide, TransitionType } from './types';
+import { PresentationState, RundownItem, Slide, TransitionType, BackgroundTheme } from './types';
 
 const defaultThemes = [
   {
@@ -313,6 +313,15 @@ export const presentationSlice = createSlice({
     setActiveBackground: (state, action: PayloadAction<string>) => {
       state.activeBackgroundId = action.payload;
     },
+    addCustomBackgroundTheme: (state, action: PayloadAction<BackgroundTheme>) => {
+      const existingIdx = state.backgroundThemes.findIndex((t) => t.id === action.payload.id);
+      if (existingIdx >= 0) {
+        state.backgroundThemes[existingIdx] = action.payload;
+      } else {
+        state.backgroundThemes.push(action.payload);
+      }
+      state.activeBackgroundId = action.payload.id;
+    },
     updateSlide: (
       state,
       action: PayloadAction<{
@@ -320,6 +329,8 @@ export const presentationSlice = createSlice({
         slideId: string;
         section: string;
         lines: string[];
+        imageUrl?: string;
+        imageFit?: 'cover' | 'contain';
       }>
     ) => {
       const item = state.rundown.find((r) => r.id === action.payload.rundownId);
@@ -328,6 +339,12 @@ export const presentationSlice = createSlice({
         if (slide) {
           slide.section = action.payload.section;
           slide.lines = action.payload.lines;
+          if (action.payload.imageUrl !== undefined) {
+            slide.imageUrl = action.payload.imageUrl;
+          }
+          if (action.payload.imageFit !== undefined) {
+            slide.imageFit = action.payload.imageFit;
+          }
         }
       }
     },
@@ -435,6 +452,7 @@ export const {
   setTransitionType,
   setFadeDuration,
   setActiveBackground,
+  addCustomBackgroundTheme,
   updateSlide,
   addSlide,
   deleteSlide,

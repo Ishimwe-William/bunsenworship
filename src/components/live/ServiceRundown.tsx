@@ -162,6 +162,8 @@ export const ServiceRundown: React.FC = () => {
         return 'type-ppt';
       case 'CANVA':
         return 'type-canva';
+      case 'IMAGE':
+        return 'type-image';
       default:
         return 'type-song';
     }
@@ -277,6 +279,7 @@ export const ServiceRundown: React.FC = () => {
                     onChange={(e) => setNewType(e.target.value as RundownItemType)}
                   >
                     <option value="SONG">SONG (Worship)</option>
+                    <option value="IMAGE">IMAGE (Graphic / Slide)</option>
                     <option value="SERMON">SERMON (Message)</option>
                     <option value="PPT">PPT (PowerPoint)</option>
                     <option value="CANVA">CANVA (Presentation)</option>
