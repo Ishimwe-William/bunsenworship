@@ -62,11 +62,14 @@ export interface VideoPlaybackState {
   isLooping: boolean;
 }
 
+export type StartupDisplayMode = 'black' | 'logo';
+
 export interface PresentationState {
   isLive: boolean;
   isBlackout: boolean;
   isTextCleared: boolean;
   isLogoActive: boolean;
+  startupDisplayMode: StartupDisplayMode;
   selectedRundownId: string;
   previewSlideId: string | null;
   liveSlideId: string | null;
@@ -78,3 +81,4 @@ export interface PresentationState {
   activeBackgroundId: string;
   videoPlayback: VideoPlaybackState;
 }
+

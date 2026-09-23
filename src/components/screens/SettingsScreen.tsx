@@ -3,9 +3,22 @@ import { ThemeToggle, useTheme } from '../theme';
 import { LanguageToggle, useLanguage } from '../language';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { logout, selectAuthUser } from '../../store/features/auth';
-import { LogoutIcon, GlobeAltIcon, SunIcon, MoonIcon, LaptopIcon, DatabaseIcon } from '../common/Icons';
+import {
+  LogoutIcon,
+  GlobeAltIcon,
+  SunIcon,
+  MoonIcon,
+  LaptopIcon,
+  DatabaseIcon,
+  BlackoutIcon,
+  LogoDisplayIcon,
+} from '../common/Icons';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
 import { setActiveTab } from '../../store/features/navigation';
+import {
+  selectStartupDisplayMode,
+  setStartupDisplayMode,
+} from '../../store/features/presentation';
 import pkg from '../../../package.json';
 
 export const SettingsScreen: React.FC = () => {
@@ -13,6 +26,7 @@ export const SettingsScreen: React.FC = () => {
   const user = useAppSelector(selectAuthUser);
   const { mode, effectiveTheme, systemPreference, isDark } = useTheme();
   const { language, t } = useLanguage();
+  const startupDisplayMode = useAppSelector(selectStartupDisplayMode);
 
   return (
     <div className="screen-content">
@@ -166,6 +180,123 @@ export const SettingsScreen: React.FC = () => {
               <code>{isDark ? 'true' : 'false'}</code>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Startup Live Screen Override Panel */}
+      <section className="theme-status-card">
+        <div className="status-card-header">
+          <div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>
+              {t.settings.startupSectionTitle}
+            </h3>
+            <p className="section-description">{t.settings.startupSectionDesc}</p>
+          </div>
+          <div className="theme-toggle-segmented" role="radiogroup" aria-label={t.settings.startupSectionTitle}>
+            <button
+              type="button"
+              className={`theme-toggle-option ${startupDisplayMode === 'black' ? 'active' : ''}`}
+              onClick={() => dispatch(setStartupDisplayMode('black'))}
+              title={t.settings.startupBlackTitle}
+              role="radio"
+              aria-checked={startupDisplayMode === 'black'}
+            >
+              <BlackoutIcon size={14} />
+              <span>{t.liveShow.blackShort}</span>
+            </button>
+            <button
+              type="button"
+              className={`theme-toggle-option ${startupDisplayMode === 'logo' ? 'active' : ''}`}
+              onClick={() => dispatch(setStartupDisplayMode('logo'))}
+              title={t.settings.startupLogoTitle}
+              role="radio"
+              aria-checked={startupDisplayMode === 'logo'}
+            >
+              <LogoDisplayIcon size={14} />
+              <span>{t.liveShow.logoShort}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="status-grid">
+          <div className="status-item">
+            <div className="status-label">{t.settings.startupActiveStatus}</div>
+            <div className="status-value">
+              <span
+                className="status-pill"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor:
+                    startupDisplayMode === 'black'
+                      ? 'rgba(239, 68, 68, 0.15)'
+                      : 'rgba(245, 158, 11, 0.15)',
+                  color:
+                    startupDisplayMode === 'black'
+                      ? 'var(--color-danger)'
+                      : '#f59e0b',
+                }}
+              >
+                {startupDisplayMode === 'black' ? (
+                  <>
+                    <BlackoutIcon size={13} />
+                    <span>{t.settings.startupBlackTitle}</span>
+                  </>
+                ) : (
+                  <>
+                    <LogoDisplayIcon size={13} />
+                    <span>{t.settings.startupLogoTitle}</span>
+                  </>
+                )}
+              </span>
+            </div>
+          </div>
+
+          <div className="status-item">
+            <div className="status-label">Live Output State</div>
+            <div className="status-value">
+              <span
+                className="status-pill"
+                style={{
+                  backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                  color: 'var(--color-success)',
+                }}
+              >
+                Live Master: ON AIR
+              </span>
+            </div>
+          </div>
+
+          <div className="status-item">
+            <div className="status-label">Release Shortcut</div>
+            <div className="status-value">
+              <code>{startupDisplayMode === 'black' ? 'F1 or Escape' : 'F3 or Escape'}</code>
+            </div>
+          </div>
+
+          <div className="status-item">
+            <div className="status-label">Expected Behavior</div>
+            <div className="status-value" style={{ fontSize: '0.875rem' }}>
+              {startupDisplayMode === 'black'
+                ? t.settings.startupBlackDesc
+                : t.settings.startupLogoDesc}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: '1rem',
+            padding: '8px 12px',
+            backgroundColor: 'var(--bg-subtle)',
+            borderRadius: '6px',
+            fontSize: '0.8125rem',
+            borderLeft: '3px solid var(--color-primary)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          {t.settings.startupLiveNotice}
         </div>
       </section>
 

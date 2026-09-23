@@ -70,6 +70,14 @@ export interface SettingsTranslations {
   description: string;
   languageSectionTitle: string;
   languageSectionDesc: string;
+  startupSectionTitle: string;
+  startupSectionDesc: string;
+  startupBlackTitle: string;
+  startupBlackDesc: string;
+  startupLogoTitle: string;
+  startupLogoDesc: string;
+  startupLiveNotice: string;
+  startupActiveStatus: string;
   performanceTitle: string;
   performanceDesc: string;
   gpuAcceleration: string;

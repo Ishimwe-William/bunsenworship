@@ -88,9 +88,9 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     const v = videoRef.current;
 
     // Play / Pause
-    if (videoPlayback.isPlaying && v.paused) {
+    if (videoPlayback.isPlaying && !isBlackout && !isLogoActive && v.paused) {
       v.play().catch((err) => console.log('Video play deferred:', err));
-    } else if (!videoPlayback.isPlaying && !v.paused) {
+    } else if ((!videoPlayback.isPlaying || isBlackout || isLogoActive) && !v.paused) {
       v.pause();
     }
 
@@ -111,6 +111,8 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
   }, [
     isLive,
     isLocalVideo,
+    isBlackout,
+    isLogoActive,
     videoPlayback.isPlaying,
     videoPlayback.volume,
     videoPlayback.isMuted,
@@ -232,7 +234,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
         <div className="stage-atmosphere-layer" />
 
         {/* Video Layer */}
-        {hasVideo && !isBlackout && (
+        {hasVideo && !isBlackout && !isLogoActive && (
           <div
             className={`stage-video-layer ${
               transitionType === 'FADE' ? 'is-video-fade' : ''
@@ -287,7 +289,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
         )}
 
         {/* Slide Image Layer */}
-        {slide?.imageUrl && !isBlackout && !hasVideo && (
+        {slide?.imageUrl && !isBlackout && !isLogoActive && !hasVideo && (
           <div
             className="stage-image-layer"
             style={{

@@ -1,10 +1,11 @@
-import { Slide, RundownItem, TransitionType, BackgroundTheme } from '../store/features/presentation/types';
+import { Slide, RundownItem, TransitionType, BackgroundTheme, StartupDisplayMode } from '../store/features/presentation/types';
 
 export interface LiveShowState {
   isLive: boolean;
   isBlackout: boolean;
   isTextCleared: boolean;
   isLogoActive: boolean;
+  startupDisplayMode: StartupDisplayMode;
   selectedRundownId: string;
   previewSlideId: string | null;
   liveSlideId: string | null;
@@ -25,6 +26,7 @@ export interface LiveShowActions {
   setClearText: (isTextCleared: boolean) => void;
   toggleLogo: () => void;
   setLogo: (isLogoActive: boolean) => void;
+  setStartupDisplayMode: (mode: StartupDisplayMode) => void;
   clearAllOverrides: () => void;
   setSelectedRundownId: (id: string) => void;
   setPreviewSlide: (data: { rundownId?: string; slideId: string }) => void;

@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PresentationState, RundownItem, Slide, TransitionType, BackgroundTheme } from './types';
+import { PresentationState, RundownItem, Slide, TransitionType, BackgroundTheme, StartupDisplayMode } from './types';
+
 
 const defaultThemes = [
   {
@@ -117,11 +118,40 @@ export const DEFAULT_RUNDOWN: RundownItem[] = [
   },
 ];
 
+export const STARTUP_DISPLAY_STORAGE_KEY = 'bunsenworship_startup_display';
+
+export const getPersistedStartupDisplay = (): StartupDisplayMode => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return 'black';
+  }
+  try {
+    const saved = window.localStorage.getItem(STARTUP_DISPLAY_STORAGE_KEY);
+    if (saved === 'black' || saved === 'logo') {
+      return saved;
+    }
+  } catch (error) {
+    console.warn('Failed to read startup display preference from localStorage:', error);
+  }
+  return 'black';
+};
+
+export const persistStartupDisplay = (mode: StartupDisplayMode): void => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    window.localStorage.setItem(STARTUP_DISPLAY_STORAGE_KEY, mode);
+  } catch (error) {
+    console.warn('Failed to save startup display preference to localStorage:', error);
+  }
+};
+
+const initialStartupMode = getPersistedStartupDisplay();
+
 const initialState: PresentationState = {
   isLive: true,
-  isBlackout: false,
+  isBlackout: initialStartupMode === 'black',
   isTextCleared: false,
-  isLogoActive: false,
+  isLogoActive: initialStartupMode === 'logo',
+  startupDisplayMode: initialStartupMode,
   selectedRundownId: 'rd-video-motion',
   liveRundownId: 'rd-video-motion',
   liveSlideId: 's-vid-motion-1',
@@ -132,7 +162,7 @@ const initialState: PresentationState = {
   backgroundThemes: defaultThemes,
   activeBackgroundId: 'clouds-cathedral',
   videoPlayback: {
-    isPlaying: true,
+    isPlaying: false,
     currentTime: 0,
     duration: 0,
     volume: 1.0,
@@ -154,9 +184,15 @@ export const presentationSlice = createSlice({
     },
     toggleBlackout: (state) => {
       state.isBlackout = !state.isBlackout;
+      if (state.isBlackout) {
+        state.isLogoActive = false;
+      }
     },
     setBlackout: (state, action: PayloadAction<boolean>) => {
       state.isBlackout = action.payload;
+      if (action.payload) {
+        state.isLogoActive = false;
+      }
     },
     toggleClearText: (state) => {
       state.isTextCleared = !state.isTextCleared;
@@ -166,9 +202,19 @@ export const presentationSlice = createSlice({
     },
     toggleLogo: (state) => {
       state.isLogoActive = !state.isLogoActive;
+      if (state.isLogoActive) {
+        state.isBlackout = false;
+      }
     },
     setLogo: (state, action: PayloadAction<boolean>) => {
       state.isLogoActive = action.payload;
+      if (action.payload) {
+        state.isBlackout = false;
+      }
+    },
+    setStartupDisplayMode: (state, action: PayloadAction<StartupDisplayMode>) => {
+      state.startupDisplayMode = action.payload;
+      persistStartupDisplay(action.payload);
     },
     clearAllOverrides: (state) => {
       state.isBlackout = false;
@@ -543,6 +589,7 @@ export const {
   setClearText,
   toggleLogo,
   setLogo,
+  setStartupDisplayMode,
   clearAllOverrides,
   setSelectedRundownId,
   setPreviewSlide,

@@ -16,6 +16,7 @@ import {
   selectIsBlackout,
   selectIsTextCleared,
   selectIsLogoActive,
+  selectStartupDisplayMode,
   setSelectedRundownId,
   setPreviewSlide,
   takeLive,
@@ -27,6 +28,7 @@ import {
   toggleBlackout,
   toggleClearText,
   toggleLogo,
+  setStartupDisplayMode,
   clearAllOverrides,
   addRundownItem,
   reorderRundown,
@@ -35,7 +37,7 @@ import {
   deleteSlide,
   reorderSlides,
 } from '../store/features/presentation';
-import { RundownItem, Slide } from '../store/features/presentation/types';
+import { RundownItem, Slide, StartupDisplayMode } from '../store/features/presentation/types';
 import { bunsenDb } from '../db';
 
 export interface UseLiveShowReturn {
@@ -55,6 +57,7 @@ export interface UseLiveShowReturn {
   isBlackout: ReturnType<typeof selectIsBlackout>;
   isTextCleared: ReturnType<typeof selectIsTextCleared>;
   isLogoActive: ReturnType<typeof selectIsLogoActive>;
+  startupDisplayMode: ReturnType<typeof selectStartupDisplayMode>;
   
   // Actions
   selectRundownItem: (id: string) => void;
@@ -68,6 +71,7 @@ export interface UseLiveShowReturn {
   toggleBlackoutMode: () => void;
   toggleClearTextMode: () => void;
   toggleLogoMode: () => void;
+  setStartupDisplay: (mode: StartupDisplayMode) => void;
   clearOverrides: () => void;
   addRundownItemAction: (item: Omit<RundownItem, 'id'>) => void;
   reorderRundownItems: (sourceIndex: number, targetIndex: number) => void;
@@ -100,8 +104,13 @@ export const useLiveShow = (): UseLiveShowReturn => {
   const isBlackout = useAppSelector(selectIsBlackout);
   const isTextCleared = useAppSelector(selectIsTextCleared);
   const isLogoActive = useAppSelector(selectIsLogoActive);
+  const startupDisplayMode = useAppSelector(selectStartupDisplayMode);
 
   // Actions
+  const setStartupDisplay = useCallback((mode: StartupDisplayMode) => {
+    dispatch(setStartupDisplayMode(mode));
+  }, [dispatch]);
+
   const selectRundownItem = useCallback((id: string) => {
     dispatch(setSelectedRundownId(id));
   }, [dispatch]);
@@ -223,6 +232,7 @@ export const useLiveShow = (): UseLiveShowReturn => {
     isBlackout,
     isTextCleared,
     isLogoActive,
+    startupDisplayMode,
     
     // Actions
     selectRundownItem,
@@ -236,6 +246,7 @@ export const useLiveShow = (): UseLiveShowReturn => {
     toggleBlackoutMode,
     toggleClearTextMode,
     toggleLogoMode,
+    setStartupDisplay,
     clearOverrides,
     addRundownItemAction,
     reorderRundownItems,

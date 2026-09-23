@@ -1,4 +1,4 @@
-import { PresentationState, RundownItem, Slide, BackgroundTheme, VideoPlaybackState } from './types';
+import { PresentationState, RundownItem, Slide, BackgroundTheme, VideoPlaybackState, StartupDisplayMode } from './types';
 
 export interface HasPresentationState {
   presentation: PresentationState;
@@ -18,6 +18,10 @@ export const selectIsTextCleared = (state: HasPresentationState): boolean =>
 
 export const selectIsLogoActive = (state: HasPresentationState): boolean =>
   state.presentation.isLogoActive;
+
+export const selectStartupDisplayMode = (state: HasPresentationState): StartupDisplayMode =>
+  state.presentation.startupDisplayMode;
+
 
 export const selectHasActiveOverride = (state: HasPresentationState): boolean =>
   state.presentation.isBlackout ||

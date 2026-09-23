@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Slide, VideoPlaybackState } from '../../store/features/presentation';
+import { Slide, VideoPlaybackState, getPersistedStartupDisplay } from '../../store/features/presentation';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
 import { buildYouTubeEmbedUrl } from '../../utils/videoHelpers';
 
@@ -30,12 +30,13 @@ export const ProjectorWindowView: React.FC = () => {
     } catch {
       // ignore
     }
+    const initialMode = getPersistedStartupDisplay();
     return {
       slide: null,
       backgroundGradient: DEFAULT_GRADIENT,
-      isBlackout: false,
+      isBlackout: initialMode === 'black',
       isTextCleared: false,
-      isLogoActive: false,
+      isLogoActive: initialMode === 'logo',
       transitionType: 'FADE',
       fadeDuration: 1.0,
       source: 'LIVE',
@@ -132,9 +133,9 @@ export const ProjectorWindowView: React.FC = () => {
     const pb = state.videoPlayback;
     if (!pb) return;
 
-    if (pb.isPlaying && v.paused) {
+    if (pb.isPlaying && !state.isBlackout && !state.isLogoActive && v.paused) {
       v.play().catch((err) => console.log('Projector video play deferred:', err));
-    } else if (!pb.isPlaying && !v.paused) {
+    } else if ((!pb.isPlaying || state.isBlackout || state.isLogoActive) && !v.paused) {
       v.pause();
     }
 
@@ -271,7 +272,7 @@ export const ProjectorWindowView: React.FC = () => {
         }}
       >
         {/* Video Layer */}
-        {hasVideo && !state.isBlackout && (
+        {hasVideo && !state.isBlackout && !state.isLogoActive && (
           <div
             style={{
               position: 'absolute',
@@ -320,7 +321,7 @@ export const ProjectorWindowView: React.FC = () => {
         )}
 
         {/* Slide Image Layer */}
-        {slide?.imageUrl && !state.isBlackout && !hasVideo && (
+        {slide?.imageUrl && !state.isBlackout && !state.isLogoActive && !hasVideo && (
           <div
             style={{
               position: 'absolute',
