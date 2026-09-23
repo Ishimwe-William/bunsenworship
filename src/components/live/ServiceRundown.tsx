@@ -16,6 +16,7 @@ import { RundownItem } from '../../store/features/presentation/types';
 import { PlusIcon, GripVerticalIcon, ClockIcon, TrashIcon, VideoIcon, YoutubeIcon } from '../common/Icons';
 import { bunsenDb } from '../../db';
 import { createNewRundownItem } from '../../utils/liveShowHelpers';
+import { normalizeVideoSource, generateVideoThumbnail } from '../../utils/videoHelpers';
 
 export const ServiceRundown: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -31,6 +32,27 @@ export const ServiceRundown: React.FC = () => {
   const [newVideoSource, setNewVideoSource] = useState<'local' | 'youtube'>('local');
   const [newVideoUrl, setNewVideoUrl] = useState('');
   const [newVideoLoop, setNewVideoLoop] = useState(true);
+  const addVideoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBrowseAddVideo = async () => {
+    if (window.electronAPI?.openVideoDialog) {
+      try {
+        const selected = await window.electronAPI.openVideoDialog();
+        if (selected) {
+          setNewVideoUrl(selected);
+          if (!newTitle.trim()) {
+            const fileName = selected.split(/[/\\]/).pop() || '';
+            const cleanName = fileName.replace(/\.[^/.]+$/, '');
+            setNewTitle(cleanName);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to open video file dialog:', err);
+      }
+    } else {
+      addVideoFileInputRef.current?.click();
+    }
+  };
 
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -122,7 +144,8 @@ export const ServiceRundown: React.FC = () => {
       const sampleUrl = isYt
         ? 'https://www.youtube.com/watch?v=nQWFzMvCfLE'
         : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
-      const finalUrl = newVideoUrl.trim() || sampleUrl;
+      const rawUrl = newVideoUrl.trim() || sampleUrl;
+      const finalUrl = isYt ? rawUrl : normalizeVideoSource(rawUrl);
 
       newItem = {
         title: newTitle.trim(),
@@ -134,6 +157,7 @@ export const ServiceRundown: React.FC = () => {
             id: `s-vid-${Date.now()}`,
             section: newTitle.trim() || (isYt ? 'YouTube Video' : 'Video Playback'),
             lines: [],
+            imageUrl: isYt ? undefined : generateVideoThumbnail(newTitle.trim()),
             videoType: isYt ? 'youtube' : 'local',
             videoUrl: finalUrl,
             videoPath: finalUrl,
@@ -143,6 +167,7 @@ export const ServiceRundown: React.FC = () => {
             videoLoop: newVideoLoop,
             videoFit: 'contain',
             videoTitle: newTitle.trim(),
+            videoMuted: true,
           },
         ],
       };
@@ -325,6 +350,23 @@ export const ServiceRundown: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleAddItem} className="modal-body">
+              <input
+                type="file"
+                ref={addVideoFileInputRef}
+                accept="video/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const fullPath = window.electronAPI?.getPathForFile?.(file) || URL.createObjectURL(file);
+                    setNewVideoUrl(fullPath);
+                    if (!newTitle.trim()) {
+                      const cleanName = file.name.replace(/\.[^/.]+$/, '');
+                      setNewTitle(cleanName);
+                    }
+                  }
+                }}
+              />
               <div>
                 <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
                   Item Title
@@ -419,18 +461,42 @@ export const ServiceRundown: React.FC = () => {
                         ? 'YouTube URL / Stream Link:'
                         : 'Local Video File Path or URL:'}
                     </label>
-                    <input
-                      type="text"
-                      className="auth-input"
-                      placeholder={
-                        newVideoSource === 'youtube'
-                          ? 'https://www.youtube.com/watch?v=... (Leave blank for sample)'
-                          : 'file:///path/to/video.mp4 or URL (Leave blank for sample)'
-                      }
-                      value={newVideoUrl}
-                      onChange={(e) => setNewVideoUrl(e.target.value)}
-                      style={{ fontSize: '0.75rem', padding: '6px' }}
-                    />
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        type="text"
+                        className="auth-input"
+                        placeholder={
+                          newVideoSource === 'youtube'
+                            ? 'https://www.youtube.com/watch?v=... (Leave blank for sample)'
+                            : 'C:\\Videos\\video.mp4 or URL (Leave blank for sample)'
+                        }
+                        value={newVideoUrl}
+                        onChange={(e) => setNewVideoUrl(e.target.value)}
+                        style={{ fontSize: '0.75rem', padding: '6px', flex: 1 }}
+                      />
+                      {newVideoSource === 'local' && (
+                        <button
+                          type="button"
+                          className="console-mini-btn"
+                          onClick={handleBrowseAddVideo}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.72rem',
+                            whiteSpace: 'nowrap',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: '#2563eb',
+                            color: '#ffffff',
+                            border: 'none',
+                          }}
+                          title="Open native Windows file dialog to choose video"
+                        >
+                          <VideoIcon size={12} />
+                          <span>Browse...</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <label

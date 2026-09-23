@@ -3,6 +3,10 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   Slide,
   selectVideoPlayback,
+  selectIsBlackout,
+  selectIsLogoActive,
+  selectIsProjectorActive,
+  clearAllOverrides,
   toggleVideoPlay,
   setVideoCurrentTime,
   setVideoVolume,
@@ -10,6 +14,8 @@ import {
   setVideoPlaybackRate,
   toggleVideoLoop,
   restartVideo,
+  relinkSlideVideo,
+  clearVideoError,
 } from '../../store/features/presentation';
 import {
   PlayIcon,
@@ -20,6 +26,7 @@ import {
   RotateCcwIcon,
   VideoIcon,
   YoutubeIcon,
+  MonitorIcon,
 } from '../common/Icons';
 import { formatTime } from '../../utils/videoHelpers';
 
@@ -31,6 +38,10 @@ interface VideoControlDeckProps {
 export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLive = true }) => {
   const dispatch = useAppDispatch();
   const videoPlayback = useAppSelector(selectVideoPlayback);
+  const isBlackout = useAppSelector(selectIsBlackout);
+  const isLogoActive = useAppSelector(selectIsLogoActive);
+  const isProjectorActive = useAppSelector(selectIsProjectorActive);
+  const relinkInputRef = React.useRef<HTMLInputElement>(null);
 
   if (!slide) return null;
 
@@ -54,6 +65,20 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
   const currentTime = videoPlayback.currentTime || 0;
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  const handleTogglePlay = () => {
+    if (!videoPlayback.isPlaying && (isBlackout || isLogoActive)) {
+      dispatch(clearAllOverrides());
+    }
+    dispatch(toggleVideoPlay());
+  };
+
+  const handleRestart = () => {
+    if (isBlackout || isLogoActive) {
+      dispatch(clearAllOverrides());
+    }
+    dispatch(restartVideo());
+  };
+
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
     dispatch(setVideoCurrentTime(newTime));
@@ -69,6 +94,28 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
   };
 
   const videoTitle = slide.videoTitle || slide.section || (isYouTube ? 'YouTube Stream' : 'Video Slide');
+  const isActivelyPlaying = videoPlayback.isPlaying && !isBlackout && !isLogoActive;
+
+  const handleRelinkVideo = async () => {
+    if (window.electronAPI?.openVideoDialog) {
+      try {
+        const chosen = await window.electronAPI.openVideoDialog();
+        if (chosen) {
+          dispatch(
+            relinkSlideVideo({
+              slideId: slide.id,
+              filePath: chosen,
+            })
+          );
+          dispatch(clearVideoError());
+        }
+      } catch (err) {
+        console.error('Failed to open video dialog:', err);
+      }
+    } else {
+      relinkInputRef.current?.click();
+    }
+  };
 
   return (
     <div
@@ -83,7 +130,26 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
         gap: '8px',
       }}
     >
-      {/* Header Row: Badge, Title, Time readout */}
+      <input
+        type="file"
+        ref={relinkInputRef}
+        accept="video/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && slide) {
+            const fullPath = window.electronAPI?.getPathForFile?.(file) || URL.createObjectURL(file);
+            dispatch(
+              relinkSlideVideo({
+                slideId: slide.id,
+                filePath: fullPath,
+              })
+            );
+            dispatch(clearVideoError());
+          }
+        }}
+      />
+      {/* Header Row: Badge, Title, Status, Time readout */}
       <div
         style={{
           display: 'flex',
@@ -125,20 +191,73 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
           </span>
         </div>
 
-        <div
-          style={{
-            fontFamily: 'monospace',
-            fontSize: '0.725rem',
-            color: 'var(--text-secondary)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {formatTime(currentTime)} / {formatTime(duration)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {videoPlayback.videoError ? (
+            <span
+              style={{
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '0.625rem',
+                fontWeight: 700,
+                background: 'rgba(239, 68, 68, 0.2)',
+                color: '#ef4444',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              <span
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: '50%',
+                  background: '#ef4444',
+                }}
+              />
+              FILE NOT FOUND
+            </span>
+          ) : (
+            <span
+              style={{
+                padding: '1px 5px',
+                borderRadius: '4px',
+                fontSize: '0.625rem',
+                fontWeight: 700,
+                background: isActivelyPlaying ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
+                color: isActivelyPlaying ? '#22c55e' : '#eab308',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+              }}
+            >
+              <span
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: '50%',
+                  background: isActivelyPlaying ? '#22c55e' : '#eab308',
+                }}
+              />
+              {isActivelyPlaying ? 'PLAYING' : 'PAUSED'}
+            </span>
+          )}
+
+          <span
+            style={{
+              fontFamily: 'monospace',
+              fontSize: '0.725rem',
+              color: 'var(--text-secondary)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
         </div>
       </div>
 
       {/* Seekbar timeline slider */}
-      {!isYouTube && duration > 0 && (
+      {duration > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <input
             type="range"
@@ -175,27 +294,27 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
           <button
             type="button"
             className="console-mini-btn"
-            onClick={() => dispatch(toggleVideoPlay())}
-            title={videoPlayback.isPlaying ? 'Pause video' : 'Play video'}
+            onClick={handleTogglePlay}
+            title={videoPlayback.isPlaying ? 'Pause video' : 'Play video (clears blackout if active)'}
             style={{
               padding: '4px 10px',
               fontSize: '0.7rem',
-              borderColor: videoPlayback.isPlaying ? 'var(--color-primary)' : undefined,
-              color: videoPlayback.isPlaying ? 'var(--color-primary)' : undefined,
+              borderColor: isActivelyPlaying ? 'var(--color-primary)' : undefined,
+              color: isActivelyPlaying ? 'var(--color-primary)' : undefined,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
             }}
           >
-            {videoPlayback.isPlaying ? <PauseIcon size={12} /> : <PlayIcon size={12} />}
-            <span>{videoPlayback.isPlaying ? 'Pause' : 'Play'}</span>
+            {isActivelyPlaying ? <PauseIcon size={12} /> : <PlayIcon size={12} />}
+            <span>{isActivelyPlaying ? 'Pause' : 'Play'}</span>
           </button>
 
           {/* Restart Button */}
           <button
             type="button"
             className="console-mini-btn"
-            onClick={() => dispatch(restartVideo())}
+            onClick={handleRestart}
             title="Restart video from beginning"
             style={{ padding: '4px 8px', fontSize: '0.7rem' }}
           >
@@ -219,10 +338,53 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
             <RepeatIcon size={12} />
             <span>Loop</span>
           </button>
+
+          {videoPlayback.videoError && (
+            <button
+              type="button"
+              className="console-mini-btn"
+              onClick={handleRelinkVideo}
+              title="Locate and relink this video file"
+              style={{
+                padding: '4px 10px',
+                fontSize: '0.7rem',
+                background: 'rgba(239, 68, 68, 0.15)',
+                borderColor: '#ef4444',
+                color: '#ef4444',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: 700,
+              }}
+            >
+              <VideoIcon size={12} />
+              <span>Relink Video</span>
+            </button>
+          )}
         </div>
 
         {/* Volume & Speed controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isProjectorActive && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '0.625rem',
+                fontWeight: 600,
+                background: 'rgba(59, 130, 246, 0.15)',
+                color: '#3b82f6',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+              }}
+              title="Projector window is active. Audio output is routed exclusively to the Projector/Sanctuary display to prevent console echo."
+            >
+              <MonitorIcon size={11} />
+              <span>Sanctuary Audio</span>
+            </span>
+          )}
           {/* Mute button */}
           <button
             type="button"

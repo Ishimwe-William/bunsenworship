@@ -1,11 +1,37 @@
-import { app, BrowserWindow, Menu, nativeImage, Tray, ipcMain } from 'electron';
+// Suppress dev-only security warnings in console (e.g. unsafe-eval CSP required for YouTube embed)
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+
+import { app, BrowserWindow, Menu, nativeImage, Tray, ipcMain, dialog, protocol, net, powerSaveBlocker } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { loadWindowState, manageWindowState } from './windowState';
 import { createSplashScreen } from './splash';
 import { setupAutoUpdater } from './updater';
 
+// Prevent Chromium from throttling timers, media, and video decoding when window is minimized or occluded
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
+// Register custom bunsen-media scheme before app ready
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'bunsen-media',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: true,
+      corsEnabled: true,
+    },
+  },
+]);
+
 let tray: Tray | null = null;
+let mainWindow: BrowserWindow | null = null;
 let projectorWindow: BrowserWindow | null = null;
 
 // Helper to resolve asset paths across dev mode and packaged distribution
@@ -91,7 +117,7 @@ const createWindow = () => {
   const appIcon = nativeImage.createFromPath(appIconPath);
 
   // Create the browser window with enforced minimum dimensions and restored coordinates
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     x: windowState.x,
     y: windowState.y,
     width: windowState.width,
@@ -103,6 +129,7 @@ const createWindow = () => {
     backgroundColor: '#0b0f19',
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
+      backgroundThrottling: false,
     },
   });
 
@@ -174,6 +201,7 @@ const createProjectorWindow = () => {
     }
     projectorWindow.show();
     projectorWindow.focus();
+    mainWindow?.webContents.send('projector:status-changed', true);
     return;
   }
 
@@ -191,6 +219,7 @@ const createProjectorWindow = () => {
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
+      backgroundThrottling: false,
     },
   });
 
@@ -202,8 +231,11 @@ const createProjectorWindow = () => {
     });
   }
 
+  mainWindow?.webContents.send('projector:status-changed', true);
+
   projectorWindow.on('closed', () => {
     projectorWindow = null;
+    mainWindow?.webContents.send('projector:status-changed', false);
   });
 };
 
@@ -211,9 +243,130 @@ ipcMain.handle('projector:open', () => {
   createProjectorWindow();
 });
 
+ipcMain.handle('projector:is-open', () => {
+  return Boolean(projectorWindow && !projectorWindow.isDestroyed());
+});
+
+ipcMain.handle('dialog:open-video', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Select Video File for Worship Presentation',
+    properties: ['openFile'],
+    filters: [
+      {
+        name: 'Video Files',
+        extensions: ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v', 'mpg', 'mpeg'],
+      },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+  return result.filePaths[0];
+});
+
+ipcMain.handle('video:resolve-path', async (_event, filename: string) => {
+  if (!filename || typeof filename !== 'string') return null;
+  const clean = filename.trim();
+  if (!clean) return null;
+
+  if (/^[a-zA-Z]:[/\\]/.test(clean) && fs.existsSync(clean)) {
+    return clean;
+  }
+
+  const baseName = path.basename(clean);
+  const searchDirs: string[] = [];
+  try { searchDirs.push(app.getPath('videos')); } catch {}
+  try { searchDirs.push(app.getPath('downloads')); } catch {}
+  try { searchDirs.push(app.getPath('desktop')); } catch {}
+  try { searchDirs.push(app.getPath('documents')); } catch {}
+  searchDirs.push(process.cwd());
+
+  for (const dir of searchDirs) {
+    const candidate = path.join(dir, baseName);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  for (const dir of searchDirs) {
+    try {
+      if (!fs.existsSync(dir)) continue;
+      const entries = fs.readdirSync(dir);
+      const match = entries.find((e) => e.toLowerCase() === baseName.toLowerCase());
+      if (match) {
+        return path.join(dir, match);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
+});
+
 // This method will be called when Electron has finished initialization
 app.on('ready', () => {
+  // Register custom bunsen-media protocol handler for secure streaming
+  protocol.handle('bunsen-media', async (request) => {
+    try {
+      let rawPath = decodeURIComponent(request.url.replace(/^bunsen-media:\/\//i, ''));
+      if (process.platform === 'win32' && /^\/[a-zA-Z]:[/\\]/.test(rawPath)) {
+        rawPath = rawPath.slice(1);
+      }
+      let resolvedPath = path.normalize(rawPath);
+
+      if (!fs.existsSync(resolvedPath)) {
+        const baseName = path.basename(resolvedPath);
+        const searchDirs: string[] = [];
+        try { searchDirs.push(app.getPath('videos')); } catch {}
+        try { searchDirs.push(app.getPath('downloads')); } catch {}
+        try { searchDirs.push(app.getPath('desktop')); } catch {}
+        try { searchDirs.push(app.getPath('documents')); } catch {}
+        searchDirs.push(process.cwd());
+
+        for (const dir of searchDirs) {
+          const candidate = path.join(dir, baseName);
+          if (fs.existsSync(candidate)) {
+            resolvedPath = candidate;
+            break;
+          }
+        }
+
+        if (!fs.existsSync(resolvedPath)) {
+          for (const dir of searchDirs) {
+            try {
+              if (!fs.existsSync(dir)) continue;
+              const entries = fs.readdirSync(dir);
+              const match = entries.find((e) => e.toLowerCase() === baseName.toLowerCase());
+              if (match) {
+                resolvedPath = path.join(dir, match);
+                break;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+
+      if (!fs.existsSync(resolvedPath)) {
+        return new Response('Media file not found: ' + rawPath, { status: 404 });
+      }
+
+      const fileUrl = pathToFileURL(resolvedPath).toString();
+      return net.fetch(fileUrl, {
+        headers: request.headers,
+        method: request.method,
+      });
+    } catch (err) {
+      console.error('Failed to handle bunsen-media request:', request.url, err);
+      return new Response('File not accessible', { status: 404 });
+    }
+  });
+
   createWindow();
+  powerSaveBlocker.start('prevent-app-suspension');
   setupAutoUpdater();
 });
 

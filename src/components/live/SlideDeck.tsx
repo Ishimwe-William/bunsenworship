@@ -6,15 +6,37 @@ import {
   selectLiveSlideId,
   selectLiveRundownId,
   selectRundown,
+  selectVideoPlayback,
+  selectIsBlackout,
+  selectIsLogoActive,
+  clearAllOverrides,
+  toggleVideoPlay,
   setPreviewSlide,
   takeSlideDirectlyLive,
   reorderSlides,
   addSlide,
   deleteSlide,
+  relinkSlideVideo,
 } from '../../store/features/presentation';
-import { PencilIcon, GripVerticalIcon, PlusIcon, TrashIcon, VideoIcon, YoutubeIcon } from '../common/Icons';
+import {
+  PencilIcon,
+  GripVerticalIcon,
+  PlusIcon,
+  TrashIcon,
+  VideoIcon,
+  YoutubeIcon,
+  PlayIcon,
+  PauseIcon,
+} from '../common/Icons';
 import { QuickEditModal } from './QuickEditModal';
 import { createNewSlide } from '../../utils/liveShowHelpers';
+import {
+  formatTime,
+  isBareFilename,
+  isVideoFile,
+  generateVideoThumbnail,
+  getFileNameFromPath,
+} from '../../utils/videoHelpers';
 import { bunsenDb } from '../../db';
 
 export const SlideDeck: React.FC = () => {
@@ -24,11 +46,68 @@ export const SlideDeck: React.FC = () => {
   const liveSlideId = useAppSelector(selectLiveSlideId);
   const liveRundownId = useAppSelector(selectLiveRundownId);
   const rundown = useAppSelector(selectRundown);
+  const videoPlayback = useAppSelector(selectVideoPlayback);
+  const isBlackout = useAppSelector(selectIsBlackout);
+  const isLogoActive = useAppSelector(selectIsLogoActive);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showAddSlide, setShowAddSlide] = useState(false);
+  const [brokenThumbs, setBrokenThumbs] = useState<Record<string, boolean>>({});
+  const slideRelinkInputRef = useRef<HTMLInputElement>(null);
+  const pendingRelinkSlideIdRef = useRef<string | null>(null);
 
+  const handleRelinkSlide = async (slideId: string) => {
+    if (!currentItem) return;
+    if (window.electronAPI?.openVideoDialog) {
+      try {
+        const chosen = await window.electronAPI.openVideoDialog();
+        if (chosen) {
+          dispatch(
+            relinkSlideVideo({
+              rundownId: currentItem.id,
+              slideId,
+              filePath: chosen,
+            })
+          );
+        }
+      } catch (err) {
+        console.error('Failed to relink slide video:', err);
+      }
+    } else {
+      pendingRelinkSlideIdRef.current = slideId;
+      slideRelinkInputRef.current?.click();
+    }
+  };
 
+  // Auto-resolve bare video filenames from user media folders for slides in current item
+  useEffect(() => {
+    if (!currentItem || !window.electronAPI?.resolveVideoPath) return;
+
+    for (const slide of currentItem.slides) {
+      const rawPath = slide.videoPath || slide.videoUrl;
+      const isYT =
+        slide.videoType === 'youtube' ||
+        (slide.youtubeUrl && !slide.videoPath && !slide.videoUrl);
+      if (rawPath && !isYT && isBareFilename(rawPath)) {
+        window.electronAPI
+          .resolveVideoPath(rawPath)
+          .then((resolved) => {
+            if (resolved) {
+              dispatch(
+                relinkSlideVideo({
+                  rundownId: currentItem.id,
+                  slideId: slide.id,
+                  filePath: resolved,
+                })
+              );
+            }
+          })
+          .catch((err) => {
+            console.warn('Auto resolve slide video path failed:', err);
+          });
+      }
+    }
+  }, [currentItem?.id, dispatch]);
 
   // Drag and drop state for slides
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -55,6 +134,9 @@ export const SlideDeck: React.FC = () => {
   };
 
   const handleSlideDoubleClick = (slideId: string) => {
+    if (isBlackout || isLogoActive) {
+      dispatch(clearAllOverrides());
+    }
     dispatch(takeSlideDirectlyLive({ rundownId: currentItem.id, slideId }));
   };
 
@@ -146,6 +228,27 @@ export const SlideDeck: React.FC = () => {
 
   return (
     <section className="slide-deck-col">
+      <input
+        type="file"
+        ref={slideRelinkInputRef}
+        accept="video/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          const targetSlideId = pendingRelinkSlideIdRef.current;
+          if (file && targetSlideId && currentItem) {
+            const fullPath = window.electronAPI?.getPathForFile?.(file) || URL.createObjectURL(file);
+            dispatch(
+              relinkSlideVideo({
+                rundownId: currentItem.id,
+                slideId: targetSlideId,
+                filePath: fullPath,
+              })
+            );
+            pendingRelinkSlideIdRef.current = null;
+          }
+        }}
+      />
       <div className="deck-header">
         <div className="deck-header-left">
           <h3 className="deck-header-title">
@@ -273,52 +376,182 @@ export const SlideDeck: React.FC = () => {
                     background: 'rgba(0, 0, 0, 0.35)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: '6px',
-                    padding: '8px 10px',
+                    padding: '6px 10px',
                     margin: '4px 0',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'space-between',
                     gap: '8px',
                   }}
                 >
-                  <span
-                    style={{
-                      background: isYouTube ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                      color: isYouTube ? '#ef4444' : '#3b82f6',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {isYouTube ? <YoutubeIcon size={11} /> : <VideoIcon size={11} />}
-                    <span>{isYouTube ? 'YOUTUBE' : 'VIDEO'}</span>
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '0.725rem',
-                      color: 'var(--text-secondary)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      flex: 1,
-                    }}
-                    title={videoTitleText || slide.videoUrl || slide.youtubeUrl || ''}
-                  >
-                    {videoTitleText || (isYouTube ? 'YouTube Stream' : 'Local Video File')}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+                    <span
+                      style={{
+                        background: isYouTube ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                        color: isYouTube ? '#ef4444' : '#3b82f6',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isYouTube ? <YoutubeIcon size={11} /> : <VideoIcon size={11} />}
+                      <span>{isYouTube ? 'YOUTUBE' : 'VIDEO'}</span>
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.725rem',
+                        color: 'var(--text-secondary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={videoTitleText || slide.videoUrl || slide.youtubeUrl || ''}
+                    >
+                      {videoTitleText || (isYouTube ? 'YouTube Stream' : 'Local Video File')}
+                    </span>
+                  </div>
+
+                  {!isYouTube && isBareFilename(slide.videoPath || slide.videoUrl) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRelinkSlide(slide.id);
+                      }}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.2)',
+                        border: '1px solid #ef4444',
+                        color: '#f87171',
+                        borderRadius: '4px',
+                        padding: '2px 8px',
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        flexShrink: 0,
+                      }}
+                      title="File location needs to be selected. Click to locate file on your computer."
+                    >
+                      <VideoIcon size={11} />
+                      <span>Relink Video</span>
+                    </button>
+                  )}
+
+                  {isLive && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                      <span
+                        style={{
+                          fontSize: '0.65rem',
+                          fontFamily: 'monospace',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        {formatTime(videoPlayback.currentTime)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!videoPlayback.isPlaying && (isBlackout || isLogoActive)) {
+                            dispatch(clearAllOverrides());
+                          }
+                          dispatch(toggleVideoPlay());
+                        }}
+                        style={{
+                          background:
+                            videoPlayback.isPlaying && !isBlackout && !isLogoActive
+                              ? 'rgba(34, 197, 94, 0.2)'
+                              : 'rgba(56, 189, 248, 0.2)',
+                          border: `1px solid ${
+                            videoPlayback.isPlaying && !isBlackout && !isLogoActive ? '#22c55e' : '#38bdf8'
+                          }`,
+                          color:
+                            videoPlayback.isPlaying && !isBlackout && !isLogoActive ? '#22c55e' : '#38bdf8',
+                          borderRadius: '4px',
+                          padding: '2px 6px',
+                          fontSize: '0.65rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                        }}
+                        title={
+                          videoPlayback.isPlaying && !isBlackout && !isLogoActive
+                            ? 'Pause video'
+                            : 'Play video'
+                        }
+                      >
+                        {videoPlayback.isPlaying && !isBlackout && !isLogoActive ? (
+                          <PauseIcon size={10} />
+                        ) : (
+                          <PlayIcon size={10} />
+                        )}
+                        <span>
+                          {videoPlayback.isPlaying && !isBlackout && !isLogoActive ? 'Pause' : 'Play'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {slide.imageUrl && (
-                <div className="slide-thumbnail-wrap">
+              {/* Media Thumbnail (Image or Video preview) */}
+              {(slide.imageUrl || hasVideo) && (
+                <div
+                  className="slide-thumbnail-wrap"
+                  style={{ position: 'relative', overflow: 'hidden' }}
+                >
                   <img
-                    src={slide.imageUrl}
+                    src={
+                      slide.imageUrl && !isVideoFile(slide.imageUrl) && !brokenThumbs[slide.id]
+                        ? slide.imageUrl
+                        : generateVideoThumbnail(
+                            slide.videoTitle ||
+                              slide.section ||
+                              getFileNameFromPath(slide.videoPath || slide.videoUrl || 'Video')
+                          )
+                    }
                     alt={slide.section || 'Slide Thumbnail'}
                     className="slide-thumbnail-img"
+                    onError={() => setBrokenThumbs((prev) => ({ ...prev, [slide.id]: true }))}
                   />
+                  {hasVideo && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'rgba(0, 0, 0, 0.28)',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: 'rgba(0, 0, 0, 0.65)',
+                          border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                        }}
+                      >
+                        <PlayIcon size={12} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -332,7 +565,7 @@ export const SlideDeck: React.FC = () => {
                 </div>
               )}
 
-              {(!slide.lines || slide.lines.length === 0) && !slide.imageUrl && (
+              {(!slide.lines || slide.lines.length === 0) && !slide.imageUrl && !hasVideo && (
                 <div
                   style={{
                     fontSize: '0.7rem',
@@ -341,7 +574,7 @@ export const SlideDeck: React.FC = () => {
                     padding: '4px 0',
                   }}
                 >
-                  {hasVideo ? 'Video active • No lyric text overlay' : 'Empty slide content'}
+                  Empty slide content
                 </div>
               )}
             </div>

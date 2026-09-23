@@ -6,6 +6,20 @@ import { ThemeProvider } from './components/theme';
 import { App } from './App';
 import './index.css';
 
+// Ensure media playback, timers, and animations never pause when window is minimized
+try {
+  Object.defineProperty(document, 'hidden', {
+    get: () => false,
+    configurable: true,
+  });
+  Object.defineProperty(document, 'visibilityState', {
+    get: () => 'visible',
+    configurable: true,
+  });
+} catch {
+  // ignore
+}
+
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {

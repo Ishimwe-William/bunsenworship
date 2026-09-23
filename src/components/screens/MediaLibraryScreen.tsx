@@ -19,6 +19,7 @@ import {
   PRO_MEDIA_ASSETS,
   ProMediaAsset,
 } from './mediaLibraryData';
+import { normalizeVideoSource, generateVideoThumbnail } from '../../utils/videoHelpers';
 import {
   SearchIcon,
   PlusIcon,
@@ -133,6 +134,25 @@ export const MediaLibraryScreen: React.FC = () => {
   const pptFileInputRef = useRef<HTMLInputElement>(null);
   const imgFileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBrowseVideoFile = async () => {
+    if (window.electronAPI?.openVideoDialog) {
+      try {
+        const selectedPath = await window.electronAPI.openVideoDialog();
+        if (selectedPath) {
+          setVideoFilePath(selectedPath);
+          const filename = selectedPath.split(/[/\\]/).pop() || '';
+          if (!videoTitle) {
+            setVideoTitle(filename.replace(/\.[^/.]+$/, ''));
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn('Native openVideoDialog failed, falling back to input:', err);
+      }
+    }
+    videoFileInputRef.current?.click();
+  };
 
   // Load records from local DB
   const loadDatabaseRecords = async () => {
@@ -409,8 +429,11 @@ export const MediaLibraryScreen: React.FC = () => {
       const isVideoAsset =
         asset.format === 'MOV' ||
         asset.format === 'MP4' ||
-        Boolean(asset.videoUrl || asset.youtubeUrl);
+        Boolean(asset.videoUrl || asset.filePath || asset.youtubeUrl);
       const isYouTube = Boolean(asset.youtubeUrl);
+      const resolvedVideoSrc = isYouTube
+        ? (asset.youtubeUrl || '')
+        : normalizeVideoSource(asset.videoUrl || asset.filePath || '');
 
       itemToCreate = {
         title: asset.title,
@@ -425,14 +448,15 @@ export const MediaLibraryScreen: React.FC = () => {
             imageUrl: asset.thumbnailUrl,
             imageFit: 'cover',
             videoType: isYouTube ? 'youtube' : isVideoAsset ? 'local' : 'none',
-            videoUrl: asset.videoUrl || asset.filePath,
-            videoPath: asset.filePath || asset.videoUrl,
+            videoUrl: resolvedVideoSrc,
+            videoPath: resolvedVideoSrc,
             youtubeUrl: asset.youtubeUrl,
             autoPlay: true,
             loop: true,
             videoLoop: true,
             videoFit: 'contain',
             videoTitle: asset.title,
+            videoMuted: true,
           },
         ],
       };
@@ -649,6 +673,14 @@ export const MediaLibraryScreen: React.FC = () => {
         return;
       }
 
+      const rawPath = videoSourceType === 'file' ? (videoFilePath.trim() || videoDataUrl) : undefined;
+      const normalizedPath = rawPath ? normalizeVideoSource(rawPath) : undefined;
+
+      const safeThumbnail =
+        videoDataUrl && videoDataUrl.startsWith('data:image')
+          ? videoDataUrl
+          : generateVideoThumbnail(videoTitle.trim());
+
       const newAsset: ProMediaAsset = {
         id: `asset-video-${Date.now()}`,
         title: videoTitle.trim(),
@@ -656,8 +688,9 @@ export const MediaLibraryScreen: React.FC = () => {
         resolution: videoRes,
         durationOrSlides: videoDuration || '0:30',
         sourceCategory: videoCategory,
-        thumbnailUrl: videoDataUrl || PRO_MEDIA_ASSETS[0].thumbnailUrl,
-        filePath: videoSourceType === 'file' ? videoFilePath.trim() : undefined,
+        thumbnailUrl: safeThumbnail,
+        filePath: normalizedPath,
+        videoUrl: normalizedPath,
         youtubeUrl: videoSourceType === 'youtube' ? videoYoutubeUrl.trim() : undefined,
       };
 
@@ -1333,8 +1366,18 @@ export const MediaLibraryScreen: React.FC = () => {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const path = (file as unknown as { path?: string }).path || file.name;
-                            setVideoFilePath(path);
+                            let resolvedPath: string | undefined;
+                            if (window.electronAPI?.getPathForFile) {
+                              try {
+                                resolvedPath = window.electronAPI.getPathForFile(file);
+                              } catch {
+                                // ignore
+                              }
+                            }
+                            const rawPath = resolvedPath || (file as unknown as { path?: string }).path;
+                            const objectUrl = URL.createObjectURL(file);
+                            setVideoFilePath(rawPath || objectUrl);
+                            setVideoDataUrl(objectUrl);
                             if (!videoTitle) {
                               setVideoTitle(file.name.replace(/\.[^/.]+$/, ''));
                             }
@@ -1344,7 +1387,7 @@ export const MediaLibraryScreen: React.FC = () => {
                       <button
                         type="button"
                         className="btn-secondary"
-                        onClick={() => videoFileInputRef.current?.click()}
+                        onClick={handleBrowseVideoFile}
                       >
                         Browse...
                       </button>

@@ -883,6 +883,16 @@
   overflow: hidden;
 }
 
+.stage-video-layer iframe,
+.stage-video-layer .bunsen-yt-player-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border: none;
+}
+
 .stage-video-controls {
   position: absolute;
   bottom: 20px;
@@ -1240,3 +1250,51 @@
     gap: 0.75rem;
   }
 }
+
+/* ==========================================================================
+   YouTube Player Container & Stage Integration
+   ========================================================================== */
+.bunsen-yt-player-container {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  background: #000000 !important;
+  pointer-events: none !important;
+}
+
+.bunsen-yt-iframe-slot {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+.bunsen-yt-iframe-slot iframe {
+  position: absolute !important;
+  top: -6% !important;
+  left: -6% !important;
+  width: 112% !important;
+  height: 112% !important;
+  border: 0 !important;
+  display: block !important;
+  pointer-events: none !important;
+}
+
+.bunsen-yt-cover-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 10 !important;
+  background-color: #000000 !important;
+  background-size: cover !important;
+  background-position: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+  transition: opacity 0.35s ease !important;
+}
+

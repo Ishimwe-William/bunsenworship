@@ -19,6 +19,11 @@ export interface ElectronAPI {
   onUpdateDownloaded: (callback: (info: UpdateInfo) => void) => () => void;
   onFcmMessage: (callback: (msg: FcmPushMessage) => void) => () => void;
   openProjectorWindow: () => Promise<void>;
+  isProjectorOpen?: () => Promise<boolean>;
+  onProjectorStatusChanged?: (callback: (isOpen: boolean) => void) => () => void;
+  openVideoDialog: () => Promise<string | null>;
+  resolveVideoPath: (filename: string) => Promise<string | null>;
+  getPathForFile: (file: File) => string;
 }
 
 declare global {

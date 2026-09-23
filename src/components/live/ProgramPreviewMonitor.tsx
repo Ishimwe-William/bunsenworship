@@ -21,6 +21,8 @@ import {
   toggleClearText,
   toggleLogo,
   clearAllOverrides,
+  setVideoError,
+  setProjectorActive,
 } from '../../store/features/presentation';
 import { PlayIcon, SlidersIcon, MonitorIcon } from '../common/Icons';
 import { ScaledRealityMonitor } from './ScaledRealityMonitor';
@@ -95,16 +97,63 @@ export const ProgramPreviewMonitor: React.FC = () => {
     broadcastProjectorState();
   }, [broadcastProjectorState]);
 
-  // Respond to projector window handshake requests
+  // Respond to projector window handshake requests & track connection status
   useEffect(() => {
     const channel = new BroadcastChannel('bunsenworship_projector_channel');
+    let disconnectTimer: any = null;
+
+    const markProjectorActive = () => {
+      dispatch(setProjectorActive(true));
+      clearTimeout(disconnectTimer);
+      disconnectTimer = setTimeout(() => {
+        dispatch(setProjectorActive(false));
+      }, 5000);
+    };
+
     channel.onmessage = (event) => {
       if (event.data?.type === 'REQUEST_PROJECTOR_STATE') {
         broadcastProjectorState();
+        markProjectorActive();
+      } else if (
+        event.data?.type === 'PROJECTOR_CONNECTED' ||
+        event.data?.type === 'PROJECTOR_HEARTBEAT'
+      ) {
+        markProjectorActive();
+      } else if (event.data?.type === 'PROJECTOR_DISCONNECTED') {
+        clearTimeout(disconnectTimer);
+        dispatch(setProjectorActive(false));
+      } else if (event.data?.type === 'PROJECTOR_VIDEO_ERROR') {
+        dispatch(setVideoError(true));
       }
     };
-    return () => channel.close();
-  }, [broadcastProjectorState]);
+
+    // Native Electron IPC listener if available
+    let unsubscribeIpc: (() => void) | undefined;
+    if (window.electronAPI?.isProjectorOpen) {
+      window.electronAPI
+        .isProjectorOpen()
+        .then((isOpen) => {
+          if (isOpen) markProjectorActive();
+        })
+        .catch(() => {});
+    }
+    if (window.electronAPI?.onProjectorStatusChanged) {
+      unsubscribeIpc = window.electronAPI.onProjectorStatusChanged((isOpen) => {
+        if (isOpen) {
+          markProjectorActive();
+        } else {
+          clearTimeout(disconnectTimer);
+          dispatch(setProjectorActive(false));
+        }
+      });
+    }
+
+    return () => {
+      clearTimeout(disconnectTimer);
+      channel.close();
+      if (unsubscribeIpc) unsubscribeIpc();
+    };
+  }, [broadcastProjectorState, dispatch]);
 
   // Global hotkeys for worship console operator
   useEffect(() => {
@@ -118,6 +167,9 @@ export const ProgramPreviewMonitor: React.FC = () => {
       // Live control shortcuts
       if (e.key === 'Enter') {
         e.preventDefault();
+        if (isBlackout || isLogoActive) {
+          dispatch(clearAllOverrides());
+        }
         dispatch(takeLive());
       } else if (e.key === ' ' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -152,9 +204,12 @@ export const ProgramPreviewMonitor: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, fadeDuration]);
+  }, [dispatch, fadeDuration, isBlackout, isLogoActive]);
 
   const handleGoLive = () => {
+    if (isBlackout || isLogoActive) {
+      dispatch(clearAllOverrides());
+    }
     dispatch(takeLive());
   };
 

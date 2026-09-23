@@ -79,3 +79,6 @@ export const selectActiveBackground = (state: HasPresentationState): BackgroundT
 
 export const selectVideoPlayback = (state: HasPresentationState): VideoPlaybackState =>
   state.presentation.videoPlayback;
+
+export const selectIsProjectorActive = (state: HasPresentationState): boolean =>
+  Boolean(state.presentation.isProjectorActive);

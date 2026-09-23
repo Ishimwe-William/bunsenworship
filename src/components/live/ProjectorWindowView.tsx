@@ -1,7 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Slide, VideoPlaybackState, getPersistedStartupDisplay } from '../../store/features/presentation';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
-import { buildYouTubeEmbedUrl } from '../../utils/videoHelpers';
+import {
+  normalizeVideoSource,
+  isVideoFile,
+  generateVideoThumbnail,
+  parseYouTubeId,
+} from '../../utils/videoHelpers';
+import { YouTubePlayer } from './YouTubePlayer';
 
 export interface ProjectorPayload {
   slide: Slide | null;
@@ -74,8 +80,27 @@ export const ProjectorWindowView: React.FC = () => {
       }
     };
 
-    // Request latest state from main window
+    // Announce projector is active and request latest state from main window
+    channel.postMessage({ type: 'PROJECTOR_CONNECTED' });
     channel.postMessage({ type: 'REQUEST_PROJECTOR_STATE' });
+
+    // Send periodic heartbeat so main window knows projector window is alive
+    const heartbeatTimer = window.setInterval(() => {
+      try {
+        channel.postMessage({ type: 'PROJECTOR_HEARTBEAT' });
+      } catch {
+        // ignore
+      }
+    }, 2000);
+
+    const handleBeforeUnload = () => {
+      try {
+        channel.postMessage({ type: 'PROJECTOR_DISCONNECTED' });
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     // Fullscreen shortcut F11
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -96,7 +121,14 @@ export const ProjectorWindowView: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      clearInterval(heartbeatTimer);
+      try {
+        channel.postMessage({ type: 'PROJECTOR_DISCONNECTED' });
+      } catch {
+        // ignore
+      }
       channel.close();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -124,7 +156,11 @@ export const ProjectorWindowView: React.FC = () => {
     hasVideo && !isYouTubeVideo && (slide?.videoPath || slide?.videoUrl)
   );
 
-  const localVideoSrc = slide?.videoPath || slide?.videoUrl || '';
+  const localVideoSrc = normalizeVideoSource(slide?.videoPath || slide?.videoUrl || '');
+  const videoPoster =
+    slide?.imageUrl && !isVideoFile(slide.imageUrl)
+      ? slide.imageUrl
+      : generateVideoThumbnail(slide?.videoTitle || slide?.section || 'Video Playback');
 
   // Synchronize projector local video playback with operator console
   useEffect(() => {
@@ -154,7 +190,7 @@ export const ProjectorWindowView: React.FC = () => {
     if (Math.abs(v.currentTime - pb.currentTime) > 1.0) {
       v.currentTime = pb.currentTime;
     }
-  }, [isLocalVideo, state.videoPlayback, slide?.loop, slide?.videoLoop]);
+  }, [isLocalVideo, state.videoPlayback, state.isBlackout, state.isLogoActive, slide?.loop, slide?.videoLoop]);
 
   // Compute responsive scale factor to fit 1920x1080 stage inside any window resolution
   const scaleX = viewportSize.width / 1920;
@@ -182,14 +218,8 @@ export const ProjectorWindowView: React.FC = () => {
     lineHeight = 1.25;
   }
 
-  const youtubeUrl = isYouTubeVideo
-    ? buildYouTubeEmbedUrl(slide?.youtubeUrl || '', {
-        autoplay: slide?.autoPlay !== false,
-        loop: Boolean(slide?.loop ?? slide?.videoLoop),
-        mute: Boolean(slide?.videoMuted),
-        startTime: slide?.videoStartTime,
-        controls: false,
-      })
+  const youtubeVideoId = isYouTubeVideo
+    ? parseYouTubeId(slide?.youtubeUrl || slide?.videoUrl || '')
     : null;
 
   return (
@@ -292,7 +322,9 @@ export const ProjectorWindowView: React.FC = () => {
               <video
                 ref={videoRef}
                 src={localVideoSrc}
-                autoPlay={slide?.autoPlay !== false}
+                poster={videoPoster}
+                preload="auto"
+                autoPlay={slide?.autoPlay !== false && !state.isBlackout && !state.isLogoActive}
                 loop={Boolean(slide?.loop ?? slide?.videoLoop ?? state.videoPlayback?.isLooping)}
                 muted={Boolean(state.videoPlayback?.isMuted)}
                 playsInline
@@ -301,20 +333,47 @@ export const ProjectorWindowView: React.FC = () => {
                   height: '100%',
                   objectFit: slide?.videoFit || 'contain',
                 }}
+                onError={() => {
+                  console.warn('Projector video failed to load source:', localVideoSrc);
+                  try {
+                    const channel = new BroadcastChannel('bunsenworship_projector_channel');
+                    channel.postMessage({ type: 'PROJECTOR_VIDEO_ERROR' });
+                    channel.close();
+                  } catch {
+                    // ignore
+                  }
+                }}
+                onPause={() => {
+                  if (state.videoPlayback?.isPlaying && !state.isBlackout && !state.isLogoActive) {
+                    videoRef.current?.play().catch(() => {});
+                  }
+                }}
               />
             )}
 
-            {isYouTubeVideo && youtubeUrl && (
-              <iframe
-                src={youtubeUrl}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
+            {isYouTubeVideo && youtubeVideoId && (
+              <YouTubePlayer
+                videoId={youtubeVideoId}
+                poster={videoPoster}
+                isPlaying={Boolean(state.videoPlayback?.isPlaying)}
+                currentTime={state.videoPlayback?.currentTime || 0}
+                volume={state.videoPlayback?.volume ?? 1.0}
+                isMuted={Boolean(state.videoPlayback?.isMuted)}
+                loop={Boolean(slide?.loop ?? slide?.videoLoop ?? state.videoPlayback?.isLooping)}
+                startTime={slide?.videoStartTime || 0}
+                isLive={state.source === 'LIVE'}
+                isBlackout={state.isBlackout}
+                isLogoActive={state.isLogoActive}
+                onError={(errCode) => {
+                  console.warn('Projector YouTube error code:', errCode);
+                  try {
+                    const channel = new BroadcastChannel('bunsenworship_projector_channel');
+                    channel.postMessage({ type: 'PROJECTOR_VIDEO_ERROR' });
+                    channel.close();
+                  } catch {
+                    // ignore
+                  }
                 }}
-                title={slide?.videoTitle || slide?.section || 'YouTube Video'}
               />
             )}
           </div>

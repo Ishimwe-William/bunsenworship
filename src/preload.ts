@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
+import { contextBridge, ipcRenderer, webUtils, IpcRendererEvent } from 'electron';
 import { UpdateInfo, FcmPushMessage } from './types/electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -33,4 +33,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
   openProjectorWindow: () => ipcRenderer.invoke('projector:open'),
+  isProjectorOpen: () => ipcRenderer.invoke('projector:is-open'),
+  onProjectorStatusChanged: (callback: (isOpen: boolean) => void) => {
+    const handler = (_event: IpcRendererEvent, isOpen: boolean) => callback(isOpen);
+    ipcRenderer.on('projector:status-changed', handler);
+    return () => {
+      ipcRenderer.removeListener('projector:status-changed', handler);
+    };
+  },
+  openVideoDialog: () => ipcRenderer.invoke('dialog:open-video'),
+  resolveVideoPath: (filename: string) => ipcRenderer.invoke('video:resolve-path', filename),
+  getPathForFile: (file: File) => {
+    try {
+      if (webUtils && typeof webUtils.getPathForFile === 'function') {
+        return webUtils.getPathForFile(file);
+      }
+    } catch {
+      // ignore
+    }
+    return (file as unknown as { path?: string }).path || file.name;
+  },
 });

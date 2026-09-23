@@ -2,13 +2,26 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   Slide,
   selectVideoPlayback,
+  selectIsProjectorActive,
   setVideoDuration,
   setVideoCurrentTime,
   setVideoPlaying,
+  relinkSlideVideo,
+  setVideoError,
+  clearVideoError,
 } from '../../store/features/presentation';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
-import { buildYouTubeEmbedUrl } from '../../utils/videoHelpers';
+import { VideoIcon } from '../common/Icons';
+import {
+  normalizeVideoSource,
+  isBareFilename,
+  isVideoFile,
+  getFileNameFromPath,
+  generateVideoThumbnail,
+  parseYouTubeId,
+} from '../../utils/videoHelpers';
+import { YouTubePlayer } from './YouTubePlayer';
 
 export interface ScaledRealityMonitorProps {
   slide: Slide | null;
@@ -35,10 +48,17 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
 }) => {
   const dispatch = useAppDispatch();
   const videoPlayback = useAppSelector(selectVideoPlayback);
+  const isProjectorActive = useAppSelector(selectIsProjectorActive);
+
+  // When projector is active, mute operator preview to prevent dual sound / echo.
+  // When projector is closed, operator preview plays audio for rehearsal / preview.
+  const shouldMuteOperatorAudio = !isLive || videoPlayback.isMuted || isProjectorActive;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const relinkInputRef = useRef<HTMLInputElement>(null);
   const [scale, setScale] = useState<number>(0.1875);
+  const [localVideoError, setLocalVideoError] = useState<boolean>(false);
   const lastDispatchedTimeRef = useRef<number>(0);
 
   // Responsive scale factor to fit 1920x1080 stage inside container
@@ -80,7 +100,66 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     hasVideo && !isYouTubeVideo && (slide?.videoPath || slide?.videoUrl)
   );
 
-  const localVideoSrc = slide?.videoPath || slide?.videoUrl || '';
+  const localVideoSrc = normalizeVideoSource(slide?.videoPath || slide?.videoUrl || '');
+  const youtubeVideoId = isYouTubeVideo
+    ? parseYouTubeId(slide?.youtubeUrl || slide?.videoUrl || '')
+    : null;
+
+  // Auto-resolve bare filenames from local user folders
+  useEffect(() => {
+    const rawPath = slide?.videoPath || slide?.videoUrl;
+    if (!rawPath || isYouTubeVideo || !isBareFilename(rawPath)) return;
+
+    if (window.electronAPI?.resolveVideoPath) {
+      window.electronAPI
+        .resolveVideoPath(rawPath)
+        .then((resolved) => {
+          if (resolved && slide?.id) {
+            dispatch(
+              relinkSlideVideo({
+                slideId: slide.id,
+                filePath: resolved,
+              })
+            );
+            setLocalVideoError(false);
+            if (isLive) dispatch(clearVideoError());
+          }
+        })
+        .catch((err) => {
+          console.warn('Auto resolve video path failed:', err);
+        });
+    }
+  }, [slide?.id, slide?.videoPath, slide?.videoUrl, isYouTubeVideo, isLive, dispatch]);
+
+  // Reset video error when slide or video source updates
+  useEffect(() => {
+    setLocalVideoError(false);
+    if (isLive) {
+      dispatch(clearVideoError());
+    }
+  }, [slide?.id, localVideoSrc, isLive, dispatch]);
+
+  const handleRelinkVideo = async () => {
+    if (window.electronAPI?.openVideoDialog) {
+      try {
+        const chosen = await window.electronAPI.openVideoDialog();
+        if (chosen) {
+          dispatch(
+            relinkSlideVideo({
+              slideId: slide?.id,
+              filePath: chosen,
+            })
+          );
+          setLocalVideoError(false);
+          if (isLive) dispatch(clearVideoError());
+        }
+      } catch (err) {
+        console.error('Failed to open video dialog:', err);
+      }
+    } else {
+      relinkInputRef.current?.click();
+    }
+  };
 
   // Synchronize local video element with Redux playback state when Live
   useEffect(() => {
@@ -96,7 +175,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
 
     // Volume & Mute
     v.volume = videoPlayback.volume;
-    v.muted = videoPlayback.isMuted;
+    v.muted = shouldMuteOperatorAudio;
 
     // Playback rate
     if (v.playbackRate !== videoPlayback.playbackRate) {
@@ -115,7 +194,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     isLogoActive,
     videoPlayback.isPlaying,
     videoPlayback.volume,
-    videoPlayback.isMuted,
+    shouldMuteOperatorAudio,
     videoPlayback.playbackRate,
     videoPlayback.isLooping,
     slide?.loop,
@@ -137,11 +216,11 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     const v = videoRef.current;
     const startTime = slide?.videoStartTime || 0;
     v.currentTime = startTime;
-    if (slide?.autoPlay !== false) {
+    if (slide?.autoPlay !== false && !isBlackout && !isLogoActive) {
       v.play().catch((err) => console.log('Autoplay deferred:', err));
       dispatch(setVideoPlaying(true));
     }
-  }, [slide?.id, isLive, isLocalVideo, slide?.videoStartTime, slide?.autoPlay, dispatch]);
+  }, [slide?.id, isLive, isLocalVideo, slide?.videoStartTime, slide?.autoPlay, isBlackout, isLogoActive, dispatch]);
 
   const handleLoadedMetadata = useCallback(() => {
     if (!videoRef.current) return;
@@ -192,22 +271,40 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     lineHeight = 1.25;
   }
 
-  // Build YouTube embed URL if applicable
-  const youtubeUrl = isYouTubeVideo
-    ? buildYouTubeEmbedUrl(slide?.youtubeUrl || '', {
-        autoplay: isLive && slide?.autoPlay !== false,
-        loop: Boolean(slide?.loop ?? slide?.videoLoop),
-        mute: !isLive || Boolean(slide?.videoMuted),
-        startTime: slide?.videoStartTime,
-        controls: true,
-      })
-    : null;
+  // Compute reliable video poster thumbnail
+  const videoPoster =
+    slide?.imageUrl && !isVideoFile(slide.imageUrl)
+      ? slide.imageUrl
+      : generateVideoThumbnail(
+          slide?.videoTitle ||
+            slide?.section ||
+            getFileNameFromPath(slide?.videoPath || slide?.videoUrl || 'Video Media')
+        );
 
   return (
     <div
       ref={containerRef}
       className={`monitor-screen-frame ${isLive ? 'is-live-frame' : 'is-preview-frame'}`}
     >
+      <input
+        type="file"
+        ref={relinkInputRef}
+        accept="video/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const fullPath = window.electronAPI?.getPathForFile?.(file) || URL.createObjectURL(file);
+            dispatch(
+              relinkSlideVideo({
+                slideId: slide?.id,
+                filePath: fullPath,
+              })
+            );
+            setVideoError(false);
+          }
+        }}
+      />
       <div
         className="sanctuary-virtual-stage"
         style={{
@@ -251,9 +348,11 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
               <video
                 ref={videoRef}
                 src={localVideoSrc}
-                autoPlay={isLive && slide?.autoPlay !== false}
+                poster={videoPoster}
+                preload="auto"
+                autoPlay={isLive && slide?.autoPlay !== false && !isBlackout && !isLogoActive}
                 loop={Boolean(slide?.loop ?? slide?.videoLoop ?? videoPlayback.isLooping)}
-                muted={!isLive || videoPlayback.isMuted}
+                muted={shouldMuteOperatorAudio}
                 playsInline
                 style={{
                   width: '100%',
@@ -263,26 +362,60 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
                 onLoadedMetadata={handleLoadedMetadata}
                 onTimeUpdate={handleTimeUpdate}
                 onEnded={handleEnded}
+                onError={() => {
+                  console.warn('Video failed to load source:', localVideoSrc);
+                  setLocalVideoError(true);
+                  if (isLive) {
+                    dispatch(setVideoError(true));
+                  }
+                }}
                 onPlay={() => {
                   if (isLive) dispatch(setVideoPlaying(true));
                 }}
                 onPause={() => {
-                  if (isLive) dispatch(setVideoPlaying(false));
+                  if (isLive && videoPlayback.isPlaying && !isBlackout && !isLogoActive) {
+                    videoRef.current?.play().catch(() => {});
+                  }
                 }}
               />
             )}
 
-            {isYouTubeVideo && youtubeUrl && (
-              <iframe
-                src={youtubeUrl}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
+            {isYouTubeVideo && youtubeVideoId && (
+              <YouTubePlayer
+                videoId={youtubeVideoId}
+                poster={videoPoster}
+                isPlaying={videoPlayback.isPlaying}
+                currentTime={videoPlayback.currentTime}
+                volume={videoPlayback.volume}
+                isMuted={shouldMuteOperatorAudio}
+                loop={Boolean(slide?.loop ?? slide?.videoLoop ?? videoPlayback.isLooping)}
+                startTime={slide?.videoStartTime || 0}
+                isLive={isLive}
+                isBlackout={isBlackout}
+                isLogoActive={isLogoActive}
+                onDurationChange={(dur) => {
+                  if (isLive) dispatch(setVideoDuration(dur));
                 }}
-                title={slide?.videoTitle || slide?.section || 'YouTube Video'}
+                onTimeUpdate={(t) => {
+                  if (isLive) dispatch(setVideoCurrentTime(t));
+                }}
+                onPlay={() => {
+                  if (isLive) dispatch(setVideoPlaying(true));
+                }}
+                onPause={() => {
+                  // Unintentional pause (e.g. minimize or window focus loss) is handled by YouTubePlayer auto-resume
+                }}
+                onEnded={() => {
+                  if (isLive) {
+                    const isLoop = Boolean(slide?.loop ?? slide?.videoLoop ?? videoPlayback.isLooping);
+                    if (!isLoop) dispatch(setVideoPlaying(false));
+                  }
+                }}
+                onError={(errCode) => {
+                  console.warn('YouTube Player error:', errCode);
+                  setLocalVideoError(true);
+                  if (isLive) dispatch(setVideoError(true));
+                }}
               />
             )}
           </div>
@@ -360,6 +493,50 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
           </div>
         )}
       </div>
+
+      {/* Operator-side error alert badge (unobtrusive, no emojis) */}
+      {(localVideoError || (isLive && videoPlayback.videoError)) && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '10px',
+            right: '10px',
+            zIndex: 40,
+            background: 'rgba(15, 23, 42, 0.92)',
+            border: '1px solid rgba(239, 68, 68, 0.6)',
+            borderRadius: '6px',
+            padding: '5px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          <span style={{ color: '#ef4444', fontSize: '0.7rem', fontWeight: 700 }}>
+            File Not Found
+          </span>
+          <button
+            type="button"
+            onClick={handleRelinkVideo}
+            style={{
+              background: '#ef4444',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              fontSize: '0.675rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <VideoIcon size={10} />
+            <span>Relink</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PresentationState, RundownItem, Slide, TransitionType, BackgroundTheme, StartupDisplayMode } from './types';
+import { isVideoFile } from '../../../utils/videoHelpers';
 
 
 const defaultThemes = [
@@ -60,6 +61,7 @@ export const DEFAULT_RUNDOWN: RundownItem[] = [
         id: 's-vid-motion-1',
         section: 'Motion Background',
         lines: ['Lord You are Good and Your Mercy Endureth Forever'],
+        imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1080&auto=format&fit=crop',
         videoType: 'local',
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
         videoPath: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
@@ -68,6 +70,7 @@ export const DEFAULT_RUNDOWN: RundownItem[] = [
         videoLoop: true,
         videoFit: 'contain',
         videoTitle: 'Cinematic Particles Blue',
+        videoMuted: true,
       },
     ],
   },
@@ -166,10 +169,13 @@ const initialState: PresentationState = {
     currentTime: 0,
     duration: 0,
     volume: 1.0,
-    isMuted: false,
+    isMuted: true,
     playbackRate: 1.0,
     isLooping: true,
+    videoError: false,
+    videoErrorMessage: '',
   },
+  isProjectorActive: false,
 };
 
 export const presentationSlice = createSlice({
@@ -246,7 +252,19 @@ export const presentationSlice = createSlice({
         const currentItem = state.rundown.find((r) => r.id === state.selectedRundownId);
         if (currentItem) {
           const targetSlide = currentItem.slides.find((s) => s.id === state.previewSlideId);
-          if (targetSlide && targetSlide.videoType && targetSlide.videoType !== 'none') {
+          const isTargetVideo = Boolean(
+            targetSlide &&
+              (targetSlide.videoType === 'local' ||
+                targetSlide.videoType === 'youtube' ||
+                targetSlide.videoUrl ||
+                targetSlide.videoPath ||
+                targetSlide.youtubeUrl) &&
+              targetSlide.videoType !== 'none'
+          );
+
+          if (isTargetVideo && targetSlide) {
+            state.videoPlayback.videoError = false;
+            state.videoPlayback.videoErrorMessage = '';
             state.videoPlayback.currentTime = targetSlide.videoStartTime || 0;
             state.videoPlayback.isPlaying = targetSlide.autoPlay !== false;
             state.videoPlayback.isLooping = Boolean(targetSlide.loop || targetSlide.videoLoop);
@@ -255,6 +273,8 @@ export const presentationSlice = createSlice({
             }
             if (targetSlide.videoMuted !== undefined) {
               state.videoPlayback.isMuted = targetSlide.videoMuted;
+            } else {
+              state.videoPlayback.isMuted = true;
             }
             if (targetSlide.videoPlaybackRate !== undefined) {
               state.videoPlayback.playbackRate = targetSlide.videoPlaybackRate;
@@ -281,7 +301,19 @@ export const presentationSlice = createSlice({
       const currentItem = state.rundown.find((r) => r.id === action.payload.rundownId);
       if (currentItem) {
         const targetSlide = currentItem.slides.find((s) => s.id === action.payload.slideId);
-        if (targetSlide && targetSlide.videoType && targetSlide.videoType !== 'none') {
+        const isTargetVideo = Boolean(
+          targetSlide &&
+            (targetSlide.videoType === 'local' ||
+              targetSlide.videoType === 'youtube' ||
+              targetSlide.videoUrl ||
+              targetSlide.videoPath ||
+              targetSlide.youtubeUrl) &&
+            targetSlide.videoType !== 'none'
+        );
+
+        if (isTargetVideo && targetSlide) {
+          state.videoPlayback.videoError = false;
+          state.videoPlayback.videoErrorMessage = '';
           state.videoPlayback.currentTime = targetSlide.videoStartTime || 0;
           state.videoPlayback.isPlaying = targetSlide.autoPlay !== false;
           state.videoPlayback.isLooping = Boolean(targetSlide.loop || targetSlide.videoLoop);
@@ -290,6 +322,8 @@ export const presentationSlice = createSlice({
           }
           if (targetSlide.videoMuted !== undefined) {
             state.videoPlayback.isMuted = targetSlide.videoMuted;
+          } else {
+            state.videoPlayback.isMuted = true;
           }
           if (targetSlide.videoPlaybackRate !== undefined) {
             state.videoPlayback.playbackRate = targetSlide.videoPlaybackRate;
@@ -439,6 +473,62 @@ export const presentationSlice = createSlice({
         }
       }
     },
+    relinkSlideVideo: (
+      state,
+      action: PayloadAction<{
+        rundownId?: string;
+        slideId?: string;
+        filePath: string;
+      }>
+    ) => {
+      const { filePath } = action.payload;
+      state.videoPlayback.videoError = false;
+      state.videoPlayback.videoErrorMessage = '';
+
+      let targetSlide: Slide | undefined;
+      if (action.payload.rundownId) {
+        const item = state.rundown.find((r) => r.id === action.payload.rundownId);
+        if (item) {
+          targetSlide = item.slides.find((s) => s.id === action.payload.slideId);
+        }
+      }
+      if (!targetSlide && action.payload.slideId) {
+        for (const item of state.rundown) {
+          const found = item.slides.find((s) => s.id === action.payload.slideId);
+          if (found) {
+            targetSlide = found;
+            break;
+          }
+        }
+      }
+      if (!targetSlide) {
+        const currentItem = state.rundown.find((r) => r.id === state.selectedRundownId);
+        if (currentItem) {
+          targetSlide =
+            currentItem.slides.find(
+              (s) => s.id === state.previewSlideId || s.id === state.liveSlideId
+            ) || currentItem.slides[0];
+        }
+      }
+
+      if (targetSlide) {
+        targetSlide.videoPath = filePath;
+        targetSlide.videoUrl = filePath;
+        targetSlide.videoType = 'local';
+        const fileName = filePath.split(/[/\\]/).pop() || '';
+        if (!targetSlide.videoTitle || targetSlide.videoTitle === 'Video Playback' || targetSlide.videoTitle === 'Local Video') {
+          targetSlide.videoTitle = fileName.replace(/\.[^/.]+$/, '');
+        }
+        if (targetSlide.imageUrl && isVideoFile(targetSlide.imageUrl)) {
+          targetSlide.imageUrl = undefined;
+        }
+        if (state.liveSlideId === targetSlide.id) {
+          state.videoPlayback.currentTime = 0;
+          state.videoPlayback.isPlaying = true;
+          state.videoPlayback.videoError = false;
+        }
+      }
+    },
     addSlide: (
       state,
       action: PayloadAction<{ rundownId: string; slide: Omit<Slide, 'id'> }>
@@ -574,6 +664,33 @@ export const presentationSlice = createSlice({
     restartVideo: (state) => {
       state.videoPlayback.currentTime = 0;
       state.videoPlayback.isPlaying = true;
+      state.videoPlayback.videoError = false;
+      state.videoPlayback.videoErrorMessage = '';
+    },
+    setVideoError: (
+      state,
+      action: PayloadAction<{ hasError: boolean; message?: string } | boolean>
+    ) => {
+      if (typeof action.payload === 'boolean') {
+        state.videoPlayback.videoError = action.payload;
+        state.videoPlayback.videoErrorMessage = '';
+        if (action.payload) {
+          state.videoPlayback.isPlaying = false;
+        }
+      } else {
+        state.videoPlayback.videoError = action.payload.hasError;
+        state.videoPlayback.videoErrorMessage = action.payload.message || '';
+        if (action.payload.hasError) {
+          state.videoPlayback.isPlaying = false;
+        }
+      }
+    },
+    clearVideoError: (state) => {
+      state.videoPlayback.videoError = false;
+      state.videoPlayback.videoErrorMessage = '';
+    },
+    setProjectorActive: (state, action: PayloadAction<boolean>) => {
+      state.isProjectorActive = action.payload;
     },
   },
 });
@@ -600,6 +717,7 @@ export const {
   setActiveBackground,
   addCustomBackgroundTheme,
   updateSlide,
+  relinkSlideVideo,
   addSlide,
   deleteSlide,
   addRundownItem,
@@ -618,6 +736,9 @@ export const {
   setVideoLooping,
   toggleVideoLoop,
   restartVideo,
+  setVideoError,
+  clearVideoError,
+  setProjectorActive,
 } = presentationSlice.actions;
 
 export const presentationReducer = presentationSlice.reducer;

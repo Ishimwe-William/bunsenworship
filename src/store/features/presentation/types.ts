@@ -60,6 +60,8 @@ export interface VideoPlaybackState {
   isMuted: boolean;
   playbackRate: number; // 0.5 to 2.0
   isLooping: boolean;
+  videoError?: boolean;
+  videoErrorMessage?: string;
 }
 
 export type StartupDisplayMode = 'black' | 'logo';
@@ -80,5 +82,6 @@ export interface PresentationState {
   backgroundThemes: BackgroundTheme[];
   activeBackgroundId: string;
   videoPlayback: VideoPlaybackState;
+  isProjectorActive?: boolean;
 }
 
