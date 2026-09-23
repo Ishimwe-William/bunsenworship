@@ -470,13 +470,11 @@ export const presentationSlice = createSlice({
     addRundownItem: (state, action: PayloadAction<Omit<RundownItem, 'id'>>) => {
       const newItem: RundownItem = {
         ...action.payload,
-        id: `rd-${Date.now()}`,
+        id: `rd-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       };
       state.rundown.push(newItem);
-      if (!state.selectedRundownId || state.rundown.length === 1) {
-        state.selectedRundownId = newItem.id;
-        state.previewSlideId = newItem.slides[0]?.id || null;
-      }
+      state.selectedRundownId = newItem.id;
+      state.previewSlideId = newItem.slides[0]?.id || null;
     },
     reorderRundown: (
       state,

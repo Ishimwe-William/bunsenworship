@@ -77,6 +77,7 @@ export const enTranslations: TranslationDictionary = {
     filterSongs: 'Songs',
     addToRundown: 'Add to Rundown',
     inRundown: 'In Rundown',
+    viewInLiveShow: 'View in Live Show →',
     setBackground: 'Set as Background',
     slidesCount: 'Slides',
     staticImage: 'Static',

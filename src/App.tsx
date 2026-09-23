@@ -1,7 +1,13 @@
-import React from 'react';
-import { useAppSelector } from './store/hooks';
+import React, { useEffect, useRef } from 'react';
+import { useAppDispatch, useAppSelector } from './store/hooks';
 import { selectActiveTab, NavTabId } from './store/features/navigation';
 import { selectIsAuthenticated } from './store/features/auth';
+import {
+  selectRundown,
+  setLoadedRundown,
+  DEFAULT_RUNDOWN,
+} from './store/features/presentation';
+import { bunsenDb } from './db';
 import { Sidebar } from './components/sidebar';
 import { ThemeToggle } from './components/theme';
 import { LanguageToggle, useLanguage } from './components/language';
@@ -29,9 +35,65 @@ export const App: React.FC = () => {
     return <ProjectorWindowView />;
   }
 
+  const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const activeTab = useAppSelector(selectActiveTab);
+  const rundown = useAppSelector(selectRundown);
   const { t } = useLanguage();
+
+  // 1. Initial hydration: Load saved rundown from DB once on application boot
+  const hasHydratedRef = useRef(false);
+  useEffect(() => {
+    if (hasHydratedRef.current) return;
+    hasHydratedRef.current = true;
+
+    bunsenDb
+      .getCurrentService()
+      .then((savedService) => {
+        if (savedService && savedService.items && savedService.items.length > 0) {
+          dispatch(setLoadedRundown(savedService.items));
+        } else {
+          bunsenDb
+            .saveService({
+              id: 'service-current',
+              title: 'Sunday Morning Worship',
+              date: new Date().toISOString().split('T')[0],
+              isCurrent: true,
+              items: DEFAULT_RUNDOWN,
+              createdAt: 1710000000000,
+              updatedAt: Date.now(),
+            })
+            .catch((err) => console.warn('Failed to seed service in DB:', err));
+        }
+      })
+      .catch((err) => {
+        console.warn('Initial rundown hydration from DB failed:', err);
+      });
+  }, [dispatch]);
+
+  // 2. Central auto-save: Persist rundown changes to IndexedDB
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      bunsenDb
+        .saveService({
+          id: 'service-current',
+          title: 'Sunday Morning Worship',
+          date: new Date().toISOString().split('T')[0],
+          isCurrent: true,
+          items: rundown,
+          createdAt: 1710000000000,
+          updatedAt: Date.now(),
+        })
+        .catch((err) => console.error('Failed to auto-save rundown to DB:', err));
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [rundown]);
 
   if (!isAuthenticated) {
     return <AuthContainer />;

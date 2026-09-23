@@ -37,85 +37,7 @@ export const ServiceRundown: React.FC = () => {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [dropPosition, setDropPosition] = useState<'above' | 'below' | null>(null);
 
-  // 1. Hydrate rundown from local DB on startup
-  useEffect(() => {
-    let isMounted = true;
-    console.log('Attempting to load service from DB...');
-    bunsenDb
-      .getCurrentService()
-      .then((savedService) => {
-        if (!isMounted) return;
-        if (savedService && savedService.items && savedService.items.length > 0) {
-          // Check if it's the old seed without any video item
-          const hasVideoItem = savedService.items.some(
-            (item) =>
-              item.type === 'VIDEO' ||
-              item.slides.some((s) => s.videoType && s.videoType !== 'none')
-          );
-          if (!hasVideoItem && savedService.items.length <= 2) {
-            console.log('Upgrading old rundown seed with video items');
-            dispatch(setLoadedRundown(DEFAULT_RUNDOWN));
-            bunsenDb.saveService({
-              ...savedService,
-              items: DEFAULT_RUNDOWN,
-              updatedAt: Date.now(),
-            }).catch(console.error);
-          } else {
-            console.log('Loaded saved service from DB:', savedService.items.length, 'items');
-            dispatch(setLoadedRundown(savedService.items));
-          }
-        } else {
-          console.log('No saved service found, loading default rundown with video items');
-          dispatch(setLoadedRundown(DEFAULT_RUNDOWN));
-          bunsenDb.saveService({
-            id: 'service-current',
-            title: 'Sunday Morning Worship',
-            date: new Date().toISOString().split('T')[0],
-            isCurrent: true,
-            items: DEFAULT_RUNDOWN,
-            createdAt: 1710000000000,
-            updatedAt: Date.now(),
-          }).catch(console.error);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load service from DB:', err);
-        dispatch(setLoadedRundown(DEFAULT_RUNDOWN));
-      });
 
-    return () => {
-      isMounted = false;
-    };
-  }, [dispatch]);
-
-  // 2. Automatically persist rundown changes to local DB (debounced)
-  const isInitialMount = useRef(true);
-  
-  useEffect(() => {
-    // Skip saving during initial load
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      console.log('Auto-saving service to DB:', rundown.length, 'items');
-      bunsenDb
-        .saveService({
-          id: 'service-current',
-          title: 'Sunday Morning Worship',
-          date: new Date().toISOString().split('T')[0],
-          isCurrent: true,
-          items: rundown,
-          createdAt: 1710000000000,
-          updatedAt: Date.now(),
-        })
-        .then(() => console.log('Service saved successfully'))
-        .catch((err) => console.error('Auto-save to local DB failed:', err));
-    }, 700);
-
-    return () => clearTimeout(timer);
-  }, [rundown]);
 
   // Keyboard shortcuts for rundown navigation
   useEffect(() => {
@@ -230,29 +152,6 @@ export const ServiceRundown: React.FC = () => {
     }
 
     dispatch(addRundownItem(newItem));
-
-    // Also persist immediately to DB
-    bunsenDb
-      .getCurrentService()
-      .then((existing) => {
-        const fullItem: RundownItem = {
-          ...newItem,
-          id: `rd-${Date.now()}`,
-        };
-        const updatedItems = [...(existing?.items || []), fullItem];
-        bunsenDb
-          .saveService({
-            id: 'service-current',
-            title: existing?.title || 'Sunday Morning Worship',
-            date: existing?.date || new Date().toISOString().split('T')[0],
-            isCurrent: true,
-            items: updatedItems,
-            createdAt: existing?.createdAt || 1710000000000,
-            updatedAt: Date.now(),
-          })
-          .catch(console.error);
-      })
-      .catch(console.error);
 
     setNewTitle('');
     setNewSubtitle('');

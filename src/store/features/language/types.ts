@@ -154,6 +154,7 @@ export interface MediaLibraryTranslations {
   filterSongs: string;
   addToRundown: string;
   inRundown: string;
+  viewInLiveShow: string;
   setBackground: string;
   slidesCount: string;
   staticImage: string;

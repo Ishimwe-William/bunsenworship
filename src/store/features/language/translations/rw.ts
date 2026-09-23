@@ -77,6 +77,7 @@ export const rwTranslations: TranslationDictionary = {
     filterSongs: "Indirimbo",
     addToRundown: "Shyira muri Gahunda",
     inRundown: "Muri Gahunda",
+    viewInLiveShow: "Kureba muri Live Show →",
     setBackground: "Koresha nk'Ishusho y'Inyuma",
     slidesCount: "Slide",
     staticImage: "Ifoto Idahinduka",

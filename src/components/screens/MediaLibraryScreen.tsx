@@ -5,6 +5,7 @@ import {
   addCustomBackgroundTheme,
   RundownItem,
 } from '../../store/features/presentation';
+import { setActiveTab } from '../../store/features/navigation';
 import {
   bunsenDb,
   SongRecord,
@@ -58,7 +59,11 @@ export const MediaLibraryScreen: React.FC = () => {
   const [selectedSource, setSelectedSource] = useState<MediaSourceCategory>('ALL');
   const [activeFilter, setActiveFilter] = useState<FormatFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<{
+    text: string;
+    type: 'success' | 'error';
+    action?: { label: string; onClick: () => void };
+  } | null>(null);
   const [addedItemIds, setAddedItemIds] = useState<Record<string, boolean>>({});
 
   // Loaded database data
@@ -158,11 +163,15 @@ export const MediaLibraryScreen: React.FC = () => {
     loadDatabaseRecords();
   }, []);
 
-  const showFeedback = (text: string, type: 'success' | 'error' = 'success') => {
-    setFeedbackMessage({ text, type });
+  const showFeedback = (
+    text: string,
+    type: 'success' | 'error' = 'success',
+    action?: { label: string; onClick: () => void }
+  ) => {
+    setFeedbackMessage({ text, type, action });
     setTimeout(() => {
       setFeedbackMessage(null);
-    }, 3500);
+    }, 4500);
   };
 
   const markAddedFeedback = (id: string) => {
@@ -332,19 +341,29 @@ export const MediaLibraryScreen: React.FC = () => {
     let itemToCreate: Omit<RundownItem, 'id'>;
 
     if (asset.format === 'SONG') {
-      const matchedSong = songs.find((s) => `song-${s.id}` === asset.id);
+      const cleanId = asset.id.replace('song-', '');
+      const matchedSong = songs.find(
+        (s) =>
+          s.id === asset.id ||
+          s.id === cleanId ||
+          `song-${s.id}` === asset.id ||
+          s.title.toLowerCase().trim() === asset.title.toLowerCase().trim()
+      );
       itemToCreate = {
         title: asset.title,
-        subtitle: `${asset.resolution} • ${asset.durationOrSlides}`,
+        subtitle: `${asset.resolution || 'Lyrics'} • ${asset.durationOrSlides || 'Hymn'}`,
         time: '09:15',
         type: 'SONG',
-        slides: matchedSong?.slides || [
-          {
-            id: `s-${Date.now()}-1`,
-            section: 'Verse 1',
-            lines: [asset.title, 'Worship Lyric line 1'],
-          },
-        ],
+        slides:
+          matchedSong && matchedSong.slides && matchedSong.slides.length > 0
+            ? matchedSong.slides
+            : [
+                {
+                  id: `s-${Date.now()}-1`,
+                  section: 'Verse 1',
+                  lines: [asset.title, 'Worship Lyric line 1'],
+                },
+              ],
       };
     } else if (asset.format === 'PPTX') {
       const count = asset.slidesCount || 12;
@@ -421,31 +440,15 @@ export const MediaLibraryScreen: React.FC = () => {
 
     dispatch(addRundownItem(itemToCreate));
 
-    // Save immediately to DB so ServiceRundown finds it on navigation
-    bunsenDb
-      .getCurrentService()
-      .then((service) => {
-        const fullItem: RundownItem = {
-          ...itemToCreate,
-          id: `rd-media-${Date.now()}`,
-        };
-        const updatedItems = [...(service?.items || []), fullItem];
-        bunsenDb
-          .saveService({
-            id: 'service-current',
-            title: service?.title || 'Sunday Morning Worship',
-            date: service?.date || new Date().toISOString().split('T')[0],
-            isCurrent: true,
-            items: updatedItems,
-            createdAt: service?.createdAt || 1710000000000,
-            updatedAt: Date.now(),
-          })
-          .catch((err) => console.error('Failed to save service from media library:', err));
-      })
-      .catch((err) => console.error('Failed to get service from DB:', err));
-
     markAddedFeedback(asset.id);
-    showFeedback(`"${asset.title}" added to service rundown!`);
+    showFeedback(
+      `"${asset.title}" added to service rundown!`,
+      'success',
+      {
+        label: t.mediaLibrary.viewInLiveShow || 'View in Live Show →',
+        onClick: () => dispatch(setActiveTab('live-show')),
+      }
+    );
   };
 
   // Action: Set as active live presentation background
@@ -884,13 +887,35 @@ export const MediaLibraryScreen: React.FC = () => {
             <CheckIcon size={16} />
             <span>{feedbackMessage.text}</span>
           </div>
-          <button
-            type="button"
-            className="medialib-filter-link"
-            onClick={() => setFeedbackMessage(null)}
-          >
-            &times;
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {feedbackMessage.action && (
+              <button
+                type="button"
+                className="medialib-banner-action-btn"
+                onClick={feedbackMessage.action.onClick}
+                style={{
+                  background: 'rgba(56, 189, 248, 0.2)',
+                  border: '1px solid rgba(56, 189, 248, 0.5)',
+                  color: '#38bdf8',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {feedbackMessage.action.label}
+              </button>
+            )}
+            <button
+              type="button"
+              className="medialib-filter-link"
+              onClick={() => setFeedbackMessage(null)}
+            >
+              &times;
+            </button>
+          </div>
         </div>
       )}
 
@@ -1135,6 +1160,15 @@ export const MediaLibraryScreen: React.FC = () => {
                           {item.title}
                         </h4>
                         <div className="medialib-card-quick-actions">
+                          <button
+                            type="button"
+                            className={`medialib-card-quick-btn ${isAdded ? 'is-added' : ''}`}
+                            onClick={() => handleAddToRundown(item)}
+                            title={isAdded ? t.mediaLibrary.inRundown : t.mediaLibrary.addToRundown}
+                            style={isAdded ? { color: '#22c55e' } : undefined}
+                          >
+                            {isAdded ? <CheckIcon size={13} /> : <PlusIcon size={13} />}
+                          </button>
                           <button
                             type="button"
                             className="medialib-card-quick-btn"

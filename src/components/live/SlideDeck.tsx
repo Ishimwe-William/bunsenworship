@@ -28,29 +28,7 @@ export const SlideDeck: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showAddSlide, setShowAddSlide] = useState(false);
 
-  // Auto-save slide changes to DB
-  const isInitialMount = useRef(true);
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
 
-    const timer = setTimeout(() => {
-      console.log('Auto-saving rundown after slide changes');
-      bunsenDb.saveService({
-        id: 'service-current',
-        title: 'Sunday Morning Worship',
-        date: new Date().toISOString().split('T')[0],
-        isCurrent: true,
-        items: rundown,
-        createdAt: 1710000000000,
-        updatedAt: Date.now(),
-      }).catch((err) => console.error('Auto-save after slide changes failed:', err));
-    }, 700);
-
-    return () => clearTimeout(timer);
-  }, [rundown]);
 
   // Drag and drop state for slides
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);

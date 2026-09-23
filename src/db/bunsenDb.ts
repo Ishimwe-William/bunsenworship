@@ -133,17 +133,17 @@ class BunsenDatabase {
     return new Promise((resolve, reject) => {
       const tx = db.transaction('services', 'readonly');
       const store = tx.objectStore('services');
-      const index = store.index('isCurrent');
-      const req = index.get(IDBKeyRange.only(true));
+      const req = store.get('service-current');
       req.onsuccess = () => {
         if (req.result) {
           resolve(req.result);
         } else {
-          // Fallback to first available or seed service
+          // Fallback to query all services
           const allReq = store.getAll();
           allReq.onsuccess = () => {
             const list = allReq.result || [];
-            resolve(list[0] || SEED_SERVICE);
+            const current = list.find((s) => s.isCurrent) || list[0] || null;
+            resolve(current);
           };
           allReq.onerror = () => reject(allReq.error);
         }
