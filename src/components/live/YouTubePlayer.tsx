@@ -1,8 +1,40 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+interface YTPlayerInstance {
+  playVideo?: () => void;
+  pauseVideo?: () => void;
+  seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
+  getDuration?: () => number;
+  getCurrentTime?: () => number;
+  getPlayerState?: () => number;
+  setVolume?: (volume: number) => void;
+  mute?: () => void;
+  unMute?: () => void;
+  unloadModule?: (moduleName: string) => void;
+  getIframe?: () => HTMLIFrameElement;
+  destroy?: () => void;
+}
+
+interface YTEvent {
+  target: YTPlayerInstance;
+  data?: number;
+}
+
+interface YTNamespace {
+  Player: new (element: HTMLElement | string, options: Record<string, unknown>) => YTPlayerInstance;
+  PlayerState: {
+    UNSTARTED: number;
+    ENDED: number;
+    PLAYING: number;
+    PAUSED: number;
+    BUFFERING: number;
+    CUED: number;
+  };
+}
+
 declare global {
   interface Window {
-    YT?: any;
+    YT?: YTNamespace;
     onYouTubeIframeAPIReady?: () => void;
   }
 }
@@ -92,7 +124,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mountSlotRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<YTPlayerInstance | null>(null);
   const isReadyRef = useRef<boolean>(false);
   const timerRef = useRef<number | null>(null);
   const lastReportedTimeRef = useRef<number>(0);
@@ -145,7 +177,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           start: startTime > 0 ? Math.floor(startTime) : undefined,
         },
         events: {
-          onReady: (event: any) => {
+          onReady: (event: YTEvent) => {
             isReadyRef.current = true;
             const p = event.target;
             // Disable captions/subtitles
@@ -180,9 +212,9 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
               p.playVideo?.();
             }
           },
-          onStateChange: (event: any) => {
+          onStateChange: (event: YTEvent) => {
             const state = event.data;
-            if (state === window.YT.PlayerState.PLAYING) {
+            if (state === window.YT?.PlayerState?.PLAYING) {
               setIsActuallyPlaying(true);
               if (typeof event.target.unloadModule === 'function') {
                 try {
@@ -197,13 +229,13 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
               if (dur && dur > 0 && onDurationChange) {
                 onDurationChange(dur);
               }
-            } else if (state === window.YT.PlayerState.PAUSED) {
+            } else if (state === window.YT?.PlayerState?.PAUSED) {
               if (isPlaying && !isBlackout && !isLogoActive) {
                 event.target.playVideo?.();
               } else {
                 onPause?.();
               }
-            } else if (state === window.YT.PlayerState.ENDED) {
+            } else if (state === window.YT?.PlayerState?.ENDED) {
               if (loop) {
                 event.target.seekTo?.(0, true);
                 event.target.playVideo?.();
@@ -213,9 +245,11 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
               }
             }
           },
-          onError: (event: any) => {
+          onError: (event: YTEvent) => {
             console.warn('YouTube Player error code:', event.data);
-            onError?.(event.data);
+            if (typeof event.data === 'number') {
+              onError?.(event.data);
+            }
           },
         },
       });

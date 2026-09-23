@@ -374,7 +374,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
                 }}
                 onPause={() => {
                   if (isLive && videoPlayback.isPlaying && !isBlackout && !isLogoActive) {
-                    videoRef.current?.play().catch(() => {});
+                    videoRef.current?.play().catch((err) => console.log('Resume deferred:', err));
                   }
                 }}
               />

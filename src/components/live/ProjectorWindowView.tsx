@@ -345,7 +345,7 @@ export const ProjectorWindowView: React.FC = () => {
                 }}
                 onPause={() => {
                   if (state.videoPlayback?.isPlaying && !state.isBlackout && !state.isLogoActive) {
-                    videoRef.current?.play().catch(() => {});
+                    videoRef.current?.play().catch((err) => console.log('Resume deferred:', err));
                   }
                 }}
               />

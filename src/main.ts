@@ -276,10 +276,17 @@ ipcMain.handle('video:resolve-path', async (_event, filename: string) => {
 
   const baseName = path.basename(clean);
   const searchDirs: string[] = [];
-  try { searchDirs.push(app.getPath('videos')); } catch {}
-  try { searchDirs.push(app.getPath('downloads')); } catch {}
-  try { searchDirs.push(app.getPath('desktop')); } catch {}
-  try { searchDirs.push(app.getPath('documents')); } catch {}
+  const addSearchDir = (name: 'videos' | 'downloads' | 'desktop' | 'documents') => {
+    try {
+      searchDirs.push(app.getPath(name));
+    } catch (err) {
+      console.debug('Path unavailable:', name, err);
+    }
+  };
+  addSearchDir('videos');
+  addSearchDir('downloads');
+  addSearchDir('desktop');
+  addSearchDir('documents');
   searchDirs.push(process.cwd());
 
   for (const dir of searchDirs) {
@@ -319,10 +326,17 @@ app.on('ready', () => {
       if (!fs.existsSync(resolvedPath)) {
         const baseName = path.basename(resolvedPath);
         const searchDirs: string[] = [];
-        try { searchDirs.push(app.getPath('videos')); } catch {}
-        try { searchDirs.push(app.getPath('downloads')); } catch {}
-        try { searchDirs.push(app.getPath('desktop')); } catch {}
-        try { searchDirs.push(app.getPath('documents')); } catch {}
+        const addSearchDir = (name: 'videos' | 'downloads' | 'desktop' | 'documents') => {
+          try {
+            searchDirs.push(app.getPath(name));
+          } catch (err) {
+            console.debug('Path unavailable:', name, err);
+          }
+        };
+        addSearchDir('videos');
+        addSearchDir('downloads');
+        addSearchDir('desktop');
+        addSearchDir('documents');
         searchDirs.push(process.cwd());
 
         for (const dir of searchDirs) {

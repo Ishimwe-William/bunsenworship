@@ -5,7 +5,6 @@ import {
   selectPreviewSlideId,
   selectLiveSlideId,
   selectLiveRundownId,
-  selectRundown,
   selectVideoPlayback,
   selectIsBlackout,
   selectIsLogoActive,
@@ -37,7 +36,6 @@ import {
   generateVideoThumbnail,
   getFileNameFromPath,
 } from '../../utils/videoHelpers';
-import { bunsenDb } from '../../db';
 
 export const SlideDeck: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -45,7 +43,6 @@ export const SlideDeck: React.FC = () => {
   const previewSlideId = useAppSelector(selectPreviewSlideId);
   const liveSlideId = useAppSelector(selectLiveSlideId);
   const liveRundownId = useAppSelector(selectLiveRundownId);
-  const rundown = useAppSelector(selectRundown);
   const videoPlayback = useAppSelector(selectVideoPlayback);
   const isBlackout = useAppSelector(selectIsBlackout);
   const isLogoActive = useAppSelector(selectIsLogoActive);

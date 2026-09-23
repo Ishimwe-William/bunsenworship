@@ -100,11 +100,11 @@ export const ProgramPreviewMonitor: React.FC = () => {
   // Respond to projector window handshake requests & track connection status
   useEffect(() => {
     const channel = new BroadcastChannel('bunsenworship_projector_channel');
-    let disconnectTimer: any = null;
+    let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     const markProjectorActive = () => {
       dispatch(setProjectorActive(true));
-      clearTimeout(disconnectTimer);
+      if (disconnectTimer) clearTimeout(disconnectTimer);
       disconnectTimer = setTimeout(() => {
         dispatch(setProjectorActive(false));
       }, 5000);
@@ -120,7 +120,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
       ) {
         markProjectorActive();
       } else if (event.data?.type === 'PROJECTOR_DISCONNECTED') {
-        clearTimeout(disconnectTimer);
+        if (disconnectTimer) clearTimeout(disconnectTimer);
         dispatch(setProjectorActive(false));
       } else if (event.data?.type === 'PROJECTOR_VIDEO_ERROR') {
         dispatch(setVideoError(true));
@@ -135,7 +135,9 @@ export const ProgramPreviewMonitor: React.FC = () => {
         .then((isOpen) => {
           if (isOpen) markProjectorActive();
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('Could not query projector status:', err);
+        });
     }
     if (window.electronAPI?.onProjectorStatusChanged) {
       unsubscribeIpc = window.electronAPI.onProjectorStatusChanged((isOpen) => {

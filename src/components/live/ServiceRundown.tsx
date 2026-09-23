@@ -8,13 +8,10 @@ import {
   addRundownItem,
   deleteRundownItem,
   reorderRundown,
-  setLoadedRundown,
   RundownItemType,
-  DEFAULT_RUNDOWN,
 } from '../../store/features/presentation';
 import { RundownItem } from '../../store/features/presentation/types';
 import { PlusIcon, GripVerticalIcon, ClockIcon, TrashIcon, VideoIcon, YoutubeIcon } from '../common/Icons';
-import { bunsenDb } from '../../db';
 import { createNewRundownItem } from '../../utils/liveShowHelpers';
 import { normalizeVideoSource, generateVideoThumbnail } from '../../utils/videoHelpers';
 

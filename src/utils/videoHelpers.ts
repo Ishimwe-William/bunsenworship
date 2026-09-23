@@ -227,8 +227,9 @@ const thumbnailCache = new Map<string, string>();
  */
 export function generateVideoThumbnail(title: string): string {
   const safeTitle = (title || 'Video Media').trim();
-  if (thumbnailCache.has(safeTitle)) {
-    return thumbnailCache.get(safeTitle)!;
+  const cached = thumbnailCache.get(safeTitle);
+  if (cached !== undefined) {
+    return cached;
   }
 
   const escapedTitle = safeTitle
