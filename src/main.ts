@@ -1,7 +1,7 @@
 // Suppress dev-only security warnings in console (e.g. unsafe-eval CSP required for YouTube embed)
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 
-import { app, BrowserWindow, Menu, nativeImage, Tray, ipcMain, dialog, protocol, net, powerSaveBlocker } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, Tray, ipcMain, dialog, protocol, net, powerSaveBlocker, session } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -378,6 +378,65 @@ app.on('ready', () => {
       return new Response('File not accessible', { status: 404 });
     }
   });
+
+  // Configure clean Chrome User-Agent without Electron token so Google/YouTube does not block embedded playback
+  const defaultUa = session.defaultSession.getUserAgent();
+  const cleanUa = defaultUa.replace(/Electron\/[^\s]+\s*/g, '');
+  session.defaultSession.setUserAgent(cleanUa);
+  app.userAgentFallback = cleanUa;
+
+  // Intercept requests to YouTube and Google Video to provide clean User-Agent, Referer, and Origin
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    {
+      urls: [
+        '*://*.youtube.com/*',
+        '*://*.youtube-nocookie.com/*',
+        '*://*.googlevideo.com/*',
+        '*://*.ytimg.com/*',
+      ],
+    },
+    (details, callback) => {
+      const requestHeaders = { ...details.requestHeaders };
+
+      // Set clean User-Agent
+      requestHeaders['User-Agent'] = cleanUa;
+
+      // Provide standard Referer & Origin to avoid Error 150/153 and localhost/file restrictions
+      requestHeaders['Referer'] = 'https://www.youtube.com/';
+      requestHeaders['Origin'] = 'https://www.youtube.com';
+
+      callback({ cancel: false, requestHeaders });
+    }
+  );
+
+  // Strip x-frame-options and frame-ancestors CSP so embedded YouTube videos can play in packaged and dev environments
+  session.defaultSession.webRequest.onHeadersReceived(
+    {
+      urls: [
+        '*://*.youtube.com/*',
+        '*://*.youtube-nocookie.com/*',
+        '*://*.googlevideo.com/*',
+        '*://*.ytimg.com/*',
+      ],
+    },
+    (details, callback) => {
+      const responseHeaders = { ...details.responseHeaders };
+      delete responseHeaders['x-frame-options'];
+      delete responseHeaders['X-Frame-Options'];
+
+      const stripFrameAncestors = (csp: string) =>
+        csp.replace(/frame-ancestors [^;]+;?/gi, '');
+
+      if (responseHeaders['content-security-policy']) {
+        responseHeaders['content-security-policy'] = responseHeaders['content-security-policy'].map(stripFrameAncestors);
+      }
+      if (responseHeaders['Content-Security-Policy']) {
+        responseHeaders['Content-Security-Policy'] = responseHeaders['Content-Security-Policy'].map(stripFrameAncestors);
+      }
+
+      callback({ cancel: false, responseHeaders });
+    }
+  );
 
   createWindow();
   powerSaveBlocker.start('prevent-app-suspension');

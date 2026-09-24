@@ -73,11 +73,7 @@ export const convertImageToAsset = (img: ImageMediaRecord): ProMediaAsset => {
   };
 };
 
-import { parseYouTubeId } from './videoHelpers';
-
-export const extractYouTubeId = (url: string): string | null => {
-  return parseYouTubeId(url);
-};
+export { extractYouTubeId } from './videoHelpers';
 
 export const generateAssetId = (type: string): string => {
   return `asset-${type}-${Date.now()}`;

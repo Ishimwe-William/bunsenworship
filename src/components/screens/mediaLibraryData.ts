@@ -91,48 +91,7 @@ export const PRO_MEDIA_ASSETS: ProMediaAsset[] = [
     durationOrSlides: '1:00',
     sourceCategory: 'VIDEO',
     youtubeUrl: 'https://www.youtube.com/watch?v=nQWFzMvCfLE',
-    thumbnailUrl: svgToDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
-        <defs>
-          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#38bdf8"/>
-            <stop offset="35%" stop-color="#7dd3fc"/>
-            <stop offset="65%" stop-color="#fed7aa"/>
-            <stop offset="85%" stop-color="#fdba74"/>
-            <stop offset="100%" stop-color="#fef08a"/>
-          </linearGradient>
-          <radialGradient id="sun" cx="0.75" cy="0.45" r="0.35">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
-            <stop offset="30%" stop-color="#fef08a" stop-opacity="0.9"/>
-            <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.4"/>
-            <stop offset="100%" stop-color="#fb923c" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="960" height="540" fill="url(#sky)"/>
-        <!-- Radiant Sun -->
-        <circle cx="720" cy="220" r="140" fill="url(#sun)"/>
-        <!-- Fluffy stylized morning clouds -->
-        <path d="M80,120 Q140,80 200,110 T320,100 T420,130 L420,170 L80,170 Z" fill="#ffffff" opacity="0.6"/>
-        <path d="M460,90 Q520,60 580,85 T680,80 T760,105 L760,140 L460,140 Z" fill="#ffffff" opacity="0.55"/>
-        <!-- Distant Mountains -->
-        <path d="M350,300 L490,230 L620,290 L740,210 L890,300 L960,300 L960,540 L350,540 Z" fill="#bbf7d0" opacity="0.5"/>
-        <path d="M220,330 L390,260 L540,320 L710,240 L880,330 L960,330 L960,540 L220,540 Z" fill="#86efac" opacity="0.65"/>
-        <!-- Midground rolling green hills -->
-        <path d="M0,350 Q280,280 560,360 T960,330 L960,540 L0,540 Z" fill="#4ade80"/>
-        <path d="M0,400 Q340,330 680,410 T960,380 L960,540 L0,540 Z" fill="#22c55e"/>
-        <!-- Winding river reflecting sky -->
-        <path d="M720,280 C680,310 630,340 600,370 C560,410 500,430 460,470 C410,510 360,520 320,540 L440,540 C480,515 540,490 580,450 C630,410 680,370 710,340 C730,315 745,295 750,280 Z" fill="#38bdf8"/>
-        <!-- Foreground rolling pastures -->
-        <path d="M0,450 Q300,390 600,470 L600,540 L0,540 Z" fill="#15803d"/>
-        <path d="M500,470 Q750,420 960,460 L960,540 L500,540 Z" fill="#166534"/>
-        <!-- Hillside trees -->
-        <circle cx="80" cy="430" r="16" fill="#14532d"/>
-        <circle cx="105" cy="440" r="14" fill="#14532d"/>
-        <circle cx="130" cy="435" r="18" fill="#14532d"/>
-        <circle cx="860" cy="445" r="20" fill="#14532d"/>
-        <circle cx="890" cy="455" r="18" fill="#14532d"/>
-      </svg>
-    `),
+    thumbnailUrl: 'https://img.youtube.com/vi/nQWFzMvCfLE/hqdefault.jpg',
     tags: ['Easter', 'Sunrise', 'Morning Worship'],
   },
   {

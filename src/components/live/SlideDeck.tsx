@@ -35,6 +35,8 @@ import {
   isVideoFile,
   generateVideoThumbnail,
   getFileNameFromPath,
+  extractYouTubeId,
+  getSlideThumbnail,
 } from '../../utils/videoHelpers';
 
 export const SlideDeck: React.FC = () => {
@@ -82,9 +84,7 @@ export const SlideDeck: React.FC = () => {
 
     for (const slide of currentItem.slides) {
       const rawPath = slide.videoPath || slide.videoUrl;
-      const isYT =
-        slide.videoType === 'youtube' ||
-        (slide.youtubeUrl && !slide.videoPath && !slide.videoUrl);
+      const isYT = Boolean(extractYouTubeId(slide));
       if (rawPath && !isYT && isBareFilename(rawPath)) {
         window.electronAPI
           .resolveVideoPath(rawPath)
@@ -283,21 +283,19 @@ export const SlideDeck: React.FC = () => {
           const isDragging = draggedIndex === index;
           const isOver = dragOverIndex === index;
 
+          const youtubeVideoId = extractYouTubeId(slide);
+          const isYouTube = Boolean(youtubeVideoId);
           const hasVideo = Boolean(
-            (slide.videoType === 'local' ||
-              slide.videoType === 'youtube' ||
+            (isYouTube ||
+              slide.videoType === 'local' ||
               slide.videoUrl ||
-              slide.videoPath ||
-              slide.youtubeUrl) &&
+              slide.videoPath) &&
               slide.videoType !== 'none'
-          );
-          const isYouTube = Boolean(
-            slide.videoType === 'youtube' ||
-              (slide.youtubeUrl && !slide.videoPath && !slide.videoUrl)
           );
           const videoTitleText =
             slide.videoTitle ||
-            (isYouTube ? 'YouTube Stream' : slide.videoUrl ? 'Video Playback' : '');
+            (isYouTube ? 'YouTube Stream' : slide.videoUrl || slide.videoPath ? 'Video Playback' : '');
+          const slideThumb = getSlideThumbnail(slide);
 
           return (
             <div
@@ -501,15 +499,15 @@ export const SlideDeck: React.FC = () => {
               )}
 
               {/* Media Thumbnail (Image or Video preview) */}
-              {(slide.imageUrl || hasVideo) && (
+              {(slideThumb || hasVideo) && (
                 <div
                   className="slide-thumbnail-wrap"
                   style={{ position: 'relative', overflow: 'hidden' }}
                 >
                   <img
                     src={
-                      slide.imageUrl && !isVideoFile(slide.imageUrl) && !brokenThumbs[slide.id]
-                        ? slide.imageUrl
+                      !brokenThumbs[slide.id] && slideThumb
+                        ? slideThumb
                         : generateVideoThumbnail(
                             slide.videoTitle ||
                               slide.section ||
@@ -537,15 +535,15 @@ export const SlideDeck: React.FC = () => {
                           width: '28px',
                           height: '28px',
                           borderRadius: '50%',
-                          background: 'rgba(0, 0, 0, 0.65)',
-                          border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                          background: isYouTube ? 'rgba(239, 68, 68, 0.9)' : 'rgba(59, 130, 246, 0.9)',
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: '#ffffff',
                         }}
                       >
-                        <PlayIcon size={12} />
+                        {isYouTube ? <YoutubeIcon size={14} /> : <PlayIcon size={12} />}
                       </div>
                     </div>
                   )}

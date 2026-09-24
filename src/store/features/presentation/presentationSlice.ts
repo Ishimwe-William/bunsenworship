@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PresentationState, RundownItem, Slide, TransitionType, BackgroundTheme, StartupDisplayMode } from './types';
-import { isVideoFile } from '../../../utils/videoHelpers';
+import { isVideoFile, extractYouTubeId } from '../../../utils/videoHelpers';
 
 
 const defaultThemes = [
@@ -110,10 +110,13 @@ export const DEFAULT_RUNDOWN: RundownItem[] = [
         id: 's-yt-stream',
         section: 'YouTube Video',
         lines: [],
+        imageUrl: 'https://img.youtube.com/vi/nQWFzMvCfLE/hqdefault.jpg',
         videoType: 'youtube',
         youtubeUrl: 'https://www.youtube.com/watch?v=nQWFzMvCfLE',
+        videoUrl: 'https://www.youtube.com/watch?v=nQWFzMvCfLE',
         autoPlay: true,
         loop: false,
+        videoMuted: true,
         videoFit: 'contain',
         videoTitle: 'Hillsong Worship - What a Beautiful Name',
       },
@@ -254,11 +257,10 @@ export const presentationSlice = createSlice({
           const targetSlide = currentItem.slides.find((s) => s.id === state.previewSlideId);
           const isTargetVideo = Boolean(
             targetSlide &&
-              (targetSlide.videoType === 'local' ||
-                targetSlide.videoType === 'youtube' ||
+              (Boolean(extractYouTubeId(targetSlide)) ||
+                targetSlide.videoType === 'local' ||
                 targetSlide.videoUrl ||
-                targetSlide.videoPath ||
-                targetSlide.youtubeUrl) &&
+                targetSlide.videoPath) &&
               targetSlide.videoType !== 'none'
           );
 
@@ -303,11 +305,10 @@ export const presentationSlice = createSlice({
         const targetSlide = currentItem.slides.find((s) => s.id === action.payload.slideId);
         const isTargetVideo = Boolean(
           targetSlide &&
-            (targetSlide.videoType === 'local' ||
-              targetSlide.videoType === 'youtube' ||
+            (Boolean(extractYouTubeId(targetSlide)) ||
+              targetSlide.videoType === 'local' ||
               targetSlide.videoUrl ||
-              targetSlide.videoPath ||
-              targetSlide.youtubeUrl) &&
+              targetSlide.videoPath) &&
             targetSlide.videoType !== 'none'
         );
 

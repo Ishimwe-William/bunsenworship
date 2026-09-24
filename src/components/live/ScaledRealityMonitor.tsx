@@ -20,6 +20,8 @@ import {
   getFileNameFromPath,
   generateVideoThumbnail,
   parseYouTubeId,
+  extractYouTubeId,
+  getSlideThumbnail,
 } from '../../utils/videoHelpers';
 import { YouTubePlayer } from './YouTubePlayer';
 
@@ -80,30 +82,24 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
+  const youtubeVideoId = extractYouTubeId(slide);
+  const isYouTubeVideo = Boolean(youtubeVideoId);
   const hasVideo = Boolean(
     slide &&
-      (slide.videoType === 'local' ||
-        slide.videoType === 'youtube' ||
+      (isYouTubeVideo ||
+        slide.videoType === 'local' ||
         slide.videoUrl ||
-        slide.videoPath ||
-        slide.youtubeUrl) &&
+        slide.videoPath) &&
       slide.videoType !== 'none'
-  );
-
-  const isYouTubeVideo = Boolean(
-    slide &&
-      (slide.videoType === 'youtube' ||
-        (slide.youtubeUrl && !slide.videoPath && !slide.videoUrl))
   );
 
   const isLocalVideo = Boolean(
     hasVideo && !isYouTubeVideo && (slide?.videoPath || slide?.videoUrl)
   );
 
-  const localVideoSrc = normalizeVideoSource(slide?.videoPath || slide?.videoUrl || '');
-  const youtubeVideoId = isYouTubeVideo
-    ? parseYouTubeId(slide?.youtubeUrl || slide?.videoUrl || '')
-    : null;
+  const localVideoSrc = isLocalVideo
+    ? normalizeVideoSource(slide?.videoPath || slide?.videoUrl || '')
+    : '';
 
   // Auto-resolve bare filenames from local user folders
   useEffect(() => {
@@ -272,14 +268,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
   }
 
   // Compute reliable video poster thumbnail
-  const videoPoster =
-    slide?.imageUrl && !isVideoFile(slide.imageUrl)
-      ? slide.imageUrl
-      : generateVideoThumbnail(
-          slide?.videoTitle ||
-            slide?.section ||
-            getFileNameFromPath(slide?.videoPath || slide?.videoUrl || 'Video Media')
-        );
+  const videoPoster = getSlideThumbnail(slide);
 
   return (
     <div
@@ -384,7 +373,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
               <YouTubePlayer
                 videoId={youtubeVideoId}
                 poster={videoPoster}
-                isPlaying={videoPlayback.isPlaying}
+                isPlaying={isLive ? videoPlayback.isPlaying : false}
                 currentTime={videoPlayback.currentTime}
                 volume={videoPlayback.volume}
                 isMuted={shouldMuteOperatorAudio}
@@ -412,9 +401,11 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
                   }
                 }}
                 onError={(errCode) => {
-                  console.warn('YouTube Player error:', errCode);
-                  setLocalVideoError(true);
-                  if (isLive) dispatch(setVideoError(true));
+                  console.warn('YouTube Player error code:', errCode);
+                  if (errCode === 100 || errCode === 101 || errCode === 150) {
+                    setLocalVideoError(true);
+                    if (isLive) dispatch(setVideoError(true));
+                  }
                 }}
               />
             )}

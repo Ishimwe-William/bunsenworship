@@ -8,6 +8,7 @@ import {
   deleteSlide,
 } from '../../store/features/presentation';
 import { TrashIcon, PlusIcon, CheckIcon, VideoIcon, YoutubeIcon } from '../common/Icons';
+import { extractYouTubeId, getYouTubeThumbnailUrl } from '../../utils/videoHelpers';
 
 interface QuickEditModalProps {
   currentItem: RundownItem;
@@ -110,14 +111,43 @@ export const QuickEditModal: React.FC<QuickEditModalProps> = ({ currentItem, onC
   };
 
   const handleSaveVideoSettings = (slideId: string) => {
+    const isYt =
+      editVideoType === 'youtube' ||
+      Boolean(extractYouTubeId(editVideoUrl) || extractYouTubeId(editYoutubeUrl));
+    const ytId = extractYouTubeId(editVideoType === 'youtube' ? editYoutubeUrl : editVideoUrl);
+    const ytThumb = ytId ? getYouTubeThumbnailUrl(ytId) : undefined;
+
     const updated = slides.map((s) => {
       if (s.id === slideId) {
+        if (editVideoType === 'none') {
+          return {
+            ...s,
+            videoType: 'none' as const,
+            videoUrl: undefined,
+            videoPath: undefined,
+            youtubeUrl: undefined,
+          };
+        }
+        if (isYt) {
+          const ytUrl = editVideoType === 'youtube' ? editYoutubeUrl : editVideoUrl;
+          return {
+            ...s,
+            videoType: 'youtube' as const,
+            videoUrl: ytUrl,
+            youtubeUrl: ytUrl,
+            videoPath: undefined,
+            imageUrl: ytThumb || s.imageUrl,
+            loop: editLoop,
+            videoLoop: editLoop,
+            autoPlay: editAutoPlay,
+          };
+        }
         return {
           ...s,
-          videoType: editVideoType,
-          videoUrl: editVideoType === 'local' ? editVideoUrl : undefined,
-          videoPath: editVideoType === 'local' ? editVideoUrl : undefined,
-          youtubeUrl: editVideoType === 'youtube' ? editYoutubeUrl : undefined,
+          videoType: 'local' as const,
+          videoUrl: editVideoUrl,
+          videoPath: editVideoUrl,
+          youtubeUrl: undefined,
           loop: editLoop,
           videoLoop: editLoop,
           autoPlay: editAutoPlay,
@@ -280,7 +310,7 @@ export const QuickEditModal: React.FC<QuickEditModalProps> = ({ currentItem, onC
                     )}
 
                     {editVideoType === 'youtube' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                           YouTube URL or Video ID:
                         </label>
@@ -292,6 +322,38 @@ export const QuickEditModal: React.FC<QuickEditModalProps> = ({ currentItem, onC
                           className="auth-input"
                           style={{ fontSize: '0.75rem', padding: '6px' }}
                         />
+                        {extractYouTubeId(editYoutubeUrl) && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              background: 'var(--bg-subtle)',
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              marginTop: '2px',
+                            }}
+                          >
+                            <img
+                              src={getYouTubeThumbnailUrl(editYoutubeUrl)}
+                              alt="Thumbnail Preview"
+                              style={{
+                                width: '80px',
+                                height: '45px',
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                              }}
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--color-primary)', fontWeight: 600 }}>
+                                YouTube Video Detected
+                              </span>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                ID: {extractYouTubeId(editYoutubeUrl)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

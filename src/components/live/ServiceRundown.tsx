@@ -13,7 +13,13 @@ import {
 import { RundownItem } from '../../store/features/presentation/types';
 import { PlusIcon, GripVerticalIcon, ClockIcon, TrashIcon, VideoIcon, YoutubeIcon } from '../common/Icons';
 import { createNewRundownItem } from '../../utils/liveShowHelpers';
-import { normalizeVideoSource, generateVideoThumbnail } from '../../utils/videoHelpers';
+import {
+  normalizeVideoSource,
+  generateVideoThumbnail,
+  getYouTubeThumbnailUrl,
+  extractYouTubeId,
+  parseYouTubeId,
+} from '../../utils/videoHelpers';
 
 export const ServiceRundown: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -137,12 +143,15 @@ export const ServiceRundown: React.FC = () => {
     let newItem: Omit<RundownItem, 'id'>;
 
     if (newType === 'VIDEO') {
-      const isYt = newVideoSource === 'youtube';
-      const sampleUrl = isYt
+      const isYtSelected = newVideoSource === 'youtube';
+      const sampleUrl = isYtSelected
         ? 'https://www.youtube.com/watch?v=nQWFzMvCfLE'
         : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
       const rawUrl = newVideoUrl.trim() || sampleUrl;
+      const ytId = parseYouTubeId(rawUrl);
+      const isYt = isYtSelected || Boolean(ytId);
       const finalUrl = isYt ? rawUrl : normalizeVideoSource(rawUrl);
+      const ytThumb = isYt ? getYouTubeThumbnailUrl(rawUrl) : null;
 
       newItem = {
         title: newTitle.trim(),
@@ -154,7 +163,7 @@ export const ServiceRundown: React.FC = () => {
             id: `s-vid-${Date.now()}`,
             section: newTitle.trim() || (isYt ? 'YouTube Video' : 'Video Playback'),
             lines: [],
-            imageUrl: isYt ? undefined : generateVideoThumbnail(newTitle.trim()),
+            imageUrl: ytThumb || (isYt ? undefined : generateVideoThumbnail(newTitle.trim())),
             videoType: isYt ? 'youtube' : 'local',
             videoUrl: finalUrl,
             videoPath: finalUrl,
@@ -267,7 +276,7 @@ export const ServiceRundown: React.FC = () => {
           const hasVideoSlide = item.slides.some(
             (s) => (s.videoType && s.videoType !== 'none') || s.videoUrl || s.youtubeUrl
           );
-          const isYouTubeItem = item.slides.some((s) => s.videoType === 'youtube' || s.youtubeUrl);
+          const isYouTubeItem = item.slides.some((s) => Boolean(extractYouTubeId(s)));
 
           return (
             <div

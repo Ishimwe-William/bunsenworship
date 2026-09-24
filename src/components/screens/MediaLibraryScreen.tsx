@@ -19,7 +19,12 @@ import {
   PRO_MEDIA_ASSETS,
   ProMediaAsset,
 } from './mediaLibraryData';
-import { normalizeVideoSource, generateVideoThumbnail } from '../../utils/videoHelpers';
+import {
+  normalizeVideoSource,
+  generateVideoThumbnail,
+  getYouTubeThumbnailUrl,
+  extractYouTubeId,
+} from '../../utils/videoHelpers';
 import {
   SearchIcon,
   PlusIcon,
@@ -426,14 +431,18 @@ export const MediaLibraryScreen: React.FC = () => {
       };
     } else {
       // Video / Still image
+      const ytId = extractYouTubeId(asset);
+      const isYouTube = Boolean(ytId);
       const isVideoAsset =
+        isYouTube ||
         asset.format === 'MOV' ||
         asset.format === 'MP4' ||
         Boolean(asset.videoUrl || asset.filePath || asset.youtubeUrl);
-      const isYouTube = Boolean(asset.youtubeUrl);
       const resolvedVideoSrc = isYouTube
-        ? (asset.youtubeUrl || '')
+        ? (asset.youtubeUrl || asset.videoUrl || asset.filePath || '')
         : normalizeVideoSource(asset.videoUrl || asset.filePath || '');
+      const resolvedThumb =
+        asset.thumbnailUrl || (isYouTube ? getYouTubeThumbnailUrl(resolvedVideoSrc) : undefined);
 
       itemToCreate = {
         title: asset.title,
@@ -445,12 +454,12 @@ export const MediaLibraryScreen: React.FC = () => {
             id: `s-media-${Date.now()}`,
             section: asset.title,
             lines: [],
-            imageUrl: asset.thumbnailUrl,
+            imageUrl: resolvedThumb,
             imageFit: 'cover',
             videoType: isYouTube ? 'youtube' : isVideoAsset ? 'local' : 'none',
             videoUrl: resolvedVideoSrc,
             videoPath: resolvedVideoSrc,
-            youtubeUrl: asset.youtubeUrl,
+            youtubeUrl: isYouTube ? resolvedVideoSrc : undefined,
             autoPlay: true,
             loop: true,
             videoLoop: true,
@@ -676,10 +685,12 @@ export const MediaLibraryScreen: React.FC = () => {
       const rawPath = videoSourceType === 'file' ? (videoFilePath.trim() || videoDataUrl) : undefined;
       const normalizedPath = rawPath ? normalizeVideoSource(rawPath) : undefined;
 
+      const isYt = videoSourceType === 'youtube' || Boolean(extractYouTubeId(videoYoutubeUrl));
+      const ytThumb = isYt ? getYouTubeThumbnailUrl(videoYoutubeUrl.trim()) : null;
       const safeThumbnail =
         videoDataUrl && videoDataUrl.startsWith('data:image')
           ? videoDataUrl
-          : generateVideoThumbnail(videoTitle.trim());
+          : ytThumb || generateVideoThumbnail(videoTitle.trim());
 
       const newAsset: ProMediaAsset = {
         id: `asset-video-${Date.now()}`,
@@ -689,9 +700,9 @@ export const MediaLibraryScreen: React.FC = () => {
         durationOrSlides: videoDuration || '0:30',
         sourceCategory: videoCategory,
         thumbnailUrl: safeThumbnail,
-        filePath: normalizedPath,
-        videoUrl: normalizedPath,
-        youtubeUrl: videoSourceType === 'youtube' ? videoYoutubeUrl.trim() : undefined,
+        filePath: isYt ? videoYoutubeUrl.trim() : normalizedPath,
+        videoUrl: isYt ? videoYoutubeUrl.trim() : normalizedPath,
+        youtubeUrl: isYt ? videoYoutubeUrl.trim() : undefined,
       };
 
       const updated = [newAsset, ...customAssets];
@@ -1403,6 +1414,45 @@ export const MediaLibraryScreen: React.FC = () => {
                       value={videoYoutubeUrl}
                       onChange={(e) => setVideoYoutubeUrl(e.target.value)}
                     />
+                    {getYouTubeThumbnailUrl(videoYoutubeUrl) && (
+                      <div
+                        style={{
+                          marginTop: '8px',
+                          borderRadius: '6px',
+                          overflow: 'hidden',
+                          border: '1px solid var(--border-subtle)',
+                          position: 'relative',
+                        }}
+                      >
+                        <img
+                          src={getYouTubeThumbnailUrl(videoYoutubeUrl)!}
+                          alt="YouTube Preview"
+                          style={{
+                            width: '100%',
+                            height: '140px',
+                            objectFit: 'cover',
+                            display: 'block',
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '6px',
+                            left: '8px',
+                            background: 'rgba(0,0,0,0.75)',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.65rem',
+                            color: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <span style={{ color: '#ef4444' }}>●</span> YouTube Thumbnail Detected
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

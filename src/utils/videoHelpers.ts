@@ -16,8 +16,40 @@ export function parseYouTubeId(url?: string): string | null {
     return trimmed;
   }
 
+  // Handle URL parsing with URL object if possible
+  try {
+    const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
+    const host = parsed.hostname.toLowerCase();
+
+    if (host.includes('youtube.com') || host.includes('youtube-nocookie.com')) {
+      const v = parsed.searchParams.get('v');
+      if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) {
+        return v;
+      }
+      const pathParts = parsed.pathname.split('/').filter(Boolean);
+      const lastPart = pathParts[pathParts.length - 1];
+      if (
+        (pathParts.includes('embed') ||
+          pathParts.includes('v') ||
+          pathParts.includes('shorts') ||
+          pathParts.includes('live')) &&
+        lastPart &&
+        /^[a-zA-Z0-9_-]{11}$/.test(lastPart)
+      ) {
+        return lastPart;
+      }
+    } else if (host === 'youtu.be') {
+      const pathParts = parsed.pathname.split('/').filter(Boolean);
+      if (pathParts[0] && /^[a-zA-Z0-9_-]{11}$/.test(pathParts[0])) {
+        return pathParts[0];
+      }
+    }
+  } catch {
+    // ignore and fallback to regex patterns
+  }
+
   const patterns = [
-    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|live\/|watch\?v=|watch\?.+&v=))([\w-]{11})/,
+    /(?:youtu\.be\/|(?:youtube\.com|youtube-nocookie\.com)\/(?:embed\/|v\/|shorts\/|live\/|watch\?v=|watch\?.+&v=))([\w-]{11})/,
     /^[a-zA-Z0-9_-]{11}$/,
   ];
 
@@ -29,6 +61,100 @@ export function parseYouTubeId(url?: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Checks if a URL or slide object represents a YouTube video
+ */
+export function isYouTubeSource(
+  source?: { videoType?: string; youtubeUrl?: string; videoUrl?: string; videoPath?: string } | string | null
+): boolean {
+  if (!source) return false;
+  if (typeof source === 'string') {
+    return Boolean(parseYouTubeId(source));
+  }
+  if (source.videoType === 'youtube') return true;
+  if (source.youtubeUrl && parseYouTubeId(source.youtubeUrl)) return true;
+  if (source.videoUrl && parseYouTubeId(source.videoUrl)) return true;
+  if (source.videoPath && parseYouTubeId(source.videoPath)) return true;
+  return false;
+}
+
+/**
+ * Extracts a YouTube 11-char ID from a slide or string source
+ */
+export function extractYouTubeId(
+  source?: { videoType?: string; youtubeUrl?: string; videoUrl?: string; videoPath?: string } | string | null
+): string | null {
+  if (!source) return null;
+  if (typeof source === 'string') {
+    return parseYouTubeId(source);
+  }
+  return (
+    parseYouTubeId(source.youtubeUrl) ||
+    parseYouTubeId(source.videoUrl) ||
+    parseYouTubeId(source.videoPath) ||
+    null
+  );
+}
+
+/**
+ * Gets the direct YouTube thumbnail URL for any YouTube video ID or URL
+ * Default is hqdefault (480x360), which is guaranteed to exist for all videos
+ */
+export function getYouTubeThumbnailUrl(
+  urlOrId?: string,
+  quality: 'maxres' | 'hq' | 'mq' | 'default' = 'hq'
+): string | null {
+  const videoId = parseYouTubeId(urlOrId);
+  if (!videoId) return null;
+
+  if (quality === 'maxres') {
+    return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  }
+  if (quality === 'mq') {
+    return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+  }
+  if (quality === 'default') {
+    return `https://img.youtube.com/vi/${videoId}/default.jpg`;
+  }
+  return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+}
+
+/**
+ * Resolves a reliable visual thumbnail for a slide.
+ * - Returns explicit image if present and not a raw video file
+ * - Returns YouTube thumbnail if slide is a YouTube video
+ * - Generates SVG title badge as fallback
+ */
+export function getSlideThumbnail(slide?: {
+  imageUrl?: string;
+  videoType?: string;
+  youtubeUrl?: string;
+  videoUrl?: string;
+  videoPath?: string;
+  videoTitle?: string;
+  section?: string;
+} | null): string {
+  if (!slide) return '';
+
+  // 1. If explicit valid image URL is provided
+  if (slide.imageUrl && !isVideoFile(slide.imageUrl)) {
+    return slide.imageUrl;
+  }
+
+  // 2. If it's a YouTube video, use official YouTube thumbnail
+  const ytId = extractYouTubeId(slide);
+  if (ytId) {
+    return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+  }
+
+  // 3. Fallback to generated title badge
+  return generateVideoThumbnail(
+    slide.videoTitle ||
+      slide.section ||
+      getFileNameFromPath(slide.videoPath || slide.videoUrl || 'Video Media')
+  );
 }
 
 /**
@@ -137,6 +263,11 @@ export function normalizeVideoSource(src?: string): string {
   if (!src || typeof src !== 'string') return '';
   const trimmed = src.trim();
   if (!trimmed) return '';
+
+  // Return YouTube sources without file protocol wrapping
+  if (isYouTubeSource(trimmed)) {
+    return trimmed;
+  }
 
   // Already standard web or data protocols
   if (

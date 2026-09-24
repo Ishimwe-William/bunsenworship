@@ -6,6 +6,8 @@ import {
   isVideoFile,
   generateVideoThumbnail,
   parseYouTubeId,
+  extractYouTubeId,
+  getSlideThumbnail,
 } from '../../utils/videoHelpers';
 import { YouTubePlayer } from './YouTubePlayer';
 
@@ -136,31 +138,25 @@ export const ProjectorWindowView: React.FC = () => {
 
   const slide = state.slide;
 
+  const youtubeVideoId = extractYouTubeId(slide);
+  const isYouTubeVideo = Boolean(youtubeVideoId);
   const hasVideo = Boolean(
     slide &&
-      (slide.videoType === 'local' ||
-        slide.videoType === 'youtube' ||
+      (isYouTubeVideo ||
+        slide.videoType === 'local' ||
         slide.videoUrl ||
-        slide.videoPath ||
-        slide.youtubeUrl) &&
+        slide.videoPath) &&
       slide.videoType !== 'none'
-  );
-
-  const isYouTubeVideo = Boolean(
-    slide &&
-      (slide.videoType === 'youtube' ||
-        (slide.youtubeUrl && !slide.videoPath && !slide.videoUrl))
   );
 
   const isLocalVideo = Boolean(
     hasVideo && !isYouTubeVideo && (slide?.videoPath || slide?.videoUrl)
   );
 
-  const localVideoSrc = normalizeVideoSource(slide?.videoPath || slide?.videoUrl || '');
-  const videoPoster =
-    slide?.imageUrl && !isVideoFile(slide.imageUrl)
-      ? slide.imageUrl
-      : generateVideoThumbnail(slide?.videoTitle || slide?.section || 'Video Playback');
+  const localVideoSrc = isLocalVideo
+    ? normalizeVideoSource(slide?.videoPath || slide?.videoUrl || '')
+    : '';
+  const videoPoster = getSlideThumbnail(slide);
 
   // Synchronize projector local video playback with operator console
   useEffect(() => {
@@ -217,11 +213,6 @@ export const ProjectorWindowView: React.FC = () => {
     fontSize = 118;
     lineHeight = 1.25;
   }
-
-  const youtubeVideoId = isYouTubeVideo
-    ? parseYouTubeId(slide?.youtubeUrl || slide?.videoUrl || '')
-    : null;
-
   return (
     <div
       style={{
@@ -366,12 +357,14 @@ export const ProjectorWindowView: React.FC = () => {
                 isLogoActive={state.isLogoActive}
                 onError={(errCode) => {
                   console.warn('Projector YouTube error code:', errCode);
-                  try {
-                    const channel = new BroadcastChannel('bunsenworship_projector_channel');
-                    channel.postMessage({ type: 'PROJECTOR_VIDEO_ERROR' });
-                    channel.close();
-                  } catch {
-                    // ignore
+                  if (errCode === 100 || errCode === 101 || errCode === 150) {
+                    try {
+                      const channel = new BroadcastChannel('bunsenworship_projector_channel');
+                      channel.postMessage({ type: 'PROJECTOR_VIDEO_ERROR' });
+                      channel.close();
+                    } catch {
+                      // ignore
+                    }
                   }
                 }}
               />

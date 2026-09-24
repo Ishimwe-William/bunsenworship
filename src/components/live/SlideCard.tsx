@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Slide } from '../../store/features/presentation/types';
-import { GripVerticalIcon } from '../common/Icons';
+import { GripVerticalIcon, PlayIcon, YoutubeIcon } from '../common/Icons';
+import { getSlideThumbnail, extractYouTubeId, generateVideoThumbnail } from '../../utils/videoHelpers';
 
 interface SlideCardProps {
   slide: Slide;
@@ -33,6 +34,22 @@ export const SlideCard: React.FC<SlideCardProps> = ({
   onDrop,
   onDragEnd,
 }) => {
+  const [imgError, setImgError] = useState(false);
+
+  const youtubeVideoId = extractYouTubeId(slide);
+  const isYouTube = Boolean(youtubeVideoId);
+  const hasVideo = Boolean(
+    isYouTube ||
+    slide.videoType === 'local' ||
+    slide.videoUrl ||
+    slide.videoPath
+  ) && slide.videoType !== 'none';
+
+  const thumbUrl = getSlideThumbnail(slide);
+  const displayThumb = imgError
+    ? generateVideoThumbnail(slide.videoTitle || slide.section || 'Video')
+    : thumbUrl;
+
   return (
     <div
       draggable
@@ -68,13 +85,42 @@ export const SlideCard: React.FC<SlideCardProps> = ({
         )}
       </div>
 
-      {slide.imageUrl && (
-        <div className="slide-thumbnail-wrap">
+      {(thumbUrl || hasVideo) && (
+        <div className="slide-thumbnail-wrap" style={{ position: 'relative', overflow: 'hidden' }}>
           <img
-            src={slide.imageUrl}
+            src={displayThumb}
             alt={slide.section || 'Slide Thumbnail'}
             className="slide-thumbnail-img"
+            onError={() => setImgError(true)}
           />
+          {hasVideo && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0, 0, 0, 0.28)',
+                pointerEvents: 'none',
+              }}
+            >
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: isYouTube ? 'rgba(239, 68, 68, 0.9)' : 'rgba(59, 130, 246, 0.9)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                }}
+              >
+                {isYouTube ? <YoutubeIcon size={14} /> : <PlayIcon size={14} />}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

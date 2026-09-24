@@ -28,7 +28,7 @@ import {
   YoutubeIcon,
   MonitorIcon,
 } from '../common/Icons';
-import { formatTime } from '../../utils/videoHelpers';
+import { formatTime, extractYouTubeId } from '../../utils/videoHelpers';
 
 interface VideoControlDeckProps {
   slide: Slide | null;
@@ -45,21 +45,17 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
 
   if (!slide) return null;
 
+  const youtubeVideoId = extractYouTubeId(slide);
+  const isYouTube = Boolean(youtubeVideoId);
   const hasVideo = Boolean(
-    (slide.videoType === 'local' ||
-      slide.videoType === 'youtube' ||
+    (isYouTube ||
+      slide.videoType === 'local' ||
       slide.videoUrl ||
-      slide.videoPath ||
-      slide.youtubeUrl) &&
+      slide.videoPath) &&
       slide.videoType !== 'none'
   );
 
   if (!hasVideo) return null;
-
-  const isYouTube = Boolean(
-    slide.videoType === 'youtube' ||
-      (slide.youtubeUrl && !slide.videoPath && !slide.videoUrl)
-  );
 
   const duration = videoPlayback.duration || 0;
   const currentTime = videoPlayback.currentTime || 0;
@@ -215,7 +211,7 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
                   background: '#ef4444',
                 }}
               />
-              FILE NOT FOUND
+              {isYouTube ? 'STREAM ERROR' : 'FILE NOT FOUND'}
             </span>
           ) : (
             <span
@@ -339,7 +335,7 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
             <span>Loop</span>
           </button>
 
-          {videoPlayback.videoError && (
+          {videoPlayback.videoError && !isYouTube && (
             <button
               type="button"
               className="console-mini-btn"
