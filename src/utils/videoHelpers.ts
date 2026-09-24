@@ -215,7 +215,7 @@ export function buildYouTubeEmbedUrl(
     params.set('start', String(Math.floor(parsedStart)));
   }
 
-  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+  return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`;
 }
 
 /**

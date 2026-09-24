@@ -317,6 +317,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 
       try {
         playerRef.current = new window.YT.Player(iframeRef.current, {
+          host: 'https://www.youtube-nocookie.com',
           events: {
             onReady: (event: YTEvent) => {
               if (isCancelled) return;
@@ -503,19 +504,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     params.set('iv_load_policy', '3');
     params.set('fs', '0');
     params.set('disablekb', '1');
-    params.set('widget_referrer', 'https://www.youtube.com');
 
-    const effectiveOrigin =
-      typeof window !== 'undefined' &&
-      window.location.origin &&
-      !window.location.origin.startsWith('file:') &&
-      window.location.origin !== 'null'
-        ? window.location.origin
-        : undefined;
-
-    if (effectiveOrigin) {
-      params.set('origin', effectiveOrigin);
-    }
     if (loop) {
       params.set('loop', '1');
       params.set('playlist', cleanVideoId);
@@ -524,7 +513,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       params.set('start', String(Math.floor(startTime)));
     }
 
-    return `https://www.youtube.com/embed/${cleanVideoId}?${params.toString()}`;
+    return `https://www.youtube-nocookie.com/embed/${cleanVideoId}?${params.toString()}`;
   }, [cleanVideoId, loop, startTime]);
 
   const handleIframeLoad = () => {

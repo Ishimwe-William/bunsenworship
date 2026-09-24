@@ -495,10 +495,8 @@ app.on('ready', () => {
             // Set clean User-Agent
             requestHeaders['User-Agent'] = cleanUa;
 
-            // Only provide standard Referer on YouTube pages/embeds to satisfy embedding restrictions
-            if (/youtube(-nocookie)?\.com/i.test(details.url)) {
-                requestHeaders['Referer'] = 'https://www.youtube.com/';
-            }
+            // Provide standard privacy-enhanced Referer to satisfy YouTube embedding restrictions without origin mismatch
+            requestHeaders['Referer'] = 'https://www.youtube-nocookie.com/';
 
             callback({cancel: false, requestHeaders});
         }
