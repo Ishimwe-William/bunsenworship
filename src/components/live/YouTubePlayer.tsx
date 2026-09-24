@@ -244,6 +244,18 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         const data = JSON.parse(event.data);
         if (!data || typeof data !== 'object') return;
 
+        // Ready / initial handshake
+        if (data.event === 'onReady' || data.event === 'initialDelivery') {
+          isReadyRef.current = true;
+          if (
+            propsRef.current.isPlaying &&
+            !propsRef.current.isBlackout &&
+            !propsRef.current.isLogoActive
+          ) {
+            sendCommand('playVideo');
+          }
+        }
+
         // Player state change events
         if (data.event === 'onStateChange') {
           const state = Number(data.info);
@@ -251,15 +263,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
             setIsActuallyPlaying(true);
             propsRef.current.onPlay?.();
           } else if (state === 2 /* PAUSED */) {
-            if (
-              propsRef.current.isPlaying &&
-              !propsRef.current.isBlackout &&
-              !propsRef.current.isLogoActive
-            ) {
-              sendCommand('playVideo');
-            } else {
-              propsRef.current.onPause?.();
-            }
+            propsRef.current.onPause?.();
           } else if (state === 0 /* ENDED */) {
             if (propsRef.current.loop) {
               sendCommand('seekTo', [0, true]);
@@ -484,29 +488,55 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     };
   }, [isLive]);
 
-  // Construct iframe embed parameters
-  const embedParams = new URLSearchParams();
-  embedParams.set('enablejsapi', '1');
-  embedParams.set('autoplay', isPlaying && !isBlackout && !isLogoActive ? '1' : '0');
-  embedParams.set('mute', !isLive || isMuted ? '1' : '0');
-  embedParams.set('controls', '0');
-  embedParams.set('rel', '0');
-  embedParams.set('modestbranding', '1');
-  embedParams.set('playsinline', '1');
-  embedParams.set('iv_load_policy', '3');
-  embedParams.set('fs', '0');
-  embedParams.set('disablekb', '1');
-  embedParams.set('widget_referrer', 'https://www.youtube.com');
+  // Stable instance ID to avoid DOM collisions between preview and live monitors
+  const playerIdRef = useRef(`yt-frame-${Math.random().toString(36).slice(2, 9)}`);
 
-  if (loop) {
-    embedParams.set('loop', '1');
-    embedParams.set('playlist', cleanVideoId);
-  }
-  if (startTime > 0) {
-    embedParams.set('start', String(Math.floor(startTime)));
-  }
+  // Construct stable iframe embed URL once per video/loop/start - NEVER change on play/pause/mute
+  const embedUrl = React.useMemo(() => {
+    if (!cleanVideoId) return '';
+    const params = new URLSearchParams();
+    params.set('enablejsapi', '1');
+    params.set('controls', '0');
+    params.set('rel', '0');
+    params.set('modestbranding', '1');
+    params.set('playsinline', '1');
+    params.set('iv_load_policy', '3');
+    params.set('fs', '0');
+    params.set('disablekb', '1');
+    params.set('widget_referrer', 'https://www.youtube.com');
 
-  const embedUrl = `https://www.youtube-nocookie.com/embed/${cleanVideoId}?${embedParams.toString()}`;
+    const effectiveOrigin =
+      typeof window !== 'undefined' &&
+      window.location.origin &&
+      !window.location.origin.startsWith('file:') &&
+      window.location.origin !== 'null'
+        ? window.location.origin
+        : undefined;
+
+    if (effectiveOrigin) {
+      params.set('origin', effectiveOrigin);
+    }
+    if (loop) {
+      params.set('loop', '1');
+      params.set('playlist', cleanVideoId);
+    }
+    if (startTime > 0) {
+      params.set('start', String(Math.floor(startTime)));
+    }
+
+    return `https://www.youtube.com/embed/${cleanVideoId}?${params.toString()}`;
+  }, [cleanVideoId, loop, startTime]);
+
+  const handleIframeLoad = () => {
+    try {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'listening' }),
+        '*'
+      );
+    } catch {
+      // ignore
+    }
+  };
 
   const showCover = !isActuallyPlaying && (!isPlaying || isBlackout || isLogoActive);
 
@@ -517,8 +547,9 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         <iframe
           ref={iframeRef}
           key={`yt-iframe-${cleanVideoId}`}
-          id={`yt-frame-${cleanVideoId}`}
+          id={playerIdRef.current}
           src={embedUrl}
+          onLoad={handleIframeLoad}
           title="YouTube Worship Stream"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           referrerPolicy="strict-origin-when-cross-origin"

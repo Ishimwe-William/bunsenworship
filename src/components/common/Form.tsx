@@ -72,7 +72,15 @@ export const FileInput: React.FC<FileInputProps> = ({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const path = (file as unknown as { path?: string }).path || file.name;
+      let resolvedPath: string | undefined;
+      if (window.electronAPI?.getPathForFile) {
+        try {
+          resolvedPath = window.electronAPI.getPathForFile(file);
+        } catch {
+          // ignore
+        }
+      }
+      const path = resolvedPath || (file as unknown as { path?: string }).path || file.name;
       onChange(path);
     }
   };

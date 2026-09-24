@@ -26,6 +26,11 @@ import {
   extractYouTubeId,
 } from '../../utils/videoHelpers';
 import {
+  parseCanvaDesignId,
+  buildCanvaEmbedUrl,
+  generateCanvaThumbnail,
+} from '../../utils/presentationHelpers';
+import {
   SearchIcon,
   PlusIcon,
   LinkIcon,
@@ -56,6 +61,15 @@ type MediaSourceCategory =
 type FormatFilter = 'ALL' | 'VIDEOS' | 'POWERPOINTS' | 'IMAGES' | 'CANVA' | 'SONGS';
 
 type ModalTab = 'VIDEO' | 'PPT' | 'IMAGE' | 'CANVA' | 'SONG' | 'BACKUP';
+
+// Converts an absolute on-disk path to a bunsen-media:// URL for safe local streaming
+const toMediaUrl = (absPath: string): string => {
+  const forward = absPath.replace(/\\/g, '/');
+  if (/^[a-zA-Z]:\//.test(forward) || forward.startsWith('/')) {
+    return `bunsen-media://${forward.startsWith('/') ? '' : '/'}${forward}`;
+  }
+  return `bunsen-media:///${forward}`;
+};
 
 export const MediaLibraryScreen: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -116,6 +130,9 @@ export const MediaLibraryScreen: React.FC = () => {
   const [pptSourceType, setPptSourceType] = useState<'file' | 'url'>('file');
   const [pptUrl, setPptUrl] = useState('');
 
+  // Export state (PowerPoint slide image extraction via PowerPoint COM)
+  const [isExporting, setIsExporting] = useState(false);
+
   // Form states - Image
   const [imgTitle, setImgTitle] = useState('');
   const [imgDataUrl, setImgDataUrl] = useState('');
@@ -157,6 +174,25 @@ export const MediaLibraryScreen: React.FC = () => {
       }
     }
     videoFileInputRef.current?.click();
+  };
+
+  const handleBrowsePptFile = async () => {
+    if (window.electronAPI?.openPresentationDialog) {
+      try {
+        const selectedPath = await window.electronAPI.openPresentationDialog();
+        if (selectedPath) {
+          setPptFilePath(selectedPath);
+          const filename = selectedPath.split(/[/\\]/).pop() || '';
+          if (!pptTitle) {
+            setPptTitle(filename.replace(/\.[^/.]+$/, ''));
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn('Native openPresentationDialog failed, falling back to input:', err);
+      }
+    }
+    pptFileInputRef.current?.click();
   };
 
   // Load records from local DB
@@ -391,27 +427,46 @@ export const MediaLibraryScreen: React.FC = () => {
               ],
       };
     } else if (asset.format === 'PPTX') {
-      const count = asset.slidesCount || 12;
+      const rawDeckId = asset.id.replace('deck-', '');
+      const deck = externalDecks.find(
+        (d) => d.id === rawDeckId || `deck-${d.id}` === asset.id
+      );
+      const deckSlides =
+        deck && deck.slides && deck.slides.length > 0
+          ? deck.slides.map((s) => ({ ...s, externalType: 'PPT' as const }))
+          : [];
       itemToCreate = {
         title: asset.title,
-        subtitle: `PowerPoint Deck • ${asset.durationOrSlides}`,
+        subtitle: `PowerPoint Deck • ${deck?.slideCount || deckSlides.length || asset.durationOrSlides}`,
         time: '09:45',
         type: 'PPT',
         externalMeta: {
           type: 'PPT',
-          filePath: asset.filePath,
-          slideCount: count,
+          filePath: deck?.filePath || asset.filePath,
+          slideCount: deck?.slideCount || deckSlides.length,
         },
-        slides: Array.from({ length: count }, (_, i) => ({
-          id: `s-ppt-${Date.now()}-${i + 1}`,
-          section: i === 0 ? 'Title Slide' : `Slide ${i + 1}`,
-          lines: [i === 0 ? asset.title : `Key Point ${i}`, 'Presentation Point'],
-          imageUrl: asset.thumbnailUrl,
-          imageFit: 'contain',
-        })),
+        slides:
+          deckSlides.length > 0
+            ? deckSlides
+            : [
+                {
+                  id: `s-ppt-${Date.now()}-1`,
+                  section: 'Title Slide',
+                  lines: [asset.title],
+                  imageUrl: asset.thumbnailUrl,
+                  imageFit: 'contain',
+                },
+              ],
       };
     } else if (asset.format === 'CANVA') {
-      const count = asset.slidesCount || 8;
+      const rawDeckId = asset.id.replace('deck-', '');
+      const deck = externalDecks.find(
+        (d) => d.id === rawDeckId || `deck-${d.id}` === asset.id
+      );
+      const deckSlides =
+        deck && deck.slides && deck.slides.length > 0
+          ? deck.slides.map((s) => ({ ...s, externalType: 'CANVA' as const }))
+          : [];
       itemToCreate = {
         title: asset.title,
         subtitle: 'Canva Cloud Visual Presentation',
@@ -419,15 +474,21 @@ export const MediaLibraryScreen: React.FC = () => {
         type: 'CANVA',
         externalMeta: {
           type: 'CANVA',
-          canvaUrl: asset.canvaUrl,
+          canvaUrl: deck?.canvaUrl || asset.canvaUrl,
+          embedUrl: deck?.embedUrl,
         },
-        slides: Array.from({ length: count }, (_, i) => ({
-          id: `s-canva-${Date.now()}-${i + 1}`,
-          section: `Page ${i + 1}`,
-          lines: [`Canva Slide ${i + 1}`, 'Visual Content'],
-          imageUrl: asset.thumbnailUrl,
-          imageFit: 'contain',
-        })),
+        slides:
+          deckSlides.length > 0
+            ? deckSlides
+            : [
+                {
+                  id: `s-canva-${Date.now()}-1`,
+                  section: 'Presentation',
+                  lines: [] as string[],
+                  imageUrl: asset.thumbnailUrl,
+                  imageFit: 'contain',
+                },
+              ],
       };
     } else {
       // Video / Still image
@@ -563,12 +624,32 @@ export const MediaLibraryScreen: React.FC = () => {
         const rawDeckId = editingAsset.id.replace('deck-', '');
         const foundDeck = externalDecks.find((d) => d.id === rawDeckId || `deck-${d.id}` === editingAsset.id);
         if (foundDeck) {
+          const nextCanvaUrl = editCanvaUrl.trim() || foundDeck.canvaUrl;
+          const nextDesignId =
+            foundDeck.type === 'CANVA' ? parseCanvaDesignId(nextCanvaUrl) || foundDeck.designId : foundDeck.designId;
+          const nextEmbedUrl =
+            foundDeck.type === 'CANVA' && nextDesignId
+              ? buildCanvaEmbedUrl(nextDesignId)
+              : foundDeck.embedUrl;
           const updatedDeck: ExternalPresentationRecord = {
             ...foundDeck,
             title,
             filePath: editFilePath.trim() || foundDeck.filePath,
-            canvaUrl: editCanvaUrl.trim() || foundDeck.canvaUrl,
+            canvaUrl: nextCanvaUrl,
+            designId: nextDesignId || undefined,
+            embedUrl: nextEmbedUrl,
             slideCount: Number(editSlideCount) || foundDeck.slideCount,
+            slides:
+              foundDeck.type === 'CANVA'
+                ? foundDeck.slides.map((s) =>
+                    s.embedUrl
+                      ? {
+                          ...s,
+                          embedUrl: nextEmbedUrl || s.embedUrl,
+                        }
+                      : s
+                  )
+                : foundDeck.slides,
             updatedAt: Date.now(),
           };
           await bunsenDb.saveExternalPresentation(updatedDeck);
@@ -726,29 +807,53 @@ export const MediaLibraryScreen: React.FC = () => {
         return;
       }
 
-      const count = Number(pptSlideCount) || 12;
-      const pptRecord: ExternalPresentationRecord = {
-        id: `ppt-${Date.now()}`,
-        title: pptTitle.trim(),
-        type: 'PPT',
-        filePath: pptSourceType === 'file' ? pptFilePath.trim() : pptUrl.trim(),
-        slideCount: count,
-        slides: Array.from({ length: count }, (_, i) => ({
+      const pptSource = pptSourceType === 'file' ? pptFilePath.trim() : pptUrl.trim();
+      setIsExporting(true);
+      try {
+        const exportResult = (await window.electronAPI?.exportPowerPoint?.(pptSource)) ?? null;
+        if (!exportResult || !exportResult.ok || !exportResult.images || exportResult.images.length === 0) {
+          throw new Error(
+            `${exportResult?.error || 'Failed to extract slides. Check that the file opens in PowerPoint.'} (source: "${pptSource}")`
+          );
+        }
+
+        const slideCount = exportResult.slideCount || exportResult.images.length;
+        const slides: ExternalPresentationRecord['slides'] = exportResult.images.map((absPath, i) => ({
           id: `s-${Date.now()}-${i + 1}`,
           section: i === 0 ? 'Title Slide' : `Slide ${i + 1}`,
-          lines: [i === 0 ? pptTitle.trim() : `Point ${i}`, 'Presentation Note'],
-        })),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      await bunsenDb.saveExternalPresentation(pptRecord);
-      await loadDatabaseRecords();
-      setShowUploadModal(false);
-      setPptTitle('');
-      setPptFilePath('');
-      setPptUrl('');
-      setPptSourceType('file');
-      showFeedback(`PowerPoint "${pptRecord.title}" linked successfully!`);
+          lines: [] as string[],
+          externalType: 'PPT',
+          imageUrl: toMediaUrl(absPath),
+          imageFit: 'contain',
+        }));
+
+        const pptRecord: ExternalPresentationRecord = {
+          id: `ppt-${Date.now()}`,
+          title: pptTitle.trim() || exportResult.title || 'PowerPoint Presentation',
+          type: 'PPT',
+          filePath: pptSource,
+          slideCount,
+          slideImages: exportResult.images,
+          slides,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        await bunsenDb.saveExternalPresentation(pptRecord);
+        await loadDatabaseRecords();
+        setShowUploadModal(false);
+        setPptTitle('');
+        setPptFilePath('');
+        setPptUrl('');
+        setPptSourceType('file');
+        showFeedback(
+          `PowerPoint "${pptRecord.title}" imported with ${slideCount} original slide${slideCount === 1 ? '' : 's'}!`
+        );
+      } catch (err) {
+        console.error('PPTX export failed:', err);
+        showFeedback(err instanceof Error ? err.message : 'Failed to import the PowerPoint file.', 'error');
+      } finally {
+        setIsExporting(false);
+      }
     } else if (modalTab === 'IMAGE') {
       if (!imgTitle.trim()) {
         showFeedback('Please provide a title', 'error');
@@ -781,18 +886,31 @@ export const MediaLibraryScreen: React.FC = () => {
       showFeedback(`Image "${newImg.title}" uploaded to library!`);
     } else if (modalTab === 'CANVA') {
       if (!canvaTitle.trim() || !canvaUrl.trim()) return;
+
+      const designId = parseCanvaDesignId(canvaUrl.trim());
+      const embedUrl = designId ? buildCanvaEmbedUrl(designId) : '';
+      const thumbnail = generateCanvaThumbnail(canvaTitle.trim());
       const count = Number(canvaSlideCount) || 8;
+
       const canvaRecord: ExternalPresentationRecord = {
         id: `canva-${Date.now()}`,
         title: canvaTitle.trim(),
         type: 'CANVA',
         canvaUrl: canvaUrl.trim(),
+        embedUrl: embedUrl || undefined,
+        designId: designId || undefined,
         slideCount: count,
-        slides: Array.from({ length: count }, (_, i) => ({
-          id: `s-canva-${Date.now()}-${i + 1}`,
-          section: `Page ${i + 1}`,
-          lines: [`Canva Slide ${i + 1}`, 'Visual Slide Content'],
-        })),
+        slides: [
+          {
+            id: `s-canva-${Date.now()}-1`,
+            section: 'Presentation',
+            lines: [],
+            externalType: 'CANVA',
+            embedUrl: embedUrl || undefined,
+            imageUrl: thumbnail,
+            imageFit: 'contain',
+          },
+        ],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -801,7 +919,11 @@ export const MediaLibraryScreen: React.FC = () => {
       setShowUploadModal(false);
       setCanvaTitle('');
       setCanvaUrl('');
-      showFeedback(`Canva presentation "${canvaRecord.title}" linked!`);
+      showFeedback(
+        embedUrl
+          ? `Canva presentation "${canvaRecord.title}" linked!`
+          : `Canva presentation "${canvaRecord.title}" linked. Could not detect a design ID from that URL.`
+      );
     } else if (modalTab === 'SONG') {
       if (!songTitle.trim()) return;
       const rawBlocks = songLyrics.split(/\n\s*\n/).filter((b) => b.trim().length > 0);
@@ -1610,7 +1732,15 @@ export const MediaLibraryScreen: React.FC = () => {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const path = (file as unknown as { path?: string }).path || file.name;
+                            let resolvedPath: string | undefined;
+                            if (window.electronAPI?.getPathForFile) {
+                              try {
+                                resolvedPath = window.electronAPI.getPathForFile(file);
+                              } catch {
+                                // ignore
+                              }
+                            }
+                            const path = resolvedPath || (file as unknown as { path?: string }).path || file.name;
                             setPptFilePath(path);
                             if (!pptTitle) {
                               setPptTitle(file.name.replace(/\.[^/.]+$/, ''));
@@ -1621,7 +1751,7 @@ export const MediaLibraryScreen: React.FC = () => {
                       <button
                         type="button"
                         className="btn-secondary"
-                        onClick={() => pptFileInputRef.current?.click()}
+                        onClick={handleBrowsePptFile}
                       >
                         Browse...
                       </button>
@@ -1655,7 +1785,7 @@ export const MediaLibraryScreen: React.FC = () => {
                   </div>
 
                   <div className="medialib-form-group">
-                    <label className="medialib-form-label">Slide Count</label>
+                    <label className="medialib-form-label">Estimated Slide Count</label>
                     <input
                       type="number"
                       min="1"
@@ -1663,7 +1793,12 @@ export const MediaLibraryScreen: React.FC = () => {
                       className="auth-input"
                       value={pptSlideCount}
                       onChange={(e) => setPptSlideCount(Number(e.target.value))}
+                      title="The real count is read from the file during export."
                     />
+                    <p className="medialib-form-hint">
+                      The exact slide count and original slide designs are read from the PowerPoint file
+                      automatically. Microsoft PowerPoint must be installed on this computer.
+                    </p>
                   </div>
                 </div>
 
@@ -1672,11 +1807,12 @@ export const MediaLibraryScreen: React.FC = () => {
                     type="button"
                     className="btn-secondary"
                     onClick={() => setShowUploadModal(false)}
+                    disabled={isExporting}
                   >
                     {t.mediaLibrary.cancel}
                   </button>
-                  <button type="submit" className="btn-primary">
-                    {t.mediaLibrary.savePowerPoint}
+                  <button type="submit" className="btn-primary" disabled={isExporting}>
+                    {isExporting ? 'Exporting Slides...' : t.mediaLibrary.savePowerPoint}
                   </button>
                 </div>
               </form>

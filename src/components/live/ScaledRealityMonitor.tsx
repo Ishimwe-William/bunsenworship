@@ -16,14 +16,11 @@ import { VideoIcon } from '../common/Icons';
 import {
   normalizeVideoSource,
   isBareFilename,
-  isVideoFile,
-  getFileNameFromPath,
-  generateVideoThumbnail,
-  parseYouTubeId,
   extractYouTubeId,
   getSlideThumbnail,
 } from '../../utils/videoHelpers';
 import { YouTubePlayer } from './YouTubePlayer';
+import { EmbeddedDeckView } from './EmbeddedDeckView';
 
 export interface ScaledRealityMonitorProps {
   slide: Slide | null;
@@ -413,7 +410,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
         )}
 
         {/* Slide Image Layer */}
-        {slide?.imageUrl && !isBlackout && !isLogoActive && !hasVideo && (
+        {slide?.imageUrl && !slide?.embedUrl && !isBlackout && !isLogoActive && !hasVideo && (
           <div
             className="stage-image-layer"
             style={{
@@ -437,6 +434,11 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
               }}
             />
           </div>
+        )}
+
+        {/* Embedded Deck Layer (Canva / live presentations) */}
+        {slide?.embedUrl && !isBlackout && !isLogoActive && (
+          <EmbeddedDeckView slide={slide} />
         )}
 
         {/* Reality Content State (Lyrics or Overrides) */}
@@ -478,7 +480,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
               ))}
             </div>
           </div>
-        ) : slide?.imageUrl || hasVideo ? null : (
+        ) : slide?.imageUrl || slide?.embedUrl || hasVideo ? null : (
           <div className="stage-empty-state">
             <span>{emptyLabel}</span>
           </div>

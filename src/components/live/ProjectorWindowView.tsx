@@ -3,13 +3,11 @@ import { Slide, VideoPlaybackState, getPersistedStartupDisplay } from '../../sto
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
 import {
   normalizeVideoSource,
-  isVideoFile,
-  generateVideoThumbnail,
-  parseYouTubeId,
   extractYouTubeId,
   getSlideThumbnail,
 } from '../../utils/videoHelpers';
 import { YouTubePlayer } from './YouTubePlayer';
+import { EmbeddedDeckView } from './EmbeddedDeckView';
 
 export interface ProjectorPayload {
   slide: Slide | null;
@@ -373,7 +371,7 @@ export const ProjectorWindowView: React.FC = () => {
         )}
 
         {/* Slide Image Layer */}
-        {slide?.imageUrl && !state.isBlackout && !state.isLogoActive && !hasVideo && (
+        {slide?.imageUrl && !slide?.embedUrl && !state.isBlackout && !state.isLogoActive && !hasVideo && (
           <div
             style={{
               position: 'absolute',
@@ -397,6 +395,11 @@ export const ProjectorWindowView: React.FC = () => {
               }}
             />
           </div>
+        )}
+
+        {/* Embedded Deck Layer (Canva / live presentations) */}
+        {slide?.embedUrl && !state.isBlackout && !state.isLogoActive && (
+          <EmbeddedDeckView slide={slide} />
         )}
 
         {/* Stage Content (Lyrics or Overrides) */}
@@ -449,7 +452,7 @@ export const ProjectorWindowView: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : slide?.imageUrl || hasVideo ? null : (
+        ) : slide?.imageUrl || slide?.embedUrl || hasVideo ? null : (
           <div
             style={{
               position: 'relative',

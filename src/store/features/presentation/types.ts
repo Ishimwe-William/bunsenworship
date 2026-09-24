@@ -8,6 +8,9 @@ export interface Slide {
   background?: string;
   imageUrl?: string;
   imageFit?: 'cover' | 'contain';
+  // Embedded / external presentation fields (PPT exports, Canva designs)
+  embedUrl?: string;
+  externalType?: 'PPT' | 'CANVA';
   // Video fields
   videoUrl?: string;
   videoPath?: string;

@@ -32,6 +32,8 @@ export interface ExternalPresentationRecord {
   filePath?: string;
   fileSize?: number;
   slideCount?: number;
+  // Absolute paths of the export PNGs (PPT imported via PowerPoint COM)
+  slideImages?: string[];
   // Canva specific fields
   canvaUrl?: string;
   embedUrl?: string;

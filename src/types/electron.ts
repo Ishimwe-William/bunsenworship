@@ -10,6 +10,16 @@ export interface FcmPushMessage {
   data?: Record<string, unknown>;
 }
 
+export interface PresentationExportResult {
+  ok: boolean;
+  title?: string;
+  slideCount?: number;
+  images?: string[];
+  width?: number;
+  height?: number;
+  error?: string;
+}
+
 export interface ElectronAPI {
   getAppVersion: () => Promise<string>;
   getUpdateStatus: () => Promise<{ cachedUpdateInfo: UpdateInfo | null; isUpdateDownloaded: boolean }>;
@@ -22,7 +32,10 @@ export interface ElectronAPI {
   isProjectorOpen?: () => Promise<boolean>;
   onProjectorStatusChanged?: (callback: (isOpen: boolean) => void) => () => void;
   openVideoDialog: () => Promise<string | null>;
+  openPresentationDialog: () => Promise<string | null>;
   resolveVideoPath: (filename: string) => Promise<string | null>;
+  openExternal: (url: string) => Promise<void>;
+  exportPowerPoint: (source: string) => Promise<PresentationExportResult>;
   getPathForFile: (file: File) => string;
 }
 

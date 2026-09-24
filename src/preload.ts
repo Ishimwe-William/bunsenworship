@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils, IpcRendererEvent } from 'electron';
-import { UpdateInfo, FcmPushMessage } from './types/electron';
+import { UpdateInfo, FcmPushMessage, PresentationExportResult } from './types/electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
@@ -42,7 +42,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
   openVideoDialog: () => ipcRenderer.invoke('dialog:open-video'),
+  openPresentationDialog: () => ipcRenderer.invoke('dialog:open-presentation'),
   resolveVideoPath: (filename: string) => ipcRenderer.invoke('video:resolve-path', filename),
+  openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
+  exportPowerPoint: (source: string): Promise<PresentationExportResult> =>
+    ipcRenderer.invoke('presentation:export-pptx', source) as Promise<PresentationExportResult>,
   getPathForFile: (file: File) => {
     try {
       if (webUtils && typeof webUtils.getPathForFile === 'function') {

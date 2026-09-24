@@ -12,7 +12,8 @@ import {
     protocol,
     net,
     powerSaveBlocker,
-    session
+    session,
+    shell
 } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +21,7 @@ import {pathToFileURL} from 'node:url';
 import {loadWindowState, manageWindowState} from './windowState';
 import {createSplashScreen} from './splash';
 import {setupAutoUpdater} from './updater';
+import {registerPresentationIpc} from './presentationExport';
 
 // Prevent Chromium from throttling timers, media, and video decoding when window is minimized or occluded
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
@@ -286,6 +288,24 @@ ipcMain.handle('dialog:open-video', async () => {
     return result.filePaths[0];
 });
 
+ipcMain.handle('dialog:open-presentation', async () => {
+    const result = await dialog.showOpenDialog({
+        title: 'Select PowerPoint Presentation',
+        properties: ['openFile'],
+        filters: [
+            {
+                name: 'PowerPoint Presentations',
+                extensions: ['pptx', 'ppt'],
+            },
+            {name: 'All Files', extensions: ['*']},
+        ],
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+        return null;
+    }
+    return result.filePaths[0];
+});
+
 ipcMain.handle('video:resolve-path', async (_event, filename: string) => {
     if (!filename || typeof filename !== 'string') return null;
     const clean = filename.trim();
@@ -333,14 +353,29 @@ ipcMain.handle('video:resolve-path', async (_event, filename: string) => {
     return null;
 });
 
+// Register presentation import IPC (PowerPoint COM export, etc.)
+registerPresentationIpc();
+
+// Open http(s) links in the system browser rather than an Electron child window
+ipcMain.handle('app:open-external', (_event, url: string) => {
+    if (typeof url === 'string' && /^https?:\/\//i.test(url.trim())) {
+        shell.openExternal(url.trim()).catch((err) => console.warn('Failed to open external URL:', err));
+    }
+});
+
 // This method will be called when Electron has finished initialization
 app.on('ready', () => {
     // Register custom bunsen-media protocol handler for secure streaming
     protocol.handle('bunsen-media', async (request) => {
         try {
             let rawPath = decodeURIComponent(request.url.replace(/^bunsen-media:\/\//i, ''));
-            if (process.platform === 'win32' && /^\/[a-zA-Z]:[/\\]/.test(rawPath)) {
-                rawPath = rawPath.slice(1);
+            rawPath = rawPath.replace(/^(media|local)\//i, '');
+            if (process.platform === 'win32') {
+                if (/^\/[a-zA-Z]:[/\\]/.test(rawPath)) {
+                    rawPath = rawPath.slice(1);
+                } else if (/^[a-zA-Z][/\\]/.test(rawPath)) {
+                    rawPath = rawPath[0].toUpperCase() + ':' + rawPath.slice(1);
+                }
             }
             let resolvedPath = path.normalize(rawPath);
 
@@ -358,6 +393,11 @@ app.on('ready', () => {
                 addSearchDir('downloads');
                 addSearchDir('desktop');
                 addSearchDir('documents');
+                try {
+                    searchDirs.push(path.join(app.getPath('userData'), 'presentation-exports'));
+                } catch {
+                    // ignore
+                }
                 searchDirs.push(process.cwd());
 
                 for (const dir of searchDirs) {
@@ -439,7 +479,7 @@ app.on('ready', () => {
     session.defaultSession.setUserAgent(cleanUa);
     app.userAgentFallback = cleanUa;
 
-    // Intercept requests to YouTube and Google Video to provide clean User-Agent, Referer, and Origin
+    // Intercept requests to YouTube and Google Video to provide clean User-Agent and Referer
     session.defaultSession.webRequest.onBeforeSendHeaders(
         {
             urls: [
@@ -455,9 +495,10 @@ app.on('ready', () => {
             // Set clean User-Agent
             requestHeaders['User-Agent'] = cleanUa;
 
-            // Provide standard Referer & Origin to avoid Error 150/153 and localhost/file restrictions
-            requestHeaders['Referer'] = 'https://www.youtube.com/';
-            requestHeaders['Origin'] = 'https://www.youtube.com';
+            // Only provide standard Referer on YouTube pages/embeds to satisfy embedding restrictions
+            if (/youtube(-nocookie)?\.com/i.test(details.url)) {
+                requestHeaders['Referer'] = 'https://www.youtube.com/';
+            }
 
             callback({cancel: false, requestHeaders});
         }
@@ -486,6 +527,10 @@ app.on('ready', () => {
             }
             if (responseHeaders['Content-Security-Policy']) {
                 responseHeaders['Content-Security-Policy'] = responseHeaders['Content-Security-Policy'].map(stripFrameAncestors);
+            }
+
+            if (!responseHeaders['access-control-allow-origin'] && !responseHeaders['Access-Control-Allow-Origin']) {
+                responseHeaders['Access-Control-Allow-Origin'] = ['*'];
             }
 
             callback({cancel: false, responseHeaders});

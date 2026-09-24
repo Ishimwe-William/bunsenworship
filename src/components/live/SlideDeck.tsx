@@ -32,7 +32,6 @@ import { createNewSlide } from '../../utils/liveShowHelpers';
 import {
   formatTime,
   isBareFilename,
-  isVideoFile,
   generateVideoThumbnail,
   getFileNameFromPath,
   extractYouTubeId,
@@ -545,6 +544,29 @@ export const SlideDeck: React.FC = () => {
                       >
                         {isYouTube ? <YoutubeIcon size={14} /> : <PlayIcon size={12} />}
                       </div>
+                    </div>
+                  )}
+
+                  {slide.embedUrl && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 6,
+                        left: 6,
+                        zIndex: 3,
+                        background: 'rgba(6, 182, 212, 0.92)',
+                        color: '#ffffff',
+                        fontSize: '0.6rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.04em',
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        textTransform: 'uppercase',
+                        pointerEvents: 'none',
+                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
+                      }}
+                    >
+                      Live Deck
                     </div>
                   )}
                 </div>
