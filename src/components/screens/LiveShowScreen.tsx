@@ -34,7 +34,8 @@ import '../live/LiveConsole.css';
 
 const DEFAULT_RUNDOWN_WIDTH = 260;
 const MIN_RUNDOWN_WIDTH = 180;
-const MAX_RUNDOWN_WIDTH = 440;
+const MAX_RUNDOWN_WIDTH = 420;
+const COLLAPSED_RUNDOWN_WIDTH = 46;
 
 const DEFAULT_PREVIEW_SPLIT = 50; // 50% Preview, 50% Live
 const MIN_PREVIEW_SPLIT = 30;
@@ -85,6 +86,38 @@ export const LiveShowScreen: React.FC = () => {
     }
     return DEFAULT_RUNDOWN_WIDTH;
   });
+
+  // Track whether Schedule column is collapsed to prioritize Preview & Live
+  const [isRundownCollapsed, setIsRundownCollapsed] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('bunsenworship_rundown_collapsed');
+      if (saved !== null) {
+        return saved === 'true';
+      }
+    } catch {
+      // ignore
+    }
+    // When window is compact (< 1180px) or non-maximized, default to prioritizing preview & live!
+    if (typeof window !== 'undefined') {
+      const isNarrow = window.innerWidth < 1180;
+      const isNotMaximized =
+        window.screen &&
+        (window.innerWidth < window.screen.availWidth - 40 ||
+          window.innerHeight < window.screen.availHeight - 40);
+      if (isNarrow || isNotMaximized) return true;
+    }
+    return false;
+  });
+
+  const handleToggleRundownCollapse = () => {
+    setIsRundownCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('bunsenworship_rundown_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const [previewSplit, setPreviewSplit] = useState<number>(() => {
     try {
@@ -137,6 +170,20 @@ export const LiveShowScreen: React.FC = () => {
   >(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Prevent horizontal scroll drift and prioritize preview & live on compact windows
+  useEffect(() => {
+    const handleWindowResize = () => {
+      if (containerRef.current) {
+        containerRef.current.scrollLeft = 0;
+      }
+      if (window.innerWidth < 1100 && !isRundownCollapsed) {
+        setIsRundownCollapsed(true);
+      }
+    };
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, [isRundownCollapsed]);
   const dragRef = useRef<{
     active: 'left' | 'center' | 'preview-monitor' | 'live-monitor' | null;
     startX: number;
@@ -196,7 +243,8 @@ export const LiveShowScreen: React.FC = () => {
           setRundownWidth(nextWidth);
         } else if (active === 'center') {
           const delta = clientX - startX;
-          const remainingWidth = Math.max(200, totalWidth - rundownWidth);
+          const currentRundownW = isRundownCollapsed ? COLLAPSED_RUNDOWN_WIDTH : rundownWidth;
+          const remainingWidth = Math.max(200, totalWidth - currentRundownW - 20);
           const splitDelta = (delta / remainingWidth) * 100;
           const nextSplit = Math.min(
             MAX_PREVIEW_SPLIT,
@@ -263,9 +311,10 @@ export const LiveShowScreen: React.FC = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [activeResizer, rundownWidth]);
+  }, [activeResizer, rundownWidth, isRundownCollapsed]);
 
   const startDraggingLeft = (e: React.MouseEvent) => {
+    if (isRundownCollapsed) return;
     e.preventDefault();
     dragRef.current = {
       active: 'left',
@@ -330,6 +379,10 @@ export const LiveShowScreen: React.FC = () => {
   };
 
   const handleResetLeft = () => {
+    if (isRundownCollapsed) {
+      setIsRundownCollapsed(false);
+      return;
+    }
     setRundownWidth(DEFAULT_RUNDOWN_WIDTH);
     persistValue('bunsenworship_rundown_width', DEFAULT_RUNDOWN_WIDTH);
   };
@@ -429,6 +482,9 @@ export const LiveShowScreen: React.FC = () => {
       } else if (e.key === 'Escape' && hasActiveOverride) {
         e.preventDefault();
         dispatch(clearAllOverrides());
+      } else if (e.key === '\\') {
+        e.preventDefault();
+        handleToggleRundownCollapse();
       } else if (e.key === '[') {
         e.preventDefault();
         const currentIndex = rundown.findIndex((r) => r.id === selectedRundownId);
@@ -438,7 +494,7 @@ export const LiveShowScreen: React.FC = () => {
       } else if (e.key === ']') {
         e.preventDefault();
         const currentIndex = rundown.findIndex((r) => r.id === selectedRundownId);
-        if (currentIndex >= 0 && currentIndex < rundown.length - 1) {
+        if (currentIndex !== -1 && currentIndex < rundown.length - 1) {
           dispatch(setSelectedRundownId(rundown[currentIndex + 1].id));
         }
       }
@@ -466,26 +522,48 @@ export const LiveShowScreen: React.FC = () => {
         ref={containerRef}
         className={`live-console-container easyworship-layout ${
           activeResizer ? 'is-resizing' : ''
-        } ${isResizingVertical ? 'is-resizing-vertical' : ''}`}
+        } ${isResizingVertical ? 'is-resizing-vertical' : ''} ${
+          isRundownCollapsed ? 'rundown-is-collapsed' : ''
+        }`}
         aria-label="Live presentation console"
+        onScroll={() => {
+          if (containerRef.current && containerRef.current.scrollLeft !== 0) {
+            containerRef.current.scrollLeft = 0;
+          }
+        }}
       >
         {/* Column 1: Schedule (Service Rundown) */}
         <div
-          className="live-console-section rundown-section"
-          style={{ width: `${rundownWidth}px`, flexShrink: 0 }}
+          className={`live-console-section rundown-section ${
+            isRundownCollapsed ? 'is-collapsed' : ''
+          }`}
+          style={{
+            width: `${isRundownCollapsed ? COLLAPSED_RUNDOWN_WIDTH : rundownWidth}px`,
+            flexShrink: 0,
+          }}
         >
-          <ServiceRundown />
+          <ServiceRundown
+            isCollapsed={isRundownCollapsed}
+            onToggleCollapse={handleToggleRundownCollapse}
+          />
         </div>
 
         {/* Resizer 1 (Left: Schedule <-> Preview) */}
         <div
-          className={`console-resizer-gutter ${activeResizer === 'left' ? 'is-active' : ''}`}
-          onMouseDown={startDraggingLeft}
-          onDoubleClick={handleResetLeft}
-          title="Drag to resize Schedule • Double-click to reset"
+          className={`console-resizer-gutter left-gutter ${
+            activeResizer === 'left' ? 'is-active' : ''
+          } ${isRundownCollapsed ? 'is-collapsed-gutter' : ''}`}
+          onMouseDown={isRundownCollapsed ? undefined : startDraggingLeft}
+          onClick={isRundownCollapsed ? handleToggleRundownCollapse : undefined}
+          onDoubleClick={handleToggleRundownCollapse}
+          title={
+            isRundownCollapsed
+              ? 'Click to expand Schedule (Show full rundown)'
+              : 'Drag to resize Schedule • Double-click to collapse'
+          }
           role="separator"
           tabIndex={0}
-          aria-label="Resize Schedule Column"
+          aria-label="Resize or Toggle Schedule Column"
           aria-orientation="vertical"
         >
           <div className="resizer-pill-grip" />
@@ -494,7 +572,7 @@ export const LiveShowScreen: React.FC = () => {
         {/* Column 2: Preview Column */}
         <div
           className="live-console-section preview-section"
-          style={{ flex: `${previewSplit} 1 0%`, minWidth: '220px' }}
+          style={{ flex: `${previewSplit} 1 0%`, minWidth: '180px' }}
         >
           <PreviewColumn
             outputDimensions={outputDimensions}
@@ -522,7 +600,7 @@ export const LiveShowScreen: React.FC = () => {
         {/* Column 3: Live Program Column */}
         <div
           className="live-console-section live-section"
-          style={{ flex: `${100 - previewSplit} 1 0%`, minWidth: '220px' }}
+          style={{ flex: `${100 - previewSplit} 1 0%`, minWidth: '180px' }}
         >
           <LiveColumn
             isProjectorActive={isProjectorActive}

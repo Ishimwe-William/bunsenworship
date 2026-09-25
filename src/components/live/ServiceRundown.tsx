@@ -24,6 +24,8 @@ import {
   FileTextIcon,
   ImageIcon,
   LayersIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from '../common/Icons';
 import { createNewRundownItem } from '../../utils/liveShowHelpers';
 import {
@@ -34,7 +36,15 @@ import {
   parseYouTubeId,
 } from '../../utils/videoHelpers';
 
-export const ServiceRundown: React.FC = () => {
+export interface ServiceRundownProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export const ServiceRundown: React.FC<ServiceRundownProps> = ({
+  isCollapsed = false,
+  onToggleCollapse,
+}) => {
   const dispatch = useAppDispatch();
   const rundown = useAppSelector(selectRundown);
   const selectedRundownId = useAppSelector(selectSelectedRundownId);
@@ -263,6 +273,291 @@ export const ServiceRundown: React.FC = () => {
     }
   };
 
+  const renderAddModal = () => (
+    <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+      <div className="quick-edit-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">Add Service Item</h3>
+          <button
+            type="button"
+            className="quick-edit-btn"
+            onClick={() => setShowAddModal(false)}
+          >
+            Close
+          </button>
+        </div>
+        <form onSubmit={handleAddItem} className="modal-body">
+          <input
+            type="file"
+            ref={addVideoFileInputRef}
+            accept="video/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const fullPath = window.electronAPI?.getPathForFile?.(file) || URL.createObjectURL(file);
+                setNewVideoUrl(fullPath);
+                if (!newTitle.trim()) {
+                  const cleanName = file.name.replace(/\.[^/.]+$/, '');
+                  setNewTitle(cleanName);
+                }
+              }
+            }}
+          />
+          <div>
+            <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
+              Item Title
+            </label>
+            <input
+              type="text"
+              className="auth-input"
+              placeholder="e.g. Way Maker / Sanctuary Video Loop"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              autoFocus
+              required
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
+                Scheduled Time
+              </label>
+              <input
+                type="text"
+                className="auth-input"
+                value={newTime}
+                onChange={(e) => setNewTime(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
+                Item Category
+              </label>
+              <select
+                className="auth-input"
+                value={newType}
+                onChange={(e) => setNewType(e.target.value as RundownItemType)}
+              >
+                <option value="VIDEO">VIDEO (Playback / YouTube)</option>
+                <option value="SONG">SONG (Worship)</option>
+                <option value="LOOP">LOOP (Motion)</option>
+                <option value="IMAGE">IMAGE (Graphic / Slide)</option>
+                <option value="SERMON">SERMON (Message)</option>
+                <option value="PPT">PPT (PowerPoint)</option>
+                <option value="CANVA">CANVA (Presentation)</option>
+              </select>
+            </div>
+          </div>
+
+          {newType === 'VIDEO' && (
+            <div
+              style={{
+                background: 'var(--bg-subtle)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '8px',
+                padding: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label className="status-label" style={{ fontWeight: 700 }}>
+                  Video Source
+                </label>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    type="button"
+                    className={`console-mini-btn ${newVideoSource === 'local' ? 'active' : ''}`}
+                    onClick={() => setNewVideoSource('local')}
+                    style={{ padding: '2px 8px', fontSize: '0.675rem' }}
+                  >
+                    <VideoIcon size={11} />
+                    <span>Local MP4</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`console-mini-btn ${newVideoSource === 'youtube' ? 'active' : ''}`}
+                    onClick={() => setNewVideoSource('youtube')}
+                    style={{ padding: '2px 8px', fontSize: '0.675rem' }}
+                  >
+                    <YoutubeIcon size={11} />
+                    <span>YouTube</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  className="status-label"
+                  style={{ display: 'block', marginBottom: '4px', fontSize: '0.68rem' }}
+                >
+                  {newVideoSource === 'youtube'
+                    ? 'YouTube URL / Stream Link:'
+                    : 'Local Video File Path or URL:'}
+                </label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    placeholder={
+                      newVideoSource === 'youtube'
+                        ? 'https://www.youtube.com/watch?v=... (Leave blank for sample)'
+                        : 'C:\\Videos\\video.mp4 or URL (Leave blank for sample)'
+                    }
+                    value={newVideoUrl}
+                    onChange={(e) => setNewVideoUrl(e.target.value)}
+                    style={{ fontSize: '0.75rem', padding: '6px', flex: 1 }}
+                  />
+                  {newVideoSource === 'local' && (
+                    <button
+                      type="button"
+                      className="console-mini-btn"
+                      onClick={handleBrowseAddVideo}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.72rem',
+                        whiteSpace: 'nowrap',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                      }}
+                      title="Open native Windows file dialog to choose video"
+                    >
+                      <VideoIcon size={12} />
+                      <span>Browse...</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={newVideoLoop}
+                  onChange={(e) => setNewVideoLoop(e.target.checked)}
+                />
+                <span>Loop video playback continuously</span>
+              </label>
+            </div>
+          )}
+
+          <div>
+            <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
+              Subtitle / Notes
+            </label>
+            <input
+              type="text"
+              className="auth-input"
+              placeholder="e.g. Cinematic Motion Loop / 4K MP4"
+              value={newSubtitle}
+              onChange={(e) => setNewSubtitle(e.target.value)}
+            />
+          </div>
+
+          <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setShowAddModal(false)}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary">
+              Add to Rundown
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  if (isCollapsed) {
+    return (
+      <aside className="service-rundown-col is-collapsed" aria-label="Service Schedule Rail">
+        <div className="rundown-rail-header">
+          {onToggleCollapse && (
+            <button
+              type="button"
+              className="rundown-rail-btn expand-btn"
+              onClick={onToggleCollapse}
+              title="Expand Schedule (Show full rundown)"
+              aria-label="Expand Schedule"
+            >
+              <ChevronRightIcon size={14} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="rundown-rail-btn add-btn"
+            onClick={() => setShowAddModal(true)}
+            title="Add item to rundown"
+            aria-label="Add item to rundown"
+          >
+            <PlusIcon size={13} />
+          </button>
+        </div>
+
+        <div className="rundown-rail-list">
+          {rundown.map((item, index) => {
+            const isSelected = item.id === selectedRundownId;
+            const hasLive = item.id === liveRundownId;
+            const itemNum = String(index + 1).padStart(2, '0');
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`rundown-rail-item ${isSelected ? 'selected' : ''} ${
+                  hasLive ? 'has-live' : ''
+                }`}
+                onClick={() => dispatch(setSelectedRundownId(item.id))}
+                title={`${itemNum}. ${item.title} (${item.type} • ${item.slides.length} slides) • Click to cue in Preview`}
+                aria-label={`${item.title}, ${item.type}`}
+                aria-pressed={isSelected}
+              >
+                <span className="rail-item-num">{itemNum}</span>
+                <span className="rail-item-icon">
+                  {item.type === 'VIDEO' || item.type === 'LOOP' ? (
+                    <VideoIcon size={13} />
+                  ) : item.type === 'IMAGE' ? (
+                    <ImageIcon size={13} />
+                  ) : item.type === 'PPT' || item.type === 'CANVA' ? (
+                    <PresentationIcon size={13} />
+                  ) : item.type === 'SERMON' ? (
+                    <FileTextIcon size={13} />
+                  ) : (
+                    <MusicIcon size={13} />
+                  )}
+                </span>
+                {hasLive && <span className="rail-live-indicator" title="Currently Live / On Air" />}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="rundown-rail-footer" title={`${rundown.length} schedule items`}>
+          <span className="rail-stat-badge">{rundown.length}</span>
+        </div>
+
+        {showAddModal && renderAddModal()}
+      </aside>
+    );
+  }
+
   return (
     <aside className="service-rundown-col">
       <div className="rundown-header">
@@ -293,6 +588,17 @@ export const ServiceRundown: React.FC = () => {
           >
             <PlusIcon size={14} />
           </button>
+          {onToggleCollapse && (
+            <button
+              type="button"
+              className="rundown-collapse-btn"
+              onClick={onToggleCollapse}
+              title="Collapse Schedule to maximize Preview & Live"
+              aria-label="Collapse Schedule"
+            >
+              <ChevronLeftIcon size={13} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -418,217 +724,7 @@ export const ServiceRundown: React.FC = () => {
         <span>Click to preview · Drag to reorder</span>
       </div>
 
-      {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="quick-edit-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Add Service Item</h3>
-              <button
-                type="button"
-                className="quick-edit-btn"
-                onClick={() => setShowAddModal(false)}
-              >
-                Close
-              </button>
-            </div>
-            <form onSubmit={handleAddItem} className="modal-body">
-              <input
-                type="file"
-                ref={addVideoFileInputRef}
-                accept="video/*"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const fullPath = window.electronAPI?.getPathForFile?.(file) || URL.createObjectURL(file);
-                    setNewVideoUrl(fullPath);
-                    if (!newTitle.trim()) {
-                      const cleanName = file.name.replace(/\.[^/.]+$/, '');
-                      setNewTitle(cleanName);
-                    }
-                  }
-                }}
-              />
-              <div>
-                <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
-                  Item Title
-                </label>
-                <input
-                  type="text"
-                  className="auth-input"
-                  placeholder="e.g. Way Maker / Sanctuary Video Loop"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  autoFocus
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
-                    Scheduled Time
-                  </label>
-                  <input
-                    type="text"
-                    className="auth-input"
-                    value={newTime}
-                    onChange={(e) => setNewTime(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
-                    Item Category
-                  </label>
-                  <select
-                    className="auth-input"
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value as RundownItemType)}
-                  >
-                    <option value="VIDEO">VIDEO (Playback / YouTube)</option>
-                    <option value="SONG">SONG (Worship)</option>
-                    <option value="LOOP">LOOP (Motion)</option>
-                    <option value="IMAGE">IMAGE (Graphic / Slide)</option>
-                    <option value="SERMON">SERMON (Message)</option>
-                    <option value="PPT">PPT (PowerPoint)</option>
-                    <option value="CANVA">CANVA (Presentation)</option>
-                  </select>
-                </div>
-              </div>
-
-              {newType === 'VIDEO' && (
-                <div
-                  style={{
-                    background: 'var(--bg-subtle)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '8px',
-                    padding: '10px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <label className="status-label" style={{ fontWeight: 700 }}>
-                      Video Source
-                    </label>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button
-                        type="button"
-                        className={`console-mini-btn ${newVideoSource === 'local' ? 'active' : ''}`}
-                        onClick={() => setNewVideoSource('local')}
-                        style={{ padding: '2px 8px', fontSize: '0.675rem' }}
-                      >
-                        <VideoIcon size={11} />
-                        <span>Local MP4</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`console-mini-btn ${newVideoSource === 'youtube' ? 'active' : ''}`}
-                        onClick={() => setNewVideoSource('youtube')}
-                        style={{ padding: '2px 8px', fontSize: '0.675rem' }}
-                      >
-                        <YoutubeIcon size={11} />
-                        <span>YouTube</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      className="status-label"
-                      style={{ display: 'block', marginBottom: '4px', fontSize: '0.68rem' }}
-                    >
-                      {newVideoSource === 'youtube'
-                        ? 'YouTube URL / Stream Link:'
-                        : 'Local Video File Path or URL:'}
-                    </label>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <input
-                        type="text"
-                        className="auth-input"
-                        placeholder={
-                          newVideoSource === 'youtube'
-                            ? 'https://www.youtube.com/watch?v=... (Leave blank for sample)'
-                            : 'C:\\Videos\\video.mp4 or URL (Leave blank for sample)'
-                        }
-                        value={newVideoUrl}
-                        onChange={(e) => setNewVideoUrl(e.target.value)}
-                        style={{ fontSize: '0.75rem', padding: '6px', flex: 1 }}
-                      />
-                      {newVideoSource === 'local' && (
-                        <button
-                          type="button"
-                          className="console-mini-btn"
-                          onClick={handleBrowseAddVideo}
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: '0.72rem',
-                            whiteSpace: 'nowrap',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            background: '#2563eb',
-                            color: '#ffffff',
-                            border: 'none',
-                          }}
-                          title="Open native Windows file dialog to choose video"
-                        >
-                          <VideoIcon size={12} />
-                          <span>Browse...</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '0.72rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={newVideoLoop}
-                      onChange={(e) => setNewVideoLoop(e.target.checked)}
-                    />
-                    <span>Loop video playback continuously</span>
-                  </label>
-                </div>
-              )}
-
-              <div>
-                <label className="status-label" style={{ display: 'block', marginBottom: '4px' }}>
-                  Subtitle / Notes
-                </label>
-                <input
-                  type="text"
-                  className="auth-input"
-                  placeholder="e.g. Cinematic Motion Loop / 4K MP4"
-                  value={newSubtitle}
-                  onChange={(e) => setNewSubtitle(e.target.value)}
-                />
-              </div>
-
-              <div className="modal-footer" style={{ padding: '0.75rem 0 0 0', border: 'none' }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowAddModal(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  Add to Rundown
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {showAddModal && renderAddModal()}
     </aside>
   );
 };

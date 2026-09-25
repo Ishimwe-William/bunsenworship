@@ -83,10 +83,16 @@
 }
 
 .screen-scroll-container.is-live-console {
-  padding: 0.875rem 1.125rem;
+  padding: 0.75rem 1rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 1200px) {
+  .screen-scroll-container.is-live-console {
+    padding: 0.5rem 0.625rem;
+  }
 }
 
 .screen-scroll-container.is-media-console {

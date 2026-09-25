@@ -1323,7 +1323,7 @@
 
 /* Responsive adjustments */
 @media (max-width: 1100px) {
-  .live-console-container {
+  .live-console-container:not(.easyworship-layout) {
     grid-template-columns: 240px 1fr 300px;
     gap: 0.75rem;
   }
@@ -3053,19 +3053,19 @@
 }
 
 @container liveconsole (max-width: 1120px) {
-  .live-console-container {
+  .live-console-container:not(.easyworship-layout) {
     display: grid;
     grid-template-columns: minmax(220px, 0.85fr) minmax(290px, 1.3fr) minmax(280px, 1fr);
     overflow-x: auto;
   }
 
-  .live-console-section {
+  .live-console-container:not(.easyworship-layout) .live-console-section {
     width: auto !important;
     min-width: 0 !important;
     flex: none !important;
   }
 
-  .console-resizer-gutter {
+  .live-console-container:not(.easyworship-layout) .console-resizer-gutter {
     display: none;
   }
 
@@ -3092,7 +3092,7 @@
     display: none;
   }
 
-  .live-console-container {
+  .live-console-container:not(.easyworship-layout) {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -3100,7 +3100,7 @@
     overflow-y: auto;
   }
 
-  .live-console-section {
+  .live-console-container:not(.easyworship-layout) .live-console-section {
     width: 100% !important;
     min-height: 480px;
     flex: 0 0 auto !important;
@@ -4192,31 +4192,53 @@
    EasyWorship 3-Column Ergonomic Layout
    ========================================================================== */
 .live-console-container.easyworship-layout {
-  display: flex;
-  flex-direction: row;
-  height: 100%;
-  width: 100%;
-  min-height: 0;
-  overflow: hidden;
-  gap: 0;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  height: 100% !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  gap: 0 !important;
   background: var(--bg-canvas, #090d16);
+  box-sizing: border-box !important;
 }
 
-.preview-section,
-.live-section {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  min-width: 0;
+.easyworship-layout .live-console-section {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  position: relative;
 }
 
-.preview-column-card,
-.live-column-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
+.easyworship-layout .rundown-section {
+  flex-shrink: 0 !important;
+  min-width: 0 !important;
+  transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.easyworship-layout .preview-section {
+  flex-shrink: 1 !important;
+  min-width: 160px !important;
+}
+
+.easyworship-layout .live-section {
+  flex-shrink: 1 !important;
+  min-width: 160px !important;
+}
+
+.easyworship-layout .preview-column-card,
+.easyworship-layout .live-column-card {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
   background: var(--bg-surface, #0f172a);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
   border-radius: 12px;
@@ -4821,6 +4843,208 @@
     display: none;
   }
 }
+/* ==========================================================================
+   Schedule Rail (Collapsed Service Rundown) & Edge-to-Edge Optimization
+   ========================================================================== */
+.service-rundown-col.is-collapsed {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 3px;
+  background: var(--bg-surface, #0f172a);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  gap: 6px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
 
+.rundown-rail-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
 
+.rundown-rail-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary, #94a3b8);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
 
+.rundown-rail-btn:hover {
+  background: var(--bg-subtle, #1e293b);
+  border-color: var(--border-subtle, rgba(255, 255, 255, 0.12));
+  color: var(--text-primary, #ffffff);
+  transform: scale(1.05);
+}
+
+.rundown-rail-btn.expand-btn {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.rundown-rail-btn.expand-btn:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+}
+
+.rundown-rail-btn.add-btn:hover {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.rundown-rail-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 0;
+}
+
+.rundown-rail-item {
+  width: 36px;
+  height: 44px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+  padding: 2px;
+}
+
+.rundown-rail-item:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--text-primary, #ffffff);
+  transform: translateY(-1px);
+}
+
+.rundown-rail-item.selected {
+  background: rgba(59, 130, 246, 0.18) !important;
+  border-color: #3b82f6 !important;
+  color: #60a5fa !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+}
+
+.rundown-rail-item.has-live {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.rail-item-num {
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.rail-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rail-live-indicator {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+  animation: pulseLiveBadge 1.5s infinite;
+}
+
+.rundown-rail-footer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.rail-stat-badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748b);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+  padding: 1px 6px;
+}
+
+/* Header collapse button on expanded rundown */
+.rundown-collapse-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  color: var(--text-secondary, #94a3b8);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  margin-left: 2px;
+}
+
+.rundown-collapse-btn:hover {
+  background: var(--bg-surface, #0f172a);
+  border-color: var(--color-primary, #3b82f6);
+  color: var(--color-primary, #3b82f6);
+  transform: scale(1.05);
+}
+
+.console-resizer-gutter.is-collapsed-gutter {
+  cursor: pointer;
+  width: 8px;
+}
+
+.console-resizer-gutter.is-collapsed-gutter:hover::before {
+  background: #3b82f6;
+  width: 3px;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+}
+
+/* On smaller windows or when rundown is collapsed, ensure preview and live expand to fill edge-to-edge */
+.rundown-is-collapsed .preview-section,
+.rundown-is-collapsed .live-section {
+  flex-grow: 1 !important;
+}
