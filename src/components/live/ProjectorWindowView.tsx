@@ -102,9 +102,16 @@ export const ProjectorWindowView: React.FC = () => {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Fullscreen shortcut F11
+    // PowerPoint-style controls: Escape exits presentation, F11 toggles fullscreen
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F11') {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (window.electronAPI?.closeProjectorWindow) {
+          window.electronAPI.closeProjectorWindow();
+        } else {
+          window.close();
+        }
+      } else if (e.key === 'F11') {
         e.preventDefault();
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen().catch((err) => {
@@ -503,7 +510,31 @@ export const ProjectorWindowView: React.FC = () => {
             {state.source === 'LIVE' ? 'LIVE PROGRAM' : 'NEXT PREVIEW'}
           </span>
           <span style={{ opacity: 0.5 }}>&bull;</span>
-          <span>Press F11 for Fullscreen</span>
+          <span>Esc or F11 to Exit</span>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.electronAPI?.closeProjectorWindow) {
+                window.electronAPI.closeProjectorWindow();
+              } else {
+                window.close();
+              }
+            }}
+            style={{
+              background: 'rgba(239, 68, 68, 0.85)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '2px 8px',
+              fontSize: '0.675rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginLeft: '4px',
+            }}
+            title="Close Projector Output (Esc)"
+          >
+            &times; Exit
+          </button>
         </div>
       )}
     </div>

@@ -23,7 +23,9 @@ import {
   clearAllOverrides,
   setVideoError,
   setProjectorActive,
+  selectIsProjectorActive,
 } from '../../store/features/presentation';
+import { DisplayInfo } from '../../types/electron';
 import { PlayIcon, SlidersIcon, MonitorIcon } from '../common/Icons';
 import { ScaledRealityMonitor } from './ScaledRealityMonitor';
 import { VideoControlDeck } from './VideoControlDeck';
@@ -40,9 +42,20 @@ export const ProgramPreviewMonitor: React.FC = () => {
   const isTextCleared = useAppSelector(selectIsTextCleared);
   const isLogoActive = useAppSelector(selectIsLogoActive);
   const videoPlayback = useAppSelector(selectVideoPlayback);
+  const isProjectorActive = useAppSelector(selectIsProjectorActive);
 
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [projectorSource, setProjectorSource] = useState<'LIVE' | 'PREVIEW'>('LIVE');
+  const [displays, setDisplays] = useState<DisplayInfo[]>([]);
+
+  useEffect(() => {
+    if (window.electronAPI?.getDisplays) {
+      window.electronAPI
+        .getDisplays()
+        .then(setDisplays)
+        .catch((err) => console.warn('Could not enumerate displays:', err));
+    }
+  }, []);
 
   // Broadcast presentation state to any detached projector window
   const broadcastProjectorState = useCallback(() => {
@@ -501,16 +514,84 @@ export const ProgramPreviewMonitor: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="console-mini-btn"
-            onClick={handleOpenOutput}
-            style={{ width: '100%', justifyContent: 'center', gap: '8px' }}
-            title="Open dedicated output window for projector or secondary screen"
-          >
-            <MonitorIcon size={13} />
-            <span>Open Projector Window ({projectorSource === 'LIVE' ? 'Live' : 'Preview'})</span>
-          </button>
+          {/* Multi-monitor Display Status Badge */}
+          {displays.length > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.65rem',
+                color: '#22c55e',
+                background: 'rgba(34, 197, 94, 0.08)',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                border: '1px solid rgba(34, 197, 94, 0.25)',
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: '#22c55e',
+                  display: 'inline-block',
+                }}
+              />
+              <span>
+                Secondary Display: {displays.find((d) => !d.isOperator)?.name || 'Monitor 2'} (Auto Fullscreen)
+              </span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              type="button"
+              className="console-mini-btn"
+              onClick={handleOpenOutput}
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                gap: '8px',
+                borderColor: isProjectorActive ? '#22c55e' : undefined,
+                color: isProjectorActive ? '#22c55e' : undefined,
+              }}
+              title={
+                displays.length > 1
+                  ? 'Present directly to secondary monitor/projector in borderless full screen'
+                  : 'Present to primary screen in borderless full screen over taskbar (Esc to exit)'
+              }
+            >
+              <MonitorIcon size={13} />
+              <span>
+                {isProjectorActive
+                  ? `Projector Live (${displays.length > 1 ? 'Monitor 2' : 'Fullscreen'})`
+                  : displays.length > 1
+                  ? `Present to Monitor 2 (Fullscreen)`
+                  : `Present Fullscreen (${projectorSource === 'LIVE' ? 'Live' : 'Preview'} - Esc to Exit)`}
+              </span>
+            </button>
+
+            {isProjectorActive && (
+              <button
+                type="button"
+                className="console-mini-btn"
+                onClick={() => {
+                  if (window.electronAPI?.closeProjectorWindow) {
+                    window.electronAPI.closeProjectorWindow();
+                  }
+                }}
+                style={{
+                  padding: '4px 10px',
+                  borderColor: '#ef4444',
+                  color: '#ef4444',
+                }}
+                title="Close Projector Output (Esc)"
+              >
+                Close Output
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -13,7 +13,8 @@ import {
     net,
     powerSaveBlocker,
     session,
-    shell
+    shell,
+    screen
 } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -223,8 +224,41 @@ const createWindow = () => {
     mainWindow.loadURL(buildAppUrl());
 };
 
-const createProjectorWindow = () => {
+const getTargetDisplay = (requestedDisplayId?: number): { display: Electron.Display; isExternal: boolean } => {
+    const allDisplays = screen.getAllDisplays();
+    let operatorDisplay = screen.getPrimaryDisplay();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+            operatorDisplay = screen.getDisplayMatching(mainWindow.getBounds());
+        } catch {
+            operatorDisplay = screen.getPrimaryDisplay();
+        }
+    }
+
+    if (typeof requestedDisplayId === 'number') {
+        const requested = allDisplays.find((d) => d.id === requestedDisplayId);
+        if (requested) {
+            return { display: requested, isExternal: requested.id !== operatorDisplay.id };
+        }
+    }
+
+    // PowerPoint-style: If a secondary monitor / projector is detected, automatically select it
+    const secondaryDisplays = allDisplays.filter((d) => d.id !== operatorDisplay.id);
+    if (secondaryDisplays.length > 0) {
+        return { display: secondaryDisplays[0], isExternal: true };
+    }
+
+    // Single monitor setup: Fall back to operator display in windowed preview
+    return { display: operatorDisplay, isExternal: false };
+};
+
+const createProjectorWindow = (requestedDisplayId?: number) => {
+    const { display: targetDisplay } = getTargetDisplay(requestedDisplayId);
+
     if (projectorWindow && !projectorWindow.isDestroyed()) {
+        projectorWindow.setFullScreen(false);
+        projectorWindow.setBounds(targetDisplay.bounds);
+        projectorWindow.setFullScreen(true);
         if (projectorWindow.isMinimized()) {
             projectorWindow.restore();
         }
@@ -237,22 +271,37 @@ const createProjectorWindow = () => {
     const appIconPath = getAssetPath('AppIcon-256.png');
     const appIcon = nativeImage.createFromPath(appIconPath);
 
-    projectorWindow = new BrowserWindow({
-        width: 1280,
-        height: 720,
-        minWidth: 800,
-        minHeight: 450,
+    // PowerPoint presentation mode: Borderless full screen over the taskbar
+    // Uses secondary monitor if connected; otherwise covers the primary monitor
+    const windowOptions: Electron.BrowserWindowConstructorOptions = {
+        x: targetDisplay.bounds.x,
+        y: targetDisplay.bounds.y,
+        width: targetDisplay.bounds.width,
+        height: targetDisplay.bounds.height,
         title: 'BunsenWorship - Sanctuary Projection Output',
         backgroundColor: '#000000',
         icon: appIcon.isEmpty() ? undefined : appIcon,
         autoHideMenuBar: true,
+        frame: false,
+        fullscreen: true,
+        show: false,
         webPreferences: {
             preload: path.join(__dirname, '../preload/preload.js'),
             backgroundThrottling: false,
         },
-    });
+    };
+
+    projectorWindow = new BrowserWindow(windowOptions);
+    projectorWindow.setBounds(targetDisplay.bounds);
+    projectorWindow.setFullScreen(true);
 
     projectorWindow.loadURL(buildAppUrl('mode=projector'));
+
+    projectorWindow.once('ready-to-show', () => {
+        projectorWindow?.show();
+        projectorWindow?.setFullScreen(true);
+        projectorWindow?.focus();
+    });
 
     mainWindow?.webContents.send('projector:status-changed', true);
 
@@ -262,12 +311,37 @@ const createProjectorWindow = () => {
     });
 };
 
-ipcMain.handle('projector:open', () => {
-    createProjectorWindow();
+ipcMain.handle('projector:open', (_event, displayId?: number) => {
+    createProjectorWindow(displayId);
+});
+
+ipcMain.handle('projector:close', () => {
+    if (projectorWindow && !projectorWindow.isDestroyed()) {
+        projectorWindow.close();
+    }
 });
 
 ipcMain.handle('projector:is-open', () => {
     return Boolean(projectorWindow && !projectorWindow.isDestroyed());
+});
+
+ipcMain.handle('screen:get-displays', () => {
+    const allDisplays = screen.getAllDisplays();
+    let operatorDisplay = screen.getPrimaryDisplay();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+            operatorDisplay = screen.getDisplayMatching(mainWindow.getBounds());
+        } catch {
+            operatorDisplay = screen.getPrimaryDisplay();
+        }
+    }
+    return allDisplays.map((d, index) => ({
+        id: d.id,
+        name: `Display ${index + 1} (${d.bounds.width}×${d.bounds.height})`,
+        isPrimary: d.id === screen.getPrimaryDisplay().id,
+        isOperator: d.id === operatorDisplay.id,
+        bounds: d.bounds,
+    }));
 });
 
 ipcMain.handle('dialog:open-video', async () => {
@@ -538,6 +612,33 @@ app.on('ready', () => {
     createWindow();
     powerSaveBlocker.start('prevent-app-suspension');
     setupAutoUpdater();
+
+    // Guard against disconnected monitors while projector is open (safe after app is ready)
+    screen.on('display-removed', () => {
+        if (projectorWindow && !projectorWindow.isDestroyed()) {
+            const allDisplays = screen.getAllDisplays();
+            const winBounds = projectorWindow.getBounds();
+            const isVisible = allDisplays.some((d) => {
+                const b = d.bounds;
+                return (
+                    winBounds.x < b.x + b.width &&
+                    winBounds.x + winBounds.width > b.x &&
+                    winBounds.y < b.y + b.height &&
+                    winBounds.y + winBounds.height > b.y
+                );
+            });
+            if (!isVisible) {
+                const primary = screen.getPrimaryDisplay();
+                projectorWindow.setFullScreen(false);
+                projectorWindow.setBounds({
+                    x: primary.bounds.x + 50,
+                    y: primary.bounds.y + 50,
+                    width: 1280,
+                    height: 720,
+                });
+            }
+        }
+    });
 });
 
 // Quit when all windows are closed, except on macOS.

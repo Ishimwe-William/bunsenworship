@@ -32,7 +32,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('fcm:message', handler);
     };
   },
-  openProjectorWindow: () => ipcRenderer.invoke('projector:open'),
+  openProjectorWindow: (displayId?: number) => ipcRenderer.invoke('projector:open', displayId),
+  closeProjectorWindow: () => ipcRenderer.invoke('projector:close'),
   isProjectorOpen: () => ipcRenderer.invoke('projector:is-open'),
   onProjectorStatusChanged: (callback: (isOpen: boolean) => void) => {
     const handler = (_event: IpcRendererEvent, isOpen: boolean) => callback(isOpen);
@@ -41,6 +42,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('projector:status-changed', handler);
     };
   },
+  getDisplays: () => ipcRenderer.invoke('screen:get-displays'),
   openVideoDialog: () => ipcRenderer.invoke('dialog:open-video'),
   openPresentationDialog: () => ipcRenderer.invoke('dialog:open-presentation'),
   resolveVideoPath: (filename: string) => ipcRenderer.invoke('video:resolve-path', filename),
