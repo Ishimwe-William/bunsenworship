@@ -210,9 +210,6 @@ export const LiveShowScreen: React.FC = () => {
             Math.max(MIN_MONITOR_HEIGHT, startPreviewHeight - deltaY)
           );
           setPreviewMonitorHeight(nextHeight);
-          if (!isIndividual && !isAltKey) {
-            setLiveMonitorHeight(nextHeight);
-          }
         } else if (active === 'live-monitor') {
           const deltaY = clientY - startY;
           const nextHeight = Math.min(
@@ -220,9 +217,6 @@ export const LiveShowScreen: React.FC = () => {
             Math.max(MIN_MONITOR_HEIGHT, startLiveHeight - deltaY)
           );
           setLiveMonitorHeight(nextHeight);
-          if (!isIndividual && !isAltKey) {
-            setPreviewMonitorHeight(nextHeight);
-          }
         }
       });
     };
@@ -243,11 +237,12 @@ export const LiveShowScreen: React.FC = () => {
           persistValue('bunsenworship_preview_split', current);
           return current;
         });
-      } else if (active === 'preview-monitor' || active === 'live-monitor') {
+      } else if (active === 'preview-monitor') {
         setPreviewMonitorHeight((currentPreview) => {
           persistValue('bunsenworship_preview_monitor_height', currentPreview);
           return currentPreview;
         });
+      } else if (active === 'live-monitor') {
         setLiveMonitorHeight((currentLive) => {
           persistValue('bunsenworship_live_monitor_height', currentLive);
           return currentLive;
@@ -346,15 +341,11 @@ export const LiveShowScreen: React.FC = () => {
 
   const handleResetPreviewMonitor = () => {
     setPreviewMonitorHeight(DEFAULT_MONITOR_HEIGHT);
-    setLiveMonitorHeight(DEFAULT_MONITOR_HEIGHT);
     persistValue('bunsenworship_preview_monitor_height', DEFAULT_MONITOR_HEIGHT);
-    persistValue('bunsenworship_live_monitor_height', DEFAULT_MONITOR_HEIGHT);
   };
 
   const handleResetLiveMonitor = () => {
-    setPreviewMonitorHeight(DEFAULT_MONITOR_HEIGHT);
     setLiveMonitorHeight(DEFAULT_MONITOR_HEIGHT);
-    persistValue('bunsenworship_preview_monitor_height', DEFAULT_MONITOR_HEIGHT);
     persistValue('bunsenworship_live_monitor_height', DEFAULT_MONITOR_HEIGHT);
   };
 
