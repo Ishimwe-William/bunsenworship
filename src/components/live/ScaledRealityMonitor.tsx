@@ -499,6 +499,14 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
               transitionType === 'FADE' ? 'is-fade' : 'is-cut'
             }`}
             style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+              padding: '40px 72px',
+              boxSizing: 'border-box',
               animationDuration: `${fadeDuration}s`,
               zIndex: 10,
               position: 'relative',
@@ -507,12 +515,28 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
             <div
               className="stage-lyrics-text"
               style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                maxWidth: '1780px',
                 fontSize: `${fontSize}px`,
                 lineHeight: lineHeight,
+                textAlign: 'center',
               }}
             >
               {lines.map((line, idx) => (
-                <div key={idx} className="stage-lyric-line">
+                <div
+                  key={idx}
+                  className="stage-lyric-line"
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'center',
+                    marginBottom: idx < lines.length - 1 ? '24px' : 0,
+                  }}
+                >
                   {line}
                 </div>
               ))}

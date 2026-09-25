@@ -366,6 +366,82 @@ export const presentationSlice = createSlice({
         state.previewSlideId = currentItem.slides[currentIdx - 1].id;
       }
     },
+    advanceLiveSlide: (state) => {
+      const liveItem = state.rundown.find((r) => r.id === state.liveRundownId);
+      if (!liveItem) {
+        // Fallback: take preview live
+        if (state.previewSlideId) {
+          state.liveSlideId = state.previewSlideId;
+          state.liveRundownId = state.selectedRundownId;
+          state.isLive = true;
+        }
+        return;
+      }
+
+      const currentIdx = liveItem.slides.findIndex((s) => s.id === state.liveSlideId);
+      if (currentIdx >= 0 && currentIdx < liveItem.slides.length - 1) {
+        const nextSlide = liveItem.slides[currentIdx + 1];
+        state.liveSlideId = nextSlide.id;
+        state.isLive = true;
+
+        const isTargetVideo = Boolean(
+          nextSlide &&
+            (Boolean(extractYouTubeId(nextSlide)) ||
+              nextSlide.videoType === 'local' ||
+              nextSlide.videoUrl ||
+              nextSlide.videoPath) &&
+            nextSlide.videoType !== 'none'
+        );
+
+        if (isTargetVideo && nextSlide) {
+          state.videoPlayback.videoError = false;
+          state.videoPlayback.videoErrorMessage = '';
+          state.videoPlayback.currentTime = nextSlide.videoStartTime || 0;
+          state.videoPlayback.isPlaying = nextSlide.autoPlay !== false;
+          state.videoPlayback.isLooping = Boolean(nextSlide.loop || nextSlide.videoLoop);
+          if (nextSlide.videoVolume !== undefined) {
+            state.videoPlayback.volume = nextSlide.videoVolume;
+          }
+          if (nextSlide.videoMuted !== undefined) {
+            state.videoPlayback.isMuted = nextSlide.videoMuted;
+          } else {
+            state.videoPlayback.isMuted = true;
+          }
+        }
+      } else {
+        // Next rundown item
+        const currentRundownIdx = state.rundown.findIndex((r) => r.id === state.liveRundownId);
+        if (currentRundownIdx >= 0 && currentRundownIdx < state.rundown.length - 1) {
+          const nextRundown = state.rundown[currentRundownIdx + 1];
+          state.liveRundownId = nextRundown.id;
+          if (nextRundown.slides.length > 0) {
+            state.liveSlideId = nextRundown.slides[0].id;
+            state.isLive = true;
+          }
+        }
+      }
+    },
+    previousLiveSlide: (state) => {
+      const liveItem = state.rundown.find((r) => r.id === state.liveRundownId);
+      if (!liveItem) return;
+
+      const currentIdx = liveItem.slides.findIndex((s) => s.id === state.liveSlideId);
+      if (currentIdx > 0) {
+        const prevSlide = liveItem.slides[currentIdx - 1];
+        state.liveSlideId = prevSlide.id;
+        state.isLive = true;
+      } else {
+        const currentRundownIdx = state.rundown.findIndex((r) => r.id === state.liveRundownId);
+        if (currentRundownIdx > 0) {
+          const prevRundown = state.rundown[currentRundownIdx - 1];
+          state.liveRundownId = prevRundown.id;
+          if (prevRundown.slides.length > 0) {
+            state.liveSlideId = prevRundown.slides[prevRundown.slides.length - 1].id;
+            state.isLive = true;
+          }
+        }
+      }
+    },
     setTransitionType: (state, action: PayloadAction<TransitionType>) => {
       state.transitionType = action.payload;
     },
@@ -734,6 +810,8 @@ export const {
   takeSlideDirectlyLive,
   advanceSlide,
   previousSlide,
+  advanceLiveSlide,
+  previousLiveSlide,
   setTransitionType,
   setFadeDuration,
   setActiveBackground,
