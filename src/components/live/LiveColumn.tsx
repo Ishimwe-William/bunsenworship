@@ -9,9 +9,6 @@ import {
   selectIsTextCleared,
   selectIsLogoActive,
   takeSlideDirectlyLive,
-  toggleBlackout,
-  toggleClearText,
-  toggleLogo,
   clearAllOverrides,
 } from '../../store/features/presentation';
 import {
@@ -22,6 +19,8 @@ import {
   RadioIcon,
   PlayIcon,
   HelpCircleIcon,
+  MusicIcon,
+  LayersIcon,
 } from '../common/Icons';
 import { ScaledRealityMonitor } from './ScaledRealityMonitor';
 import { VideoControlDeck } from './VideoControlDeck';
@@ -35,14 +34,20 @@ import {
 
 interface LiveColumnProps {
   isProjectorActive: boolean;
-  onToggleOnAir: () => void;
   outputDimensions: { width: number; height: number };
+  monitorHeight: number;
+  onStartResizeMonitor: (e: React.MouseEvent) => void;
+  onResetMonitorHeight: () => void;
+  isResizingMonitor?: boolean;
 }
 
 export const LiveColumn: React.FC<LiveColumnProps> = ({
   isProjectorActive,
-  onToggleOnAir,
   outputDimensions,
+  monitorHeight,
+  onStartResizeMonitor,
+  onResetMonitorHeight,
+  isResizingMonitor = false,
 }) => {
   const dispatch = useAppDispatch();
   const { slide: liveSlide, rundownItem: liveItem } = useAppSelector(selectLiveSlide);
@@ -75,7 +80,7 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
 
   return (
     <section className="live-column-card" aria-label="Live Program Column">
-      {/* Column Header */}
+      {/* Column Header: Clean title, type badge, count, and shortcuts guide */}
       <div className="column-top-header live-header">
         <div className="console-section-heading">
           <span className={`console-section-index live-index ${isProjectorActive ? 'is-active-pulse' : ''}`}>
@@ -88,56 +93,34 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
           </div>
         </div>
 
-        {/* Quick Broadcast Overrides & ON AIR */}
-        <div className="live-controls-group">
-          <div className="live-override-btns" role="group" aria-label="Broadcast overrides">
-            <button
-              type="button"
-              className={`override-pill-btn is-logo ${isLogoActive ? 'is-active' : ''}`}
-              onClick={() => dispatch(toggleLogo())}
-              title="Toggle Church Logo (L or F3)"
-              aria-keyshortcuts="L F3"
-              aria-pressed={isLogoActive}
-            >
-              Logo
-            </button>
-            <button
-              type="button"
-              className={`override-pill-btn is-blackout ${isBlackout ? 'is-active' : ''}`}
-              onClick={() => dispatch(toggleBlackout())}
-              title="Toggle Black Screen (B or F1)"
-              aria-keyshortcuts="B F1"
-              aria-pressed={isBlackout}
-            >
-              Black
-            </button>
-            <button
-              type="button"
-              className={`override-pill-btn is-clear ${isTextCleared ? 'is-active' : ''}`}
-              onClick={() => dispatch(toggleClearText())}
-              title="Clear Lyrics / Background Only (C or F2)"
-              aria-keyshortcuts="C F2"
-              aria-pressed={isTextCleared}
-            >
-              Clear
-            </button>
-          </div>
-
+        <div className="column-header-actions">
+          {liveItem && (
+            <>
+              <span className="deck-type-badge">
+                {liveItem.type === 'SONG' ? (
+                  <MusicIcon size={12} />
+                ) : liveItem.type === 'VIDEO' ? (
+                  <VideoIcon size={12} />
+                ) : liveItem.type === 'PPT' || liveItem.type === 'CANVA' ? (
+                  <PresentationIcon size={12} />
+                ) : (
+                  <LayersIcon size={12} />
+                )}
+                <span className="deck-type-label">{liveItem.type}</span>
+              </span>
+              <span className="deck-slide-count" title={`${liveItem.slides.length} slides`}>
+                <LayersIcon size={12} /> {liveItem.slides.length}
+              </span>
+            </>
+          )}
           <button
             type="button"
-            className={`master-onair-btn ${isProjectorActive ? 'is-live' : 'is-standby'}`}
-            onClick={onToggleOnAir}
-            title={
-              isProjectorActive
-                ? `Sanctuary output is ON AIR (${outputDimensions.width}×${outputDimensions.height}). Click or press F5 to take Off Air`
-                : 'Take Sanctuary Output ON AIR (F5 or F6)'
-            }
-            aria-keyshortcuts="F5 F6"
-            aria-pressed={isProjectorActive}
+            className="shortcut-help-trigger"
+            onClick={() => setShowShortcutsModal(true)}
+            title="Keyboard Shortcuts & Clicker Guide"
+            aria-label="View Keyboard Shortcuts"
           >
-            <span className={`onair-dot ${isProjectorActive ? 'is-pulsing' : ''}`} />
-            <RadioIcon size={13} />
-            <span>ON AIR</span>
+            <HelpCircleIcon size={14} />
           </button>
         </div>
       </div>
@@ -280,6 +263,20 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
         )}
       </div>
 
+      {/* Horizontal Resizer between Slide List and Live Monitor Dock */}
+      <div
+        className={`horizontal-monitor-resizer ${isResizingMonitor ? 'is-active' : ''}`}
+        onMouseDown={onStartResizeMonitor}
+        onDoubleClick={onResetMonitorHeight}
+        title="Drag up/down to resize Preview & Live Monitors (Hold Alt for individual) • Double-click to reset"
+        role="separator"
+        tabIndex={0}
+        aria-label="Resize Sanctuary Live Monitor Height"
+        aria-orientation="horizontal"
+      >
+        <div className="horizontal-resizer-grip" />
+      </div>
+
       {/* Bottom Dock: Sanctuary Live Reality Monitor & Video Controls */}
       <div className="column-bottom-dock live-bottom-dock">
         <div className="column-monitor-container live-monitor-container">
@@ -295,19 +292,10 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
               >
                 {outputDimensions.width}×{outputDimensions.height}
               </span>
-              <button
-                type="button"
-                className="shortcut-help-trigger"
-                onClick={() => setShowShortcutsModal(true)}
-                title="View Keyboard Shortcuts & Clicker Guide"
-                aria-label="View Keyboard Shortcuts"
-              >
-                <HelpCircleIcon size={13} />
-              </button>
             </div>
           </div>
 
-          <div className="monitor-frame-box">
+          <div className="monitor-frame-box" style={{ height: `${monitorHeight}px` }}>
             <ScaledRealityMonitor
               slide={liveSlide}
               backgroundGradient={activeBackground.gradient}

@@ -234,6 +234,16 @@ export const useProjectorOutput = (): UseProjectorOutputReturn => {
     }
   }, [isProjectorActive, handleCloseOutput, handleOpenOutput]);
 
+  useEffect(() => {
+    const handleToggleEvent = () => {
+      handleToggleOnAir();
+    };
+    window.addEventListener('bunsenworship:toggle-onair', handleToggleEvent);
+    return () => {
+      window.removeEventListener('bunsenworship:toggle-onair', handleToggleEvent);
+    };
+  }, [handleToggleOnAir]);
+
   return {
     isProjectorActive,
     projectorSource,

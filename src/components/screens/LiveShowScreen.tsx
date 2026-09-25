@@ -40,6 +40,10 @@ const DEFAULT_PREVIEW_SPLIT = 50; // 50% Preview, 50% Live
 const MIN_PREVIEW_SPLIT = 30;
 const MAX_PREVIEW_SPLIT = 70;
 
+const DEFAULT_MONITOR_HEIGHT = 190;
+const MIN_MONITOR_HEIGHT = 100;
+const MAX_MONITOR_HEIGHT = 440;
+
 const persistValue = (key: string, val: number) => {
   try {
     localStorage.setItem(key, String(val));
@@ -97,29 +101,81 @@ export const LiveShowScreen: React.FC = () => {
     return DEFAULT_PREVIEW_SPLIT;
   });
 
-  const [activeResizer, setActiveResizer] = useState<'left' | 'center' | null>(null);
+  // Monitor dock height states with localStorage persistence
+  const [previewMonitorHeight, setPreviewMonitorHeight] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('bunsenworship_preview_monitor_height');
+      if (saved) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val) && val >= MIN_MONITOR_HEIGHT && val <= MAX_MONITOR_HEIGHT) {
+          return val;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_MONITOR_HEIGHT;
+  });
+
+  const [liveMonitorHeight, setLiveMonitorHeight] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('bunsenworship_live_monitor_height');
+      if (saved) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val) && val >= MIN_MONITOR_HEIGHT && val <= MAX_MONITOR_HEIGHT) {
+          return val;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_MONITOR_HEIGHT;
+  });
+
+  const [activeResizer, setActiveResizer] = useState<
+    'left' | 'center' | 'preview-monitor' | 'live-monitor' | null
+  >(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
-    active: 'left' | 'center' | null;
+    active: 'left' | 'center' | 'preview-monitor' | 'live-monitor' | null;
     startX: number;
+    startY: number;
     startWidth: number;
     startSplit: number;
+    startPreviewHeight: number;
+    startLiveHeight: number;
+    isIndividual: boolean;
     totalWidth: number;
   }>({
     active: null,
     startX: 0,
+    startY: 0,
     startWidth: 0,
     startSplit: 0,
+    startPreviewHeight: 0,
+    startLiveHeight: 0,
+    isIndividual: false,
     totalWidth: 0,
   });
 
-  // Global mouse move and up listeners for fluid column resizing
+  // Global mouse move and up listeners for fluid column and monitor resizing
   useEffect(() => {
     if (!activeResizer) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const { active, startX, startWidth, startSplit, totalWidth } = dragRef.current;
+      const {
+        active,
+        startX,
+        startY,
+        startWidth,
+        startSplit,
+        startPreviewHeight,
+        startLiveHeight,
+        isIndividual,
+        totalWidth,
+      } = dragRef.current;
+
       if (active === 'left') {
         const delta = e.clientX - startX;
         const nextWidth = Math.min(
@@ -136,6 +192,26 @@ export const LiveShowScreen: React.FC = () => {
           Math.max(MIN_PREVIEW_SPLIT, Math.round(startSplit + splitDelta))
         );
         setPreviewSplit(nextSplit);
+      } else if (active === 'preview-monitor') {
+        const deltaY = e.clientY - startY;
+        const nextHeight = Math.min(
+          MAX_MONITOR_HEIGHT,
+          Math.max(MIN_MONITOR_HEIGHT, startPreviewHeight - deltaY)
+        );
+        setPreviewMonitorHeight(nextHeight);
+        if (!isIndividual && !e.altKey) {
+          setLiveMonitorHeight(nextHeight);
+        }
+      } else if (active === 'live-monitor') {
+        const deltaY = e.clientY - startY;
+        const nextHeight = Math.min(
+          MAX_MONITOR_HEIGHT,
+          Math.max(MIN_MONITOR_HEIGHT, startLiveHeight - deltaY)
+        );
+        setLiveMonitorHeight(nextHeight);
+        if (!isIndividual && !e.altKey) {
+          setPreviewMonitorHeight(nextHeight);
+        }
       }
     };
 
@@ -150,6 +226,15 @@ export const LiveShowScreen: React.FC = () => {
         setPreviewSplit((current) => {
           persistValue('bunsenworship_preview_split', current);
           return current;
+        });
+      } else if (active === 'preview-monitor' || active === 'live-monitor') {
+        setPreviewMonitorHeight((currentPreview) => {
+          persistValue('bunsenworship_preview_monitor_height', currentPreview);
+          return currentPreview;
+        });
+        setLiveMonitorHeight((currentLive) => {
+          persistValue('bunsenworship_live_monitor_height', currentLive);
+          return currentLive;
         });
       }
 
@@ -171,8 +256,12 @@ export const LiveShowScreen: React.FC = () => {
     dragRef.current = {
       active: 'left',
       startX: e.clientX,
+      startY: e.clientY,
       startWidth: rundownWidth,
       startSplit: previewSplit,
+      startPreviewHeight: previewMonitorHeight,
+      startLiveHeight: liveMonitorHeight,
+      isIndividual: false,
       totalWidth: containerRef.current?.clientWidth || window.innerWidth,
     };
     setActiveResizer('left');
@@ -183,11 +272,47 @@ export const LiveShowScreen: React.FC = () => {
     dragRef.current = {
       active: 'center',
       startX: e.clientX,
+      startY: e.clientY,
       startWidth: rundownWidth,
       startSplit: previewSplit,
+      startPreviewHeight: previewMonitorHeight,
+      startLiveHeight: liveMonitorHeight,
+      isIndividual: false,
       totalWidth: containerRef.current?.clientWidth || window.innerWidth,
     };
     setActiveResizer('center');
+  };
+
+  const startDraggingPreviewMonitor = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = {
+      active: 'preview-monitor',
+      startX: e.clientX,
+      startY: e.clientY,
+      startWidth: rundownWidth,
+      startSplit: previewSplit,
+      startPreviewHeight: previewMonitorHeight,
+      startLiveHeight: liveMonitorHeight,
+      isIndividual: e.altKey || e.ctrlKey,
+      totalWidth: containerRef.current?.clientWidth || window.innerWidth,
+    };
+    setActiveResizer('preview-monitor');
+  };
+
+  const startDraggingLiveMonitor = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = {
+      active: 'live-monitor',
+      startX: e.clientX,
+      startY: e.clientY,
+      startWidth: rundownWidth,
+      startSplit: previewSplit,
+      startPreviewHeight: previewMonitorHeight,
+      startLiveHeight: liveMonitorHeight,
+      isIndividual: e.altKey || e.ctrlKey,
+      totalWidth: containerRef.current?.clientWidth || window.innerWidth,
+    };
+    setActiveResizer('live-monitor');
   };
 
   const handleResetLeft = () => {
@@ -198,6 +323,20 @@ export const LiveShowScreen: React.FC = () => {
   const handleResetCenter = () => {
     setPreviewSplit(DEFAULT_PREVIEW_SPLIT);
     persistValue('bunsenworship_preview_split', DEFAULT_PREVIEW_SPLIT);
+  };
+
+  const handleResetPreviewMonitor = () => {
+    setPreviewMonitorHeight(DEFAULT_MONITOR_HEIGHT);
+    setLiveMonitorHeight(DEFAULT_MONITOR_HEIGHT);
+    persistValue('bunsenworship_preview_monitor_height', DEFAULT_MONITOR_HEIGHT);
+    persistValue('bunsenworship_live_monitor_height', DEFAULT_MONITOR_HEIGHT);
+  };
+
+  const handleResetLiveMonitor = () => {
+    setPreviewMonitorHeight(DEFAULT_MONITOR_HEIGHT);
+    setLiveMonitorHeight(DEFAULT_MONITOR_HEIGHT);
+    persistValue('bunsenworship_preview_monitor_height', DEFAULT_MONITOR_HEIGHT);
+    persistValue('bunsenworship_live_monitor_height', DEFAULT_MONITOR_HEIGHT);
   };
 
   // Global hotkeys for worship console operator
@@ -308,11 +447,16 @@ export const LiveShowScreen: React.FC = () => {
     selectedRundownId,
   ]);
 
+  const isResizingVertical =
+    activeResizer === 'preview-monitor' || activeResizer === 'live-monitor';
+
   return (
     <div className="live-show-screen">
       <div
         ref={containerRef}
-        className={`live-console-container easyworship-layout ${activeResizer ? 'is-resizing' : ''}`}
+        className={`live-console-container easyworship-layout ${
+          activeResizer ? 'is-resizing' : ''
+        } ${isResizingVertical ? 'is-resizing-vertical' : ''}`}
         aria-label="Live presentation console"
       >
         {/* Column 1: Schedule (Service Rundown) */}
@@ -342,7 +486,13 @@ export const LiveShowScreen: React.FC = () => {
           className="live-console-section preview-section"
           style={{ flex: `${previewSplit} 1 0%`, minWidth: '320px' }}
         >
-          <PreviewColumn outputDimensions={outputDimensions} />
+          <PreviewColumn
+            outputDimensions={outputDimensions}
+            monitorHeight={previewMonitorHeight}
+            onStartResizeMonitor={startDraggingPreviewMonitor}
+            onResetMonitorHeight={handleResetPreviewMonitor}
+            isResizingMonitor={activeResizer === 'preview-monitor'}
+          />
         </div>
 
         {/* Resizer 2 (Center: Preview <-> Live) */}
@@ -366,8 +516,11 @@ export const LiveShowScreen: React.FC = () => {
         >
           <LiveColumn
             isProjectorActive={isProjectorActive}
-            onToggleOnAir={handleToggleOnAir}
             outputDimensions={outputDimensions}
+            monitorHeight={liveMonitorHeight}
+            onStartResizeMonitor={startDraggingLiveMonitor}
+            onResetMonitorHeight={handleResetLiveMonitor}
+            isResizingMonitor={activeResizer === 'live-monitor'}
           />
         </div>
       </div>

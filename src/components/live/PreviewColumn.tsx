@@ -51,9 +51,19 @@ import {
 
 interface PreviewColumnProps {
   outputDimensions?: { width: number; height: number };
+  monitorHeight: number;
+  onStartResizeMonitor: (e: React.MouseEvent) => void;
+  onResetMonitorHeight: () => void;
+  isResizingMonitor?: boolean;
 }
 
-export const PreviewColumn: React.FC<PreviewColumnProps> = ({ outputDimensions }) => {
+export const PreviewColumn: React.FC<PreviewColumnProps> = ({
+  outputDimensions,
+  monitorHeight,
+  onStartResizeMonitor,
+  onResetMonitorHeight,
+  isResizingMonitor = false,
+}) => {
   const dispatch = useAppDispatch();
   const currentItem = useAppSelector(selectCurrentRundownItem);
   const previewSlideId = useAppSelector(selectPreviewSlideId);
@@ -504,6 +514,20 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({ outputDimensions }
         )}
       </div>
 
+      {/* Horizontal Resizer between Slide List and Preview Monitor Dock */}
+      <div
+        className={`horizontal-monitor-resizer ${isResizingMonitor ? 'is-active' : ''}`}
+        onMouseDown={onStartResizeMonitor}
+        onDoubleClick={onResetMonitorHeight}
+        title="Drag up/down to resize Preview & Live Monitors (Hold Alt for individual) • Double-click to reset"
+        role="separator"
+        tabIndex={0}
+        aria-label="Resize Preview Monitor Height"
+        aria-orientation="horizontal"
+      >
+        <div className="horizontal-resizer-grip" />
+      </div>
+
       {/* Bottom Dock: Controls & Preview Reality Monitor */}
       <div className="column-bottom-dock preview-bottom-dock">
         <div className="preview-action-row">
@@ -583,7 +607,7 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({ outputDimensions }
             </span>
           </div>
 
-          <div className="monitor-frame-box">
+          <div className="monitor-frame-box" style={{ height: `${monitorHeight}px` }}>
             <ScaledRealityMonitor
               slide={previewSlide}
               backgroundGradient={activeBackground.gradient}
