@@ -85,9 +85,11 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
   const videoPlayback = useAppSelector(selectVideoPlayback);
   const isProjectorActive = useAppSelector(selectIsProjectorActive);
 
-  const stageWidth = outputDimensions?.width || 1920;
-  const stageHeight = outputDimensions?.height || 1080;
-  const stageAspectRatio = `${stageWidth} / ${stageHeight}`;
+  const outW = outputDimensions?.width || 1920;
+  const outH = outputDimensions?.height || 1080;
+  const stageWidth = 1920;
+  const stageHeight = Math.round(1920 * (outH / outW));
+  const stageAspectRatio = `${outW} / ${outH}`;
 
   // When projector is active, mute operator preview to prevent dual sound / echo.
   // When projector is closed, operator preview plays audio for rehearsal / preview.
@@ -302,7 +304,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
       style={{ aspectRatio: stageAspectRatio }}
     >
       <div className="monitor-dimension-tag">
-        {stageWidth}×{stageHeight}
+        {outW}×{outH}
       </div>
       <input
         type="file"

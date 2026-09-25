@@ -221,8 +221,12 @@ export const ProjectorWindowView: React.FC = () => {
     }
   }, [isLocalVideo, state.videoPlayback, state.isBlackout, state.isLogoActive, slide?.loop, slide?.videoLoop]);
 
-  // Compute responsive scale factor to fit 1920x1080 stage inside any window resolution
-  const scale = getRealityStageScale(viewportSize.width, viewportSize.height);
+  // Compute responsive scale factor and stage dimensions to fit sanctuary output stage inside any window resolution
+  const outW = viewportSize.width > 0 ? viewportSize.width : 1920;
+  const outH = viewportSize.height > 0 ? viewportSize.height : 1080;
+  const stageWidth = 1920;
+  const stageHeight = Math.round(1920 * (outH / outW));
+  const scale = getRealityStageScale(viewportSize.width, viewportSize.height, stageWidth, stageHeight);
 
   const lines = slide?.lines || [];
   const { fontSize, lineHeight } = getStageTypographicMetrics(lines);
@@ -289,17 +293,17 @@ export const ProjectorWindowView: React.FC = () => {
         }}
       />
 
-      {/* 1920x1080 Scaled Reality Stage (Maintains exact 1:1 fidelity with Live Monitor) */}
+      {/* Dynamic Scaled Reality Stage (Maintains exact 1:1 fidelity with Live Monitor) */}
       <div
         className="sanctuary-virtual-stage"
         style={{
           position: 'absolute',
           top: '50%',
           left: '50%',
-          marginTop: -540,
-          marginLeft: -960,
-          width: 1920,
-          height: 1080,
+          marginTop: -stageHeight / 2,
+          marginLeft: -stageWidth / 2,
+          width: stageWidth,
+          height: stageHeight,
           transform: `scale(${scale})`,
           transformOrigin: 'center center',
           overflow: 'hidden',
