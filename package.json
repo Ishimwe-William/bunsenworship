@@ -76,7 +76,9 @@
         "rpm"
       ],
       "icon": "src/assets/AppIcon-512.png",
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "desktopName": "bunsenworship.desktop",
+      "syncDesktopName": true
     },
     "directories": {
       "output": "dist-release"
