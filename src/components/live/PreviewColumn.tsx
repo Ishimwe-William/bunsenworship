@@ -150,7 +150,8 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
     if (isBlackout || isLogoActive) {
       dispatch(clearAllOverrides());
     }
-    dispatch(takeSlideDirectlyLive({ rundownId: currentItem.id, slideId }));
+    dispatch(setPreviewSlide({ rundownId: currentItem.id, slideId }));
+    dispatch(takeLive());
   };
 
   const handleGoLive = () => {

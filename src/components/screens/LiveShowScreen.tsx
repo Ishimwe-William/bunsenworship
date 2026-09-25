@@ -32,8 +32,8 @@ import {
 } from '../../store/features/presentation';
 import '../live/LiveConsole.css';
 
-const DEFAULT_RUNDOWN_WIDTH = 280;
-const MIN_RUNDOWN_WIDTH = 200;
+const DEFAULT_RUNDOWN_WIDTH = 260;
+const MIN_RUNDOWN_WIDTH = 180;
 const MAX_RUNDOWN_WIDTH = 440;
 
 const DEFAULT_PREVIEW_SPLIT = 50; // 50% Preview, 50% Live
@@ -163,59 +163,75 @@ export const LiveShowScreen: React.FC = () => {
   useEffect(() => {
     if (!activeResizer) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const {
-        active,
-        startX,
-        startY,
-        startWidth,
-        startSplit,
-        startPreviewHeight,
-        startLiveHeight,
-        isIndividual,
-        totalWidth,
-      } = dragRef.current;
+    let rafId: number | null = null;
 
-      if (active === 'left') {
-        const delta = e.clientX - startX;
-        const nextWidth = Math.min(
-          MAX_RUNDOWN_WIDTH,
-          Math.max(MIN_RUNDOWN_WIDTH, startWidth + delta)
-        );
-        setRundownWidth(nextWidth);
-      } else if (active === 'center') {
-        const delta = e.clientX - startX;
-        const remainingWidth = Math.max(200, totalWidth - rundownWidth);
-        const splitDelta = (delta / remainingWidth) * 100;
-        const nextSplit = Math.min(
-          MAX_PREVIEW_SPLIT,
-          Math.max(MIN_PREVIEW_SPLIT, Math.round(startSplit + splitDelta))
-        );
-        setPreviewSplit(nextSplit);
-      } else if (active === 'preview-monitor') {
-        const deltaY = e.clientY - startY;
-        const nextHeight = Math.min(
-          MAX_MONITOR_HEIGHT,
-          Math.max(MIN_MONITOR_HEIGHT, startPreviewHeight - deltaY)
-        );
-        setPreviewMonitorHeight(nextHeight);
-        if (!isIndividual && !e.altKey) {
-          setLiveMonitorHeight(nextHeight);
-        }
-      } else if (active === 'live-monitor') {
-        const deltaY = e.clientY - startY;
-        const nextHeight = Math.min(
-          MAX_MONITOR_HEIGHT,
-          Math.max(MIN_MONITOR_HEIGHT, startLiveHeight - deltaY)
-        );
-        setLiveMonitorHeight(nextHeight);
-        if (!isIndividual && !e.altKey) {
-          setPreviewMonitorHeight(nextHeight);
-        }
+    const handleMouseMove = (e: MouseEvent) => {
+      const clientX = e.clientX;
+      const clientY = e.clientY;
+      const isAltKey = e.altKey;
+
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
       }
+
+      rafId = requestAnimationFrame(() => {
+        const {
+          active,
+          startX,
+          startY,
+          startWidth,
+          startSplit,
+          startPreviewHeight,
+          startLiveHeight,
+          isIndividual,
+          totalWidth,
+        } = dragRef.current;
+
+        if (active === 'left') {
+          const delta = clientX - startX;
+          const nextWidth = Math.min(
+            MAX_RUNDOWN_WIDTH,
+            Math.max(MIN_RUNDOWN_WIDTH, startWidth + delta)
+          );
+          setRundownWidth(nextWidth);
+        } else if (active === 'center') {
+          const delta = clientX - startX;
+          const remainingWidth = Math.max(200, totalWidth - rundownWidth);
+          const splitDelta = (delta / remainingWidth) * 100;
+          const nextSplit = Math.min(
+            MAX_PREVIEW_SPLIT,
+            Math.max(MIN_PREVIEW_SPLIT, Math.round(startSplit + splitDelta))
+          );
+          setPreviewSplit(nextSplit);
+        } else if (active === 'preview-monitor') {
+          const deltaY = clientY - startY;
+          const nextHeight = Math.min(
+            MAX_MONITOR_HEIGHT,
+            Math.max(MIN_MONITOR_HEIGHT, startPreviewHeight - deltaY)
+          );
+          setPreviewMonitorHeight(nextHeight);
+          if (!isIndividual && !isAltKey) {
+            setLiveMonitorHeight(nextHeight);
+          }
+        } else if (active === 'live-monitor') {
+          const deltaY = clientY - startY;
+          const nextHeight = Math.min(
+            MAX_MONITOR_HEIGHT,
+            Math.max(MIN_MONITOR_HEIGHT, startLiveHeight - deltaY)
+          );
+          setLiveMonitorHeight(nextHeight);
+          if (!isIndividual && !isAltKey) {
+            setPreviewMonitorHeight(nextHeight);
+          }
+        }
+      });
     };
 
     const handleMouseUp = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+
       const { active } = dragRef.current;
       if (active === 'left') {
         setRundownWidth((current) => {
@@ -246,6 +262,9 @@ export const LiveShowScreen: React.FC = () => {
     window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
@@ -359,37 +378,32 @@ export const LiveShowScreen: React.FC = () => {
         return;
       }
 
-      if (e.key === 'Enter' || e.key === 'F4') {
+      if (e.key === 'Enter' || e.key === 'F4' || e.key === ' ' || e.key === 'PageDown') {
         e.preventDefault();
         if (hasActiveOverride) {
           dispatch(clearAllOverrides());
         }
         dispatch(takeLive());
-      } else if (e.key === ' ' || e.key === 'ArrowDown' || e.key === 'PageDown') {
+      } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (isLive && liveSlideId) {
-          dispatch(advanceLiveSlide());
-        } else {
-          dispatch(advanceSlide());
-        }
-      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        dispatch(advanceSlide());
+      } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        if (isLive && liveSlideId) {
-          dispatch(previousLiveSlide());
-        } else {
-          dispatch(previousSlide());
-        }
+        dispatch(previousSlide());
+      } else if (e.key === 'PageUp') {
+        e.preventDefault();
+        dispatch(previousLiveSlide());
       } else if (e.key === 'Home') {
         e.preventDefault();
         const currentItem = rundown.find((r) => r.id === selectedRundownId);
         if (currentItem && currentItem.slides.length > 0) {
-          dispatch(setPreviewSlide({ slideId: currentItem.slides[0].id }));
+          dispatch(setPreviewSlide({ rundownId: currentItem.id, slideId: currentItem.slides[0].id }));
         }
       } else if (e.key === 'End') {
         e.preventDefault();
         const currentItem = rundown.find((r) => r.id === selectedRundownId);
         if (currentItem && currentItem.slides.length > 0) {
-          dispatch(setPreviewSlide({ slideId: currentItem.slides[currentItem.slides.length - 1].id }));
+          dispatch(setPreviewSlide({ rundownId: currentItem.id, slideId: currentItem.slides[currentItem.slides.length - 1].id }));
         }
       } else if (e.key === 'F5' || e.key === 'F6') {
         e.preventDefault();
@@ -484,7 +498,7 @@ export const LiveShowScreen: React.FC = () => {
         {/* Column 2: Preview Column */}
         <div
           className="live-console-section preview-section"
-          style={{ flex: `${previewSplit} 1 0%`, minWidth: '320px' }}
+          style={{ flex: `${previewSplit} 1 0%`, minWidth: '220px' }}
         >
           <PreviewColumn
             outputDimensions={outputDimensions}
@@ -512,7 +526,7 @@ export const LiveShowScreen: React.FC = () => {
         {/* Column 3: Live Program Column */}
         <div
           className="live-console-section live-section"
-          style={{ flex: `${100 - previewSplit} 1 0%`, minWidth: '320px' }}
+          style={{ flex: `${100 - previewSplit} 1 0%`, minWidth: '220px' }}
         >
           <LiveColumn
             isProjectorActive={isProjectorActive}

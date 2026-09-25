@@ -247,6 +247,17 @@ export const presentationSlice = createSlice({
       state.previewSlideId = action.payload.slideId;
     },
     takeLive: (state) => {
+      if (!state.previewSlideId && state.selectedRundownId) {
+        const item = state.rundown.find((r) => r.id === state.selectedRundownId);
+        if (item && item.slides.length > 0) {
+          state.previewSlideId = item.slides[0].id;
+        }
+      }
+      if (!state.previewSlideId && state.rundown.length > 0 && state.rundown[0].slides.length > 0) {
+        state.selectedRundownId = state.rundown[0].id;
+        state.previewSlideId = state.rundown[0].slides[0].id;
+      }
+
       if (state.previewSlideId) {
         state.liveSlideId = state.previewSlideId;
         state.liveRundownId = state.selectedRundownId;
@@ -275,18 +286,25 @@ export const presentationSlice = createSlice({
             }
             if (targetSlide.videoMuted !== undefined) {
               state.videoPlayback.isMuted = targetSlide.videoMuted;
-            } else {
-              state.videoPlayback.isMuted = true;
             }
             if (targetSlide.videoPlaybackRate !== undefined) {
               state.videoPlayback.playbackRate = targetSlide.videoPlaybackRate;
             }
           }
 
-          // Auto-advance preview to the subsequent slide in the deck
+          // Auto-advance preview to subsequent slide in deck, or cue first slide of next rundown item
           const currentIndex = currentItem.slides.findIndex((s) => s.id === state.previewSlideId);
           if (currentIndex >= 0 && currentIndex < currentItem.slides.length - 1) {
             state.previewSlideId = currentItem.slides[currentIndex + 1].id;
+          } else {
+            const currentRundownIdx = state.rundown.findIndex((r) => r.id === state.selectedRundownId);
+            if (currentRundownIdx >= 0 && currentRundownIdx < state.rundown.length - 1) {
+              const nextRundown = state.rundown[currentRundownIdx + 1];
+              state.selectedRundownId = nextRundown.id;
+              if (nextRundown.slides.length > 0) {
+                state.previewSlideId = nextRundown.slides[0].id;
+              }
+            }
           }
         }
       }
@@ -296,6 +314,7 @@ export const presentationSlice = createSlice({
       action: PayloadAction<{ rundownId: string; slideId: string }>
     ) => {
       state.selectedRundownId = action.payload.rundownId;
+      state.previewSlideId = action.payload.slideId;
       state.liveRundownId = action.payload.rundownId;
       state.liveSlideId = action.payload.slideId;
       state.isLive = true;
@@ -323,18 +342,25 @@ export const presentationSlice = createSlice({
           }
           if (targetSlide.videoMuted !== undefined) {
             state.videoPlayback.isMuted = targetSlide.videoMuted;
-          } else {
-            state.videoPlayback.isMuted = true;
           }
           if (targetSlide.videoPlaybackRate !== undefined) {
             state.videoPlayback.playbackRate = targetSlide.videoPlaybackRate;
           }
         }
 
-        // Set preview to next slide
+        // Set preview to next slide, or cue first slide of next rundown item
         const currentIndex = currentItem.slides.findIndex((s) => s.id === action.payload.slideId);
         if (currentIndex >= 0 && currentIndex < currentItem.slides.length - 1) {
           state.previewSlideId = currentItem.slides[currentIndex + 1].id;
+        } else {
+          const currentRundownIdx = state.rundown.findIndex((r) => r.id === action.payload.rundownId);
+          if (currentRundownIdx >= 0 && currentRundownIdx < state.rundown.length - 1) {
+            const nextRundown = state.rundown[currentRundownIdx + 1];
+            state.selectedRundownId = nextRundown.id;
+            if (nextRundown.slides.length > 0) {
+              state.previewSlideId = nextRundown.slides[0].id;
+            }
+          }
         }
       }
     },
@@ -429,14 +455,19 @@ export const presentationSlice = createSlice({
       if (currentIdx > 0) {
         const prevSlide = liveItem.slides[currentIdx - 1];
         state.liveSlideId = prevSlide.id;
+        state.previewSlideId = prevSlide.id;
+        state.selectedRundownId = liveItem.id;
         state.isLive = true;
       } else {
         const currentRundownIdx = state.rundown.findIndex((r) => r.id === state.liveRundownId);
         if (currentRundownIdx > 0) {
           const prevRundown = state.rundown[currentRundownIdx - 1];
           state.liveRundownId = prevRundown.id;
+          state.selectedRundownId = prevRundown.id;
           if (prevRundown.slides.length > 0) {
-            state.liveSlideId = prevRundown.slides[prevRundown.slides.length - 1].id;
+            const prevSlide = prevRundown.slides[prevRundown.slides.length - 1];
+            state.liveSlideId = prevSlide.id;
+            state.previewSlideId = prevSlide.id;
             state.isLive = true;
           }
         }

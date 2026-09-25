@@ -2,13 +2,16 @@ import React, { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectLiveSlide,
+  selectPreviewSlideId,
+  selectSelectedRundownId,
   selectTransitionType,
   selectFadeDuration,
   selectActiveBackground,
   selectIsBlackout,
   selectIsTextCleared,
   selectIsLogoActive,
-  takeSlideDirectlyLive,
+  setPreviewSlide,
+  takeLive,
   clearAllOverrides,
 } from '../../store/features/presentation';
 import {
@@ -51,6 +54,8 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
 }) => {
   const dispatch = useAppDispatch();
   const { slide: liveSlide, rundownItem: liveItem } = useAppSelector(selectLiveSlide);
+  const previewSlideId = useAppSelector(selectPreviewSlideId);
+  const selectedRundownId = useAppSelector(selectSelectedRundownId);
   const transitionType = useAppSelector(selectTransitionType);
   const fadeDuration = useAppSelector(selectFadeDuration);
   const activeBackground = useAppSelector(selectActiveBackground);
@@ -61,12 +66,20 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
   const [brokenThumbs, setBrokenThumbs] = useState<Record<string, boolean>>({});
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
+  // Single-clicking any slide cues it into the Preview Section first
   const handleLiveSlideClick = (slideId: string) => {
+    if (!liveItem) return;
+    dispatch(setPreviewSlide({ rundownId: liveItem.id, slideId }));
+  };
+
+  // Double-clicking cues it in preview and takes it live
+  const handleLiveSlideDoubleClick = (slideId: string) => {
     if (!liveItem) return;
     if (isBlackout || isLogoActive) {
       dispatch(clearAllOverrides());
     }
-    dispatch(takeSlideDirectlyLive({ rundownId: liveItem.id, slideId }));
+    dispatch(setPreviewSlide({ rundownId: liveItem.id, slideId }));
+    dispatch(takeLive());
   };
 
   const hasLiveVideo = Boolean(
@@ -138,6 +151,7 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
         ) : (
           liveItem.slides.map((slide, index) => {
             const isLive = slide.id === liveSlide?.id;
+            const isCuedInPreview = previewSlideId === slide.id && selectedRundownId === liveItem.id;
             const isYouTube = Boolean(extractYouTubeId(slide));
             const hasVideo = Boolean(
               (isYouTube ||
@@ -159,18 +173,26 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
             return (
               <div
                 key={slide.id}
-                className={`slide-item-card live-item-card ${isLive ? 'is-live is-active-live' : ''}`}
+                className={`slide-item-card live-item-card ${isLive ? 'is-live is-active-live' : ''} ${
+                  isCuedInPreview && !isLive ? 'is-preview' : ''
+                }`}
                 onClick={() => handleLiveSlideClick(slide.id)}
+                onDoubleClick={() => handleLiveSlideDoubleClick(slide.id)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                  if (e.key === 'Enter') {
                     e.preventDefault();
                     handleLiveSlideClick(slide.id);
+                  } else if (e.key === ' ') {
+                    e.preventDefault();
+                    handleLiveSlideDoubleClick(slide.id);
                   }
                 }}
                 role="button"
                 tabIndex={0}
-                aria-label={`${slide.section}, slide ${index + 1}${isLive ? ', currently live' : ''}`}
-                title="Click this verse to present it LIVE immediately on screen"
+                aria-label={`${slide.section}, slide ${index + 1}${
+                  isLive ? ', currently live' : isCuedInPreview ? ', cued in preview' : ''
+                }`}
+                title="Click to Cue in Preview • Double-click or press Enter to Go Live"
               >
                 <div className="slide-item-top">
                   <div className="slide-item-info">
@@ -194,8 +216,12 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
                         <span className="live-indicator" />
                         LIVE NOW
                       </span>
+                    ) : isCuedInPreview ? (
+                      <span className="slide-status-tag tag-cued-preview">
+                        CUED IN PREVIEW
+                      </span>
                     ) : (
-                      <span className="slide-status-hint">Click to Air</span>
+                      <span className="slide-status-hint">Click to Preview</span>
                     )}
                   </div>
                 </div>
@@ -333,9 +359,10 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
               </button>
             </div>
             <div className="shortcuts-modal-grid">
-              <div><kbd>Enter / F4</kbd><span>Go Live (take preview to live)</span></div>
-              <div><kbd>Space / Down / PgDn</kbd><span>Next slide on screen</span></div>
-              <div><kbd>Up / PgUp</kbd><span>Previous slide</span></div>
+              <div><kbd>Enter / F4</kbd><span>Go Live (take preview slide to sanctuary output)</span></div>
+              <div><kbd>Space / PgDn</kbd><span>Presenter Clicker: Take preview live & cue next slide</span></div>
+              <div><kbd>Down / Up</kbd><span>Operator: Cue next / previous slide in Preview only</span></div>
+              <div><kbd>PgUp</kbd><span>Presenter Clicker: Previous slide</span></div>
               <div><kbd>Home / End</kbd><span>First / Last slide of song</span></div>
               <div><kbd>F5 / F6</kbd><span>Toggle Sanctuary ON AIR output</span></div>
               <div><kbd>1 / 2</kbd><span>Cut / Fade transition</span></div>

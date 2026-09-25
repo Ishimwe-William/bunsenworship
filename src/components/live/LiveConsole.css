@@ -4728,4 +4728,99 @@
   color: var(--text-secondary, #cbd5e1);
 }
 
+/* ==========================================================================
+   Responsiveness & Preview-First Presentation Styling
+   ========================================================================== */
+
+/* Pointer-events isolation during resizer dragging to guarantee 60fps tracking without iframe lock */
+.live-console-container.is-resizing iframe,
+.live-console-container.is-resizing video,
+.live-console-container.is-resizing .monitor-frame-box,
+.live-console-container.is-resizing .scaled-reality-monitor,
+.live-console-container.is-resizing-vertical iframe,
+.live-console-container.is-resizing-vertical video,
+.live-console-container.is-resizing-vertical .monitor-frame-box,
+.live-console-container.is-resizing-vertical .scaled-reality-monitor {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* EasyWorship Preview Deck Styling: Blue for Preview, Red for Live */
+.easyworship-layout .slide-item-card.is-preview {
+  border-color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+  box-shadow: 0 0 0 1px #3b82f6, 0 4px 14px rgba(59, 130, 246, 0.2) !important;
+}
+
+.easyworship-layout .slide-item-card.is-preview .slide-section-label {
+  color: #60a5fa !important;
+}
+
+.slide-status-tag.tag-cued-preview {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Responsive Container Queries for Columns */
+.preview-column-card,
+.live-column-card {
+  container-type: inline-size;
+}
+
+@container (max-width: 360px) {
+  .deck-type-badge .deck-type-label {
+    display: none;
+  }
+  .column-title {
+    max-width: 140px;
+    font-size: 0.8rem;
+  }
+  .go-live-master-btn {
+    padding: 5px 10px;
+    font-size: 0.725rem;
+  }
+  .go-live-master-btn kbd {
+    display: none;
+  }
+}
+
+@container (max-width: 290px) {
+  .deck-slide-count {
+    display: none;
+  }
+  .preview-switch-btn {
+    padding: 3px 5px;
+    font-size: 0.65rem;
+  }
+  .preview-action-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .resolution-badge {
+    display: none;
+  }
+  .column-title {
+    max-width: 110px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .rundown-stats {
+    display: none;
+  }
+  .rundown-item-subtitle {
+    display: none;
+  }
+}
+
+
 
