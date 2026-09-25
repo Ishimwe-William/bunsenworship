@@ -8,6 +8,7 @@ import {
 } from '../../utils/videoHelpers';
 import { YouTubePlayer } from './YouTubePlayer';
 import { EmbeddedDeckView } from './EmbeddedDeckView';
+import { getRealityStageScale } from './ScaledRealityMonitor';
 
 export interface ProjectorPayload {
   slide: Slide | null;
@@ -104,6 +105,8 @@ export const ProjectorWindowView: React.FC = () => {
 
     // PowerPoint-style controls: Escape exits presentation, F11 toggles fullscreen
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+
       if (e.key === 'Escape') {
         e.preventDefault();
         if (window.electronAPI?.closeProjectorWindow) {
@@ -194,9 +197,7 @@ export const ProjectorWindowView: React.FC = () => {
   }, [isLocalVideo, state.videoPlayback, state.isBlackout, state.isLogoActive, slide?.loop, slide?.videoLoop]);
 
   // Compute responsive scale factor to fit 1920x1080 stage inside any window resolution
-  const scaleX = viewportSize.width / 1920;
-  const scaleY = viewportSize.height / 1080;
-  const scale = Math.min(scaleX, scaleY);
+  const scale = getRealityStageScale(viewportSize.width, viewportSize.height);
 
   const lines = slide?.lines || [];
   const lineCount = lines.length;
@@ -430,8 +431,11 @@ export const ProjectorWindowView: React.FC = () => {
             style={{
               position: 'relative',
               zIndex: 10,
-              maxWidth: '1780px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               width: '100%',
+              height: '100%',
               padding: '40px 72px',
               color: '#ffffff',
               fontWeight: 800,
@@ -442,6 +446,7 @@ export const ProjectorWindowView: React.FC = () => {
               textShadow:
                 '0 8px 32px rgba(0, 0, 0, 0.95), 0 2px 10px rgba(0, 0, 0, 0.9)',
               boxSizing: 'border-box',
+              wordWrap: 'break-word',
               animation:
                 state.transitionType === 'FADE'
                   ? `stageFadeIn ${state.fadeDuration}s ease-out`
@@ -510,7 +515,7 @@ export const ProjectorWindowView: React.FC = () => {
             {state.source === 'LIVE' ? 'LIVE PROGRAM' : 'NEXT PREVIEW'}
           </span>
           <span style={{ opacity: 0.5 }}>&bull;</span>
-          <span>Esc or F11 to Exit</span>
+          <span>Esc Exit / F11 Fullscreen</span>
           <button
             type="button"
             onClick={() => {
@@ -532,6 +537,7 @@ export const ProjectorWindowView: React.FC = () => {
               marginLeft: '4px',
             }}
             title="Close Projector Output (Esc)"
+            aria-keyshortcuts="Escape"
           >
             &times; Exit
           </button>

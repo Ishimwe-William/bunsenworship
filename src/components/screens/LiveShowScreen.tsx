@@ -19,13 +19,20 @@ const DEFAULT_MONITOR_WIDTH = 360;
 const MIN_MONITOR_WIDTH = 280;
 const MAX_MONITOR_WIDTH = 600;
 
+const persistColumnWidth = (key: string, width: number) => {
+  try {
+    localStorage.setItem(key, String(width));
+  } catch {
+    return;
+  }
+};
+
 export const LiveShowScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const isBlackout = useAppSelector(selectIsBlackout);
   const isTextCleared = useAppSelector(selectIsTextCleared);
   const isLogoActive = useAppSelector(selectIsLogoActive);
   const { language } = useLanguage();
-
   // Column width states with localStorage persistence
   const [rundownWidth, setRundownWidth] = useState<number>(() => {
     try {
@@ -97,20 +104,12 @@ export const LiveShowScreen: React.FC = () => {
       const { active } = dragRef.current;
       if (active === 'left') {
         setRundownWidth((current) => {
-          try {
-            localStorage.setItem('bunsenworship_rundown_width', String(current));
-          } catch {
-            // ignore
-          }
+          persistColumnWidth('bunsenworship_rundown_width', current);
           return current;
         });
       } else if (active === 'right') {
         setMonitorWidth((current) => {
-          try {
-            localStorage.setItem('bunsenworship_monitor_width', String(current));
-          } catch {
-            // ignore
-          }
+          persistColumnWidth('bunsenworship_monitor_width', current);
           return current;
         });
       }
@@ -150,40 +149,49 @@ export const LiveShowScreen: React.FC = () => {
 
   const handleResetLeft = () => {
     setRundownWidth(DEFAULT_RUNDOWN_WIDTH);
-    try {
-      localStorage.setItem('bunsenworship_rundown_width', String(DEFAULT_RUNDOWN_WIDTH));
-    } catch {
-      // ignore
-    }
+    persistColumnWidth('bunsenworship_rundown_width', DEFAULT_RUNDOWN_WIDTH);
   };
 
   const handleResetRight = () => {
     setMonitorWidth(DEFAULT_MONITOR_WIDTH);
-    try {
-      localStorage.setItem('bunsenworship_monitor_width', String(DEFAULT_MONITOR_WIDTH));
-    } catch {
-      // ignore
+    persistColumnWidth('bunsenworship_monitor_width', DEFAULT_MONITOR_WIDTH);
+  };
+
+  const handleResizerKeyDown = (
+    e: React.KeyboardEvent<HTMLDivElement>,
+    side: 'left' | 'right'
+  ) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+
+    e.preventDefault();
+    const direction = e.key === 'ArrowRight' ? 1 : -1;
+
+    if (side === 'left') {
+      const nextWidth = Math.min(
+        MAX_RUNDOWN_WIDTH,
+        Math.max(MIN_RUNDOWN_WIDTH, rundownWidth + direction * 16)
+      );
+      setRundownWidth(nextWidth);
+      persistColumnWidth('bunsenworship_rundown_width', nextWidth);
+    } else {
+      const nextWidth = Math.min(
+        MAX_MONITOR_WIDTH,
+        Math.max(MIN_MONITOR_WIDTH, monitorWidth - direction * 16)
+      );
+      setMonitorWidth(nextWidth);
+      persistColumnWidth('bunsenworship_monitor_width', nextWidth);
     }
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-        height: '100%',
-        flex: 1,
-        minHeight: 0,
-      }}
-    >
+    <div className="live-show-screen">
       {/* Active Global Override Banner */}
       {(isBlackout || isTextCleared || isLogoActive) && (
         <div
           className={`broadcast-override-banner ${
             isBlackout ? 'blackout' : isLogoActive ? 'logo-active' : 'clear-text'
           }`}
-          style={{ margin: 0 }}
+          role="alert"
         >
           <div className="broadcast-override-info">
             {isBlackout && <BlackoutIcon size={18} />}
@@ -205,34 +213,36 @@ export const LiveShowScreen: React.FC = () => {
           </div>
           <button
             type="button"
-            className="btn-secondary"
+            className="override-resume-btn"
             onClick={() => dispatch(clearAllOverrides())}
-            style={{ padding: '3px 10px', fontSize: '0.75rem' }}
+            title={language === 'rw' ? 'Subiza Bisanzwe (Esc)' : 'Resume Presentation (Esc)'}
+            aria-keyshortcuts="Escape"
           >
             {language === 'rw' ? 'Subiza Bisanzwe' : 'Resume Presentation'}
           </button>
         </div>
       )}
 
-      {/* 3-Column Professional Live Presentation Console with Resizable Sections */}
       <div
         className={`live-console-container ${activeResizer ? 'is-resizing' : ''}`}
+        aria-label="Live presentation workspace"
       >
-        {/* Column 1: Service Rundown Playlist */}
         <div
-          className="live-console-section"
+          className="live-console-section rundown-section"
           style={{ width: `${rundownWidth}px`, flexShrink: 0 }}
         >
           <ServiceRundown />
         </div>
 
-        {/* Resizer Splitter 1: Left */}
         <div
           className={`console-resizer-gutter ${activeResizer === 'left' ? 'is-active' : ''}`}
           onMouseDown={startDraggingLeft}
           onDoubleClick={handleResetLeft}
+          onKeyDown={(e) => handleResizerKeyDown(e, 'left')}
           title="Drag to resize Service Rundown • Double-click to reset"
           role="separator"
+          tabIndex={0}
+          aria-label="Resize Service Rundown"
           aria-orientation="vertical"
           aria-valuenow={rundownWidth}
           aria-valuemin={MIN_RUNDOWN_WIDTH}
@@ -241,21 +251,22 @@ export const LiveShowScreen: React.FC = () => {
           <div className="resizer-pill-grip" />
         </div>
 
-        {/* Column 2: Selected Item Slide Deck */}
         <div
-          className="live-console-section"
+          className="live-console-section deck-section"
           style={{ flex: 1, minWidth: '260px' }}
         >
           <SlideDeck />
         </div>
 
-        {/* Resizer Splitter 2: Right */}
         <div
           className={`console-resizer-gutter ${activeResizer === 'right' ? 'is-active' : ''}`}
           onMouseDown={startDraggingRight}
           onDoubleClick={handleResetRight}
+          onKeyDown={(e) => handleResizerKeyDown(e, 'right')}
           title="Drag to resize Program/Preview Monitors • Double-click to reset"
           role="separator"
+          tabIndex={0}
+          aria-label="Resize Program and Preview monitors"
           aria-orientation="vertical"
           aria-valuenow={monitorWidth}
           aria-valuemin={MIN_MONITOR_WIDTH}
@@ -264,9 +275,8 @@ export const LiveShowScreen: React.FC = () => {
           <div className="resizer-pill-grip" />
         </div>
 
-        {/* Column 3: Live Program, Next Preview, Transitions & Action Controls */}
         <div
-          className="live-console-section"
+          className="live-console-section output-section"
           style={{ width: `${monitorWidth}px`, flexShrink: 0 }}
         >
           <ProgramPreviewMonitor />

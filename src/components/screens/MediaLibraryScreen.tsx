@@ -507,7 +507,9 @@ export const MediaLibraryScreen: React.FC = () => {
 
       itemToCreate = {
         title: asset.title,
-        subtitle: `${asset.format} ${asset.resolution || 'Media'} • ${asset.durationOrSlides}`,
+        subtitle: isVideoAsset
+          ? `Video • ${asset.durationOrSlides || 'Media'}`
+          : 'Image',
         time: '09:00',
         type: isVideoAsset ? 'VIDEO' : 'IMAGE',
         slides: [
@@ -1358,11 +1360,10 @@ export const MediaLibraryScreen: React.FC = () => {
                           <span className={`medialib-format-pill ${item.format.toLowerCase()}`}>
                             {item.format}
                           </span>
-                          {item.resolution && (
-                            <span className="medialib-res-pill">{item.resolution}</span>
-                          )}
                         </div>
-                        <span className="medialib-duration-pill">{item.durationOrSlides}</span>
+                        {Boolean(item.durationOrSlides && item.durationOrSlides.toLowerCase() !== 'static') && (
+                          <span className="medialib-duration-pill">{item.durationOrSlides}</span>
+                        )}
                       </div>
                     </div>
                   </div>

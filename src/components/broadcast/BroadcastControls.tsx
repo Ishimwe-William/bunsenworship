@@ -27,13 +27,12 @@ export const BroadcastControls: React.FC = () => {
   // F4: Toggle Go Live, F1: Blackout, F2: Clear Text, F3: Logo, Escape: Clear Overrides
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if active element is an editable input or textarea
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+
       const target = e.target as HTMLElement | null;
       if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
+        target?.closest('input, textarea, select') ||
+        target?.isContentEditable
       ) {
         return;
       }
@@ -60,7 +59,7 @@ export const BroadcastControls: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [dispatch, isLive, isBlackout, isTextCleared, isLogoActive]);
+  }, [dispatch, isBlackout, isTextCleared, isLogoActive]);
 
   return (
     <nav
@@ -75,6 +74,7 @@ export const BroadcastControls: React.FC = () => {
         onClick={() => dispatch(toggleLive())}
         title={isLive ? `${t.common.onAir} (F4)` : t.liveShow.goLive}
         aria-label={isLive ? `${t.common.onAir} (F4)` : t.liveShow.goLive}
+        aria-keyshortcuts="F4"
         aria-pressed={isLive}
       >
         <kbd className="broadcast-hotkey-tag">F4</kbd>
@@ -94,6 +94,7 @@ export const BroadcastControls: React.FC = () => {
         onClick={() => dispatch(toggleBlackout())}
         title={t.liveShow.blackScreen}
         aria-label={t.liveShow.blackScreen}
+        aria-keyshortcuts="F1"
         aria-pressed={isBlackout}
       >
         <kbd className="broadcast-hotkey-tag">F1</kbd>
@@ -108,6 +109,7 @@ export const BroadcastControls: React.FC = () => {
         onClick={() => dispatch(toggleClearText())}
         title={t.liveShow.clearText}
         aria-label={t.liveShow.clearText}
+        aria-keyshortcuts="F2"
         aria-pressed={isTextCleared}
       >
         <kbd className="broadcast-hotkey-tag">F2</kbd>
@@ -122,6 +124,7 @@ export const BroadcastControls: React.FC = () => {
         onClick={() => dispatch(toggleLogo())}
         title={t.liveShow.logo}
         aria-label={t.liveShow.logo}
+        aria-keyshortcuts="F3"
         aria-pressed={isLogoActive}
       >
         <kbd className="broadcast-hotkey-tag">F3</kbd>

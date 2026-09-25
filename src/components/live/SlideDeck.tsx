@@ -26,6 +26,7 @@ import {
   YoutubeIcon,
   PlayIcon,
   PauseIcon,
+  PresentationIcon,
 } from '../common/Icons';
 import { QuickEditModal } from './QuickEditModal';
 import { createNewSlide } from '../../utils/liveShowHelpers';
@@ -114,12 +115,20 @@ export const SlideDeck: React.FC = () => {
     return (
       <section className="slide-deck-col">
         <div className="deck-header">
-          <h3 className="deck-header-title">No Item Selected</h3>
+          <div className="console-section-heading">
+            <span className="console-section-index">02</span>
+            <div className="console-section-heading-copy">
+              <span>Content library</span>
+              <h3 className="deck-header-title">Slide Deck</h3>
+            </div>
+          </div>
         </div>
-        <div className="deck-scroll-list" style={{ justifyContent: 'center', alignItems: 'center' }}>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            Select an item from the Service Rundown to view its slide deck.
-          </p>
+        <div className="deck-empty-state">
+          <div className="deck-empty-icon">
+            <PresentationIcon size={26} />
+          </div>
+          <strong>No item selected</strong>
+          <span>Choose a service item to load its slides.</span>
         </div>
       </section>
     );
@@ -246,30 +255,37 @@ export const SlideDeck: React.FC = () => {
         }}
       />
       <div className="deck-header">
-        <div className="deck-header-left">
-          <h3 className="deck-header-title">
-            {currentItem.title} - {getDeckTypeLabel()}
-          </h3>
+        <div className="console-section-heading deck-heading-main">
+          <span className="console-section-index">02</span>
+          <div className="console-section-heading-copy">
+            <span>Selected content</span>
+            <h3 className="deck-header-title" title={currentItem.title}>
+              {currentItem.title}
+            </h3>
+          </div>
+        </div>
+        <div className="deck-header-actions">
+          <span className="deck-type-badge">{getDeckTypeLabel()}</span>
           <span className="deck-slide-count">
             {currentItem.slides.length} {currentItem.slides.length === 1 ? 'slide' : 'slides'}
           </span>
-        </div>
-        <div className="deck-header-actions">
           <button
             type="button"
             className="deck-action-btn"
             onClick={() => setShowAddSlide(true)}
             title="Add new slide"
+            aria-label="Add new slide"
           >
-            <PlusIcon size={13} />
+            <PlusIcon size={14} />
           </button>
           <button
             type="button"
             className="deck-action-btn"
             onClick={() => setIsEditModalOpen(true)}
             title="Edit slides in this deck"
+            aria-label="Edit slides in this deck"
           >
-            <PencilIcon size={13} />
+            <PencilIcon size={14} />
           </button>
         </div>
       </div>
@@ -282,8 +298,8 @@ export const SlideDeck: React.FC = () => {
           const isDragging = draggedIndex === index;
           const isOver = dragOverIndex === index;
 
-          const youtubeVideoId = extractYouTubeId(slide);
-          const isYouTube = Boolean(youtubeVideoId);
+          const isYouTube = Boolean(extractYouTubeId(slide));
+          const isVideoPlaying = videoPlayback.isPlaying && !isBlackout && !isLogoActive;
           const hasVideo = Boolean(
             (isYouTube ||
               slide.videoType === 'local' ||
@@ -312,6 +328,20 @@ export const SlideDeck: React.FC = () => {
               }`}
               onClick={() => handleSlideClick(slide.id)}
               onDoubleClick={() => handleSlideDoubleClick(slide.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSlideClick(slide.id);
+                } else if (e.key === ' ') {
+                  e.preventDefault();
+                  handleSlideDoubleClick(slide.id);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={`${slide.section}, slide ${index + 1}${
+                isLive ? ', live' : isPreview ? ', next preview' : ''
+              }`}
               title="Click to Preview • Double-click to Take Live • Drag to rearrange"
             >
               <div className="slide-item-top">
@@ -320,17 +350,10 @@ export const SlideDeck: React.FC = () => {
                     <GripVerticalIcon size={13} />
                   </span>
                   <span className="slide-number">{index + 1}</span>
-                  <span
-                    className="slide-section-label"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                  >
+                  <span className="slide-section-label">
                     {hasVideo && (
                       <span
-                        style={{
-                          color: isYouTube ? '#ef4444' : '#3b82f6',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                        }}
+                        className={`slide-media-icon ${isYouTube ? 'is-youtube' : 'is-local'}`}
                         title={isYouTube ? 'YouTube Video' : 'Local Video'}
                       >
                         {isYouTube ? <YoutubeIcon size={12} /> : <VideoIcon size={12} />}
@@ -356,54 +379,25 @@ export const SlideDeck: React.FC = () => {
                       e.stopPropagation();
                       handleDeleteSlide(slide.id);
                     }}
-                    title="Delete slide"
+                    title={`Delete ${slide.section}`}
+                    aria-label={`Delete ${slide.section}`}
                   >
                     <TrashIcon size={11} />
                   </button>
                 </div>
               </div>
 
-              {/* Video Media Banner */}
               {hasVideo && (
-                <div
-                  style={{
-                    background: 'rgba(0, 0, 0, 0.35)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '6px',
-                    padding: '6px 10px',
-                    margin: '4px 0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '8px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+                <div className="slide-media-banner">
+                  <div className="slide-media-copy">
                     <span
-                      style={{
-                        background: isYouTube ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                        color: isYouTube ? '#ef4444' : '#3b82f6',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '0.65rem',
-                        fontWeight: 700,
-                        flexShrink: 0,
-                      }}
+                      className={`slide-media-kind ${isYouTube ? 'is-youtube' : 'is-local'}`}
                     >
                       {isYouTube ? <YoutubeIcon size={11} /> : <VideoIcon size={11} />}
                       <span>{isYouTube ? 'YOUTUBE' : 'VIDEO'}</span>
                     </span>
                     <span
-                      style={{
-                        fontSize: '0.725rem',
-                        color: 'var(--text-secondary)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
+                      className="slide-media-title"
                       title={videoTitleText || slide.videoUrl || slide.youtubeUrl || ''}
                     >
                       {videoTitleText || (isYouTube ? 'YouTube Stream' : 'Local Video File')}
@@ -413,44 +407,26 @@ export const SlideDeck: React.FC = () => {
                   {!isYouTube && isBareFilename(slide.videoPath || slide.videoUrl) && (
                     <button
                       type="button"
+                      className="slide-relink-btn"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRelinkSlide(slide.id);
                       }}
-                      style={{
-                        background: 'rgba(239, 68, 68, 0.2)',
-                        border: '1px solid #ef4444',
-                        color: '#f87171',
-                        borderRadius: '4px',
-                        padding: '2px 8px',
-                        fontSize: '0.65rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        flexShrink: 0,
-                      }}
-                      title="File location needs to be selected. Click to locate file on your computer."
+                      title="Locate video file on your computer"
+                      aria-label="Locate video file on your computer"
                     >
-                      <VideoIcon size={11} />
-                      <span>Relink Video</span>
+                      <VideoIcon size={14} />
                     </button>
                   )}
 
                   {isLive && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                      <span
-                        style={{
-                          fontSize: '0.65rem',
-                          fontFamily: 'monospace',
-                          color: 'var(--text-muted)',
-                        }}
-                      >
+                    <div className="slide-live-media-controls">
+                      <span className="slide-media-time">
                         {formatTime(videoPlayback.currentTime)}
                       </span>
                       <button
                         type="button"
+                        className={`slide-media-toggle ${isVideoPlaying ? 'is-playing' : ''}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           if (!videoPlayback.isPlaying && (isBlackout || isLogoActive)) {
@@ -458,51 +434,18 @@ export const SlideDeck: React.FC = () => {
                           }
                           dispatch(toggleVideoPlay());
                         }}
-                        style={{
-                          background:
-                            videoPlayback.isPlaying && !isBlackout && !isLogoActive
-                              ? 'rgba(34, 197, 94, 0.2)'
-                              : 'rgba(56, 189, 248, 0.2)',
-                          border: `1px solid ${
-                            videoPlayback.isPlaying && !isBlackout && !isLogoActive ? '#22c55e' : '#38bdf8'
-                          }`,
-                          color:
-                            videoPlayback.isPlaying && !isBlackout && !isLogoActive ? '#22c55e' : '#38bdf8',
-                          borderRadius: '4px',
-                          padding: '2px 6px',
-                          fontSize: '0.65rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                        }}
-                        title={
-                          videoPlayback.isPlaying && !isBlackout && !isLogoActive
-                            ? 'Pause video'
-                            : 'Play video'
-                        }
+                        title={isVideoPlaying ? 'Pause video' : 'Play video'}
+                        aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
                       >
-                        {videoPlayback.isPlaying && !isBlackout && !isLogoActive ? (
-                          <PauseIcon size={10} />
-                        ) : (
-                          <PlayIcon size={10} />
-                        )}
-                        <span>
-                          {videoPlayback.isPlaying && !isBlackout && !isLogoActive ? 'Pause' : 'Play'}
-                        </span>
+                        {isVideoPlaying ? <PauseIcon size={14} /> : <PlayIcon size={14} />}
                       </button>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Media Thumbnail (Image or Video preview) */}
               {(slideThumb || hasVideo) && (
-                <div
-                  className="slide-thumbnail-wrap"
-                  style={{ position: 'relative', overflow: 'hidden' }}
-                >
+                <div className="slide-thumbnail-wrap">
                   <img
                     src={
                       !brokenThumbs[slide.id] && slideThumb
@@ -518,57 +461,14 @@ export const SlideDeck: React.FC = () => {
                     onError={() => setBrokenThumbs((prev) => ({ ...prev, [slide.id]: true }))}
                   />
                   {hasVideo && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'rgba(0, 0, 0, 0.28)',
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          background: isYouTube ? 'rgba(239, 68, 68, 0.9)' : 'rgba(59, 130, 246, 0.9)',
-                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#ffffff',
-                        }}
-                      >
+                    <div className="slide-thumbnail-overlay">
+                      <div className={`slide-thumbnail-play ${isYouTube ? 'is-youtube' : ''}`}>
                         {isYouTube ? <YoutubeIcon size={14} /> : <PlayIcon size={12} />}
                       </div>
                     </div>
                   )}
 
-                  {slide.embedUrl && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 6,
-                        left: 6,
-                        zIndex: 3,
-                        background: 'rgba(6, 182, 212, 0.92)',
-                        color: '#ffffff',
-                        fontSize: '0.6rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.04em',
-                        padding: '2px 7px',
-                        borderRadius: '4px',
-                        textTransform: 'uppercase',
-                        pointerEvents: 'none',
-                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
-                      }}
-                    >
-                      Live Deck
-                    </div>
-                  )}
+                  {slide.embedUrl && <div className="slide-embed-badge">Live Deck</div>}
                 </div>
               )}
 
@@ -583,20 +483,18 @@ export const SlideDeck: React.FC = () => {
               )}
 
               {(!slide.lines || slide.lines.length === 0) && !slide.imageUrl && !hasVideo && (
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    color: 'var(--text-muted)',
-                    fontStyle: 'italic',
-                    padding: '4px 0',
-                  }}
-                >
-                  Empty slide content
-                </div>
+                <div className="slide-empty-content">Empty slide content</div>
               )}
             </div>
           );
         })}
+      </div>
+
+      <div className="deck-footer-hint">
+        <span>
+          <PlayIcon size={11} /> Click to preview
+        </span>
+        <span>Double-click to take live</span>
       </div>
 
       {showAddSlide && (

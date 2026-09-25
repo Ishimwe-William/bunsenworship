@@ -67,8 +67,13 @@ export const ServiceRundown: React.FC = () => {
   // Keyboard shortcuts for rundown navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest('input, textarea, select, button, summary, [role="button"], [role="separator"]') ||
+        target?.isContentEditable
+      ) {
         return;
       }
 
@@ -195,9 +200,12 @@ export const ServiceRundown: React.FC = () => {
       alert('Cannot delete the last item. Add a new item first.');
       return;
     }
-    if (confirm('Are you sure you want to delete this item from the service rundown?')) {
-      dispatch(deleteRundownItem(itemId));
+    const item = rundown.find((i) => i.id === itemId);
+    const itemTitle = item?.title ? `"${item.title}"` : 'this item';
+    if (!window.confirm(`Are you sure you want to remove ${itemTitle} from the service rundown?`)) {
+      return;
     }
+    dispatch(deleteRundownItem(itemId));
   };
 
   const calculateTotalSlides = () => {
@@ -245,26 +253,33 @@ export const ServiceRundown: React.FC = () => {
   return (
     <aside className="service-rundown-col">
       <div className="rundown-header">
-        <div className="rundown-header-left">
-          <h3 className="rundown-header-title">Service Rundown</h3>
-          <div className="rundown-stats">
-            <span className="rundown-stat">
-              <ClockIcon size={12} />
-              {calculateEstimatedDuration()}min
-            </span>
-            <span className="rundown-stat">
-              {calculateTotalSlides()} slides
-            </span>
+        <div className="console-section-heading">
+          <span className="console-section-index">01</span>
+          <div className="console-section-heading-copy">
+            <span>Run of show</span>
+            <h3 className="rundown-header-title">Service Rundown</h3>
           </div>
         </div>
-        <button
-          type="button"
-          className="rundown-add-btn"
-          onClick={() => setShowAddModal(true)}
-          title="Add Item to Rundown"
-        >
-          <PlusIcon size={13} />
-        </button>
+        <div className="rundown-header-controls">
+          <div className="rundown-stats">
+            <span className="rundown-stat" title="Estimated service duration">
+              <ClockIcon size={12} />
+              {calculateEstimatedDuration()} min
+            </span>
+            <span className="rundown-stat" title="Total slides in this service">
+              {calculateTotalSlides()} {calculateTotalSlides() === 1 ? 'slide' : 'slides'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="rundown-add-btn"
+            onClick={() => setShowAddModal(true)}
+            title="Add item to rundown"
+            aria-label="Add item to rundown"
+          >
+            <PlusIcon size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="rundown-scroll-list">
@@ -293,7 +308,19 @@ export const ServiceRundown: React.FC = () => {
                 isOver && dropPosition ? `drop-target-${dropPosition}` : ''
               }`}
               onClick={() => dispatch(setSelectedRundownId(item.id))}
-              title="Click to select &bull; Drag to rearrange order"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  dispatch(setSelectedRundownId(item.id));
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              aria-label={`${item.title}, ${item.time}, ${item.slides.length} slides${
+                hasLive ? ', on air' : ''
+              }`}
+              title="Click to select • Drag to rearrange order"
             >
               <div className="rundown-accent-bar" />
               <div className="rundown-card-top">
@@ -301,20 +328,18 @@ export const ServiceRundown: React.FC = () => {
                   <span className="card-drag-handle" title="Drag to rearrange order">
                     <GripVerticalIcon size={13} />
                   </span>
+                  <span className="rundown-sequence">{String(index + 1).padStart(2, '0')}</span>
                   <span className="rundown-time">{item.time}</span>
-                  <span className="rundown-slide-count">
-                    {item.slides.length} {item.slides.length === 1 ? 'slide' : 'slides'}
-                  </span>
                 </div>
                 <div className="rundown-card-right">
                   <span className={`rundown-type-pill ${getTypeClass(item.type)}`}>
                     {item.type === 'VIDEO' ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <span className="rundown-type-content">
                         {isYouTubeItem ? <YoutubeIcon size={10} /> : <VideoIcon size={10} />}
                         VIDEO
                       </span>
                     ) : hasVideoSlide ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <span className="rundown-type-content">
                         <VideoIcon size={10} />
                         {item.type}
                       </span>
@@ -329,17 +354,40 @@ export const ServiceRundown: React.FC = () => {
                       e.stopPropagation();
                       handleDeleteItem(item.id);
                     }}
-                    title="Delete item"
+                    title={`Delete ${item.title}`}
+                    aria-label={`Delete ${item.title}`}
                   >
                     <TrashIcon size={11} />
                   </button>
                 </div>
               </div>
-              <h4 className="rundown-item-title">{item.title}</h4>
-              <p className="rundown-item-subtitle">{item.subtitle}</p>
+              <h4 className="rundown-item-title" title={item.title}>
+                {item.title}
+              </h4>
+              <p className="rundown-item-subtitle" title={item.subtitle}>
+                {item.subtitle}
+              </p>
+              <div className="rundown-card-footer">
+                <span className="rundown-slide-count">
+                  {item.slides.length} {item.slides.length === 1 ? 'slide' : 'slides'}
+                </span>
+                {hasLive ? (
+                  <span className="rundown-live-badge">
+                    <span />
+                    On air
+                  </span>
+                ) : isSelected ? (
+                  <span className="rundown-selected-badge">Selected</span>
+                ) : null}
+              </div>
             </div>
           );
         })}
+      </div>
+
+      <div className="rundown-footer-hint">
+        <GripVerticalIcon size={12} />
+        <span>Click to preview · Drag to reorder</span>
       </div>
 
       {showAddModal && (

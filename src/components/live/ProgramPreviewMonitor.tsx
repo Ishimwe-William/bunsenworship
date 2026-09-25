@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectLiveSlide,
@@ -17,16 +17,13 @@ import {
   setTransitionType,
   setFadeDuration,
   setActiveBackground,
-  toggleBlackout,
-  toggleClearText,
-  toggleLogo,
   clearAllOverrides,
   setVideoError,
   setProjectorActive,
   selectIsProjectorActive,
 } from '../../store/features/presentation';
 import { DisplayInfo } from '../../types/electron';
-import { PlayIcon, SlidersIcon, MonitorIcon } from '../common/Icons';
+import { ArrowDownIcon, ArrowUpIcon, MonitorIcon, PlayIcon, SlidersIcon } from '../common/Icons';
 import { ScaledRealityMonitor } from './ScaledRealityMonitor';
 import { VideoControlDeck } from './VideoControlDeck';
 
@@ -41,12 +38,14 @@ export const ProgramPreviewMonitor: React.FC = () => {
   const isBlackout = useAppSelector(selectIsBlackout);
   const isTextCleared = useAppSelector(selectIsTextCleared);
   const isLogoActive = useAppSelector(selectIsLogoActive);
+  const hasActiveOverride = isBlackout || isTextCleared || isLogoActive;
   const videoPlayback = useAppSelector(selectVideoPlayback);
   const isProjectorActive = useAppSelector(selectIsProjectorActive);
 
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [projectorSource, setProjectorSource] = useState<'LIVE' | 'PREVIEW'>('LIVE');
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
+  const projectorWindowRef = useRef<Window | null>(null);
 
   useEffect(() => {
     if (window.electronAPI?.getDisplays) {
@@ -173,16 +172,26 @@ export const ProgramPreviewMonitor: React.FC = () => {
   // Global hotkeys for worship console operator
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Avoid hotkeys when typing in inputs or textareas
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest('input, textarea, select') ||
+        target?.isContentEditable
+      ) {
         return;
       }
 
-      // Live control shortcuts
+      if (
+        (e.key === 'Enter' || e.key === ' ') &&
+        target?.closest('button, summary, [role="button"]')
+      ) {
+        return;
+      }
+
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (isBlackout || isLogoActive) {
+        if (hasActiveOverride) {
           dispatch(clearAllOverrides());
         }
         dispatch(takeLive());
@@ -192,18 +201,6 @@ export const ProgramPreviewMonitor: React.FC = () => {
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         dispatch(previousSlide());
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        dispatch(clearAllOverrides());
-      } else if (e.key === 'b' || e.key === 'B') {
-        e.preventDefault();
-        dispatch(toggleBlackout());
-      } else if (e.key === 'c' || e.key === 'C') {
-        e.preventDefault();
-        dispatch(toggleClearText());
-      } else if (e.key === 'l' || e.key === 'L') {
-        e.preventDefault();
-        dispatch(toggleLogo());
       } else if (e.key === '1') {
         e.preventDefault();
         dispatch(setTransitionType('CUT'));
@@ -219,13 +216,22 @@ export const ProgramPreviewMonitor: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, fadeDuration, isBlackout, isLogoActive]);
+  }, [dispatch, fadeDuration, hasActiveOverride]);
 
   const handleGoLive = () => {
-    if (isBlackout || isLogoActive) {
+    if (hasActiveOverride) {
       dispatch(clearAllOverrides());
     }
     dispatch(takeLive());
+  };
+
+  const handleFadeClick = () => {
+    if (transitionType === 'FADE') {
+      const nextDuration = fadeDuration >= 2.0 ? 0.5 : Number((fadeDuration + 0.5).toFixed(1));
+      dispatch(setFadeDuration(nextDuration));
+    } else {
+      dispatch(setTransitionType('FADE'));
+    }
   };
 
   const handleOpenOutput = async () => {
@@ -244,356 +250,278 @@ export const ProgramPreviewMonitor: React.FC = () => {
     // 2. Fallback: window.open with ?mode=projector
     const currentBase = window.location.href.split('?')[0].split('#')[0];
     const projectorUrl = `${currentBase}?mode=projector`;
-    window.open(
+    const win = window.open(
       projectorUrl,
       'BunsenWorship_Projector',
       'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no'
     );
+    projectorWindowRef.current = win;
   };
 
   return (
     <div className="program-preview-col">
-      {/* 1. LIVE PROGRAM MONITOR */}
-      <div className="monitor-card">
-        <div className="monitor-header">
-          <h4 className="monitor-title">Live Program</h4>
-          {liveItem && (
-            <span
-              style={{
-                fontSize: '0.7rem',
-                color: 'var(--text-muted)',
-                fontWeight: 600,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: '120px',
-              }}
-              title={liveItem.title}
+      <div className="output-section-header">
+        <div className="console-section-heading">
+          <span className="console-section-index">03</span>
+          <div className="console-section-heading-copy">
+            <span>Program & preview</span>
+            <h3>Sanctuary Output</h3>
+          </div>
+        </div>
+        <span
+          className={`output-connection-badge ${
+            isProjectorActive ? 'is-connected' : 'is-ready'
+          }`}
+          title={
+            displays.length > 1
+              ? displays.find((display) => !display.isOperator)?.name || 'Secondary display'
+              : 'Primary display'
+          }
+        >
+          <span />
+          {isProjectorActive ? 'Connected' : 'Ready'}
+        </span>
+      </div>
+
+      <section className="program-command-deck" aria-label="Program controls">
+        <div className="program-command-topline">
+          <div className="program-transition-switch" role="group" aria-label="Transition style">
+            <button
+              type="button"
+              className={`program-transition-btn ${
+                transitionType === 'CUT' ? 'is-active' : ''
+              }`}
+              onClick={() => dispatch(setTransitionType('CUT'))}
+              title="Cut transition (1)"
+              aria-keyshortcuts="1"
+              aria-pressed={transitionType === 'CUT'}
             >
-              {liveItem.title}
-            </span>
-          )}
-          <span className="monitor-badge badge-live">Live</span>
+              Cut
+            </button>
+            <button
+              type="button"
+              className={`program-transition-btn ${
+                transitionType === 'FADE' ? 'is-active' : ''
+              }`}
+              onClick={handleFadeClick}
+              title={
+                transitionType === 'FADE'
+                  ? `Fade transition: ${fadeDuration.toFixed(1)}s (click to change duration, or press F)`
+                  : 'Fade transition (2)'
+              }
+              aria-keyshortcuts="2 F"
+              aria-pressed={transitionType === 'FADE'}
+            >
+              Fade {fadeDuration.toFixed(1)}s
+            </button>
+          </div>
+
+          <div className="program-display-actions">
+            <button
+              type="button"
+              className={`program-icon-btn ${showBgPicker ? 'is-active' : ''}`}
+              onClick={() => setShowBgPicker(!showBgPicker)}
+              title="Change background"
+              aria-label="Change background"
+              aria-expanded={showBgPicker}
+            >
+              <SlidersIcon size={16} />
+            </button>
+          </div>
         </div>
 
-        <ScaledRealityMonitor
-          slide={liveSlide}
-          backgroundGradient={activeBackground.gradient}
-          isBlackout={isBlackout}
-          isTextCleared={isTextCleared}
-          isLogoActive={isLogoActive}
-          transitionType={transitionType}
-          fadeDuration={fadeDuration}
-          emptyLabel="[No Active Live Slide]"
-          isLive={true}
-        />
-
-        <VideoControlDeck slide={liveSlide} isLive={true} />
-      </div>
-
-      {/* 2. NEXT PREVIEW MONITOR */}
-      <div className="monitor-card">
-        <div className="monitor-header">
-          <h4 className="monitor-title">Next Preview</h4>
-          <span className="monitor-badge badge-preview">Preview</span>
-        </div>
-
-        <ScaledRealityMonitor
-          slide={previewSlide}
-          backgroundGradient={activeBackground.gradient}
-          transitionType="CUT"
-          emptyLabel="[No Slide Queued]"
-          isLive={false}
-        />
-      </div>
-
-      {/* 3. TRANSITIONS & GO LIVE CONTROLS */}
-      <div className="transitions-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h4 className="transitions-title">Transitions</h4>
-          <button
-            type="button"
-            className="console-mini-btn"
-            onClick={() => setShowBgPicker(!showBgPicker)}
-            title="Change sanctuary motion background"
-          >
-            <SlidersIcon size={12} />
-            <span>Theme</span>
-          </button>
-        </div>
-
-        {/* Background Theme Selector Popover */}
         {showBgPicker && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              padding: '8px',
-              background: 'var(--bg-subtle)',
-              borderRadius: '8px',
-              border: '1px solid var(--border-subtle)',
-            }}
-          >
-            <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)', fontWeight: 700 }}>
-              SANCTUARY BACKGROUND
-            </span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+          <div className="background-picker">
+            <span className="background-picker-title">Background</span>
+            <div className="background-picker-grid">
               {backgroundThemes.map((theme) => (
                 <button
                   key={theme.id}
                   type="button"
+                  className={`background-theme-btn ${
+                    theme.id === activeBackground.id ? 'is-active' : ''
+                  }`}
                   onClick={() => {
                     dispatch(setActiveBackground(theme.id));
                     setShowBgPicker(false);
                   }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 6px',
-                    borderRadius: '6px',
-                    border: theme.id === activeBackground.id ? '1.5px solid var(--color-primary)' : '1px solid var(--border-subtle)',
-                    background: 'var(--bg-surface)',
-                    cursor: 'pointer',
-                    fontSize: '0.7rem',
-                    color: 'var(--text-primary)',
-                    textAlign: 'left',
-                  }}
+                  aria-pressed={theme.id === activeBackground.id}
                 >
-                  <span style={{ width: 12, height: 12, borderRadius: '50%', background: theme.accent }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {theme.name}
-                  </span>
+                  <span style={{ background: theme.accent }} />
+                  <span>{theme.name}</span>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Transition Mode Selector (CUT vs FADE) */}
-        <div className="transitions-button-row">
+        <div className="program-primary-actions">
           <button
             type="button"
-            className={`transition-toggle-btn ${transitionType === 'CUT' ? 'active' : ''}`}
-            onClick={() => dispatch(setTransitionType('CUT'))}
-          >
-            CUT
-          </button>
-          <button
-            type="button"
-            className={`transition-toggle-btn ${transitionType === 'FADE' ? 'active' : ''}`}
-            onClick={() => dispatch(setTransitionType('FADE'))}
-          >
-            FADE ({fadeDuration.toFixed(1)}s)
-          </button>
-        </div>
-
-        {/* Big Coral Red GO LIVE Button */}
-        <button
-          type="button"
-          className="go-live-big-btn"
-          onClick={handleGoLive}
-          title="Take Preview directly to Live Program (Press Enter)"
-        >
-          <PlayIcon size={16} />
-          <span>GO LIVE (ENTER)</span>
-        </button>
-
-        {/* Slide navigation shortcuts */}
-        <div className="console-quick-actions-row">
-          <button
-            type="button"
-            className="console-mini-btn"
+            className="program-nav-btn"
             onClick={() => dispatch(previousSlide())}
-            title="Go to previous slide (Up Arrow)"
+            title="Previous slide (Arrow Up)"
+            aria-label="Previous slide"
+            aria-keyshortcuts="ArrowUp"
           >
-            &uarr; Prev Slide
+            <ArrowUpIcon size={18} />
           </button>
           <button
             type="button"
-            className="console-mini-btn"
-            onClick={() => dispatch(advanceSlide())}
-            title="Advance to next slide (Down Arrow / Space)"
+            className="go-live-big-btn"
+            onClick={handleGoLive}
+            title="Take Preview to Live Program (Enter)"
+            aria-keyshortcuts="Enter"
           >
-            Next Slide &darr;
+            <PlayIcon size={17} />
+            <span>Go live</span>
+          </button>
+          <button
+            type="button"
+            className="program-nav-btn"
+            onClick={() => dispatch(advanceSlide())}
+            title="Next slide (Arrow Down or Space)"
+            aria-label="Next slide"
+            aria-keyshortcuts="ArrowDown Space"
+          >
+            <ArrowDownIcon size={18} />
           </button>
         </div>
 
-        {/* Keyboard shortcuts reference */}
-        <div
-          style={{
-            marginTop: '8px',
-            padding: '8px',
-            background: 'var(--bg-subtle)',
-            borderRadius: '6px',
-            border: '1px solid var(--border-subtle)',
-          }}
-        >
+        <div className="program-output-actions">
           <div
-            style={{
-              fontSize: '0.65rem',
-              color: 'var(--text-secondary)',
-              fontWeight: 700,
-              marginBottom: '4px',
-            }}
+            className="output-source-switch"
+            role="group"
+            aria-label="Projector source"
           >
-            KEYBOARD SHORTCUTS
-          </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '4px',
-              fontSize: '0.625rem',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>Enter</span> Go Live</div>
-            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>Space</span> Next</div>
-            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>&uarr;</span> Prev</div>
-            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>Esc</span> Clear</div>
-            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>B</span> Blackout</div>
-            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>C</span> Clear Text</div>
-            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>L</span> Logo</div>
-            <div><span style={{ fontFamily: 'monospace', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: '3px' }}>F</span> Fade Time</div>
-          </div>
-        </div>
-
-        {/* Pop-out Sanctuary Projector Display with Live/Preview Source Selector */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-            marginTop: '4px',
-            paddingTop: '6px',
-            borderTop: '1px solid var(--border-subtle)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '0.7rem',
-              color: 'var(--text-muted)',
-              fontWeight: 600,
-            }}
-          >
-            <span>Projector Target:</span>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button
-                type="button"
-                className={`console-mini-btn ${projectorSource === 'LIVE' ? 'active' : ''}`}
-                style={{
-                  padding: '2px 8px',
-                  fontSize: '0.65rem',
-                  borderColor: projectorSource === 'LIVE' ? '#ef4444' : undefined,
-                  color: projectorSource === 'LIVE' ? '#ef4444' : undefined,
-                }}
-                onClick={() => setProjectorSource('LIVE')}
-                title="Send Live Program to Projector Output"
-              >
-                ● Live
-              </button>
-              <button
-                type="button"
-                className={`console-mini-btn ${projectorSource === 'PREVIEW' ? 'active' : ''}`}
-                style={{
-                  padding: '2px 8px',
-                  fontSize: '0.65rem',
-                  borderColor: projectorSource === 'PREVIEW' ? '#22c55e' : undefined,
-                  color: projectorSource === 'PREVIEW' ? '#22c55e' : undefined,
-                }}
-                onClick={() => setProjectorSource('PREVIEW')}
-                title="Send Preview to Projector Output"
-              >
-                Next Preview
-              </button>
-            </div>
-          </div>
-
-          {/* Multi-monitor Display Status Badge */}
-          {displays.length > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.65rem',
-                color: '#22c55e',
-                background: 'rgba(34, 197, 94, 0.08)',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                border: '1px solid rgba(34, 197, 94, 0.25)',
-              }}
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: '#22c55e',
-                  display: 'inline-block',
-                }}
-              />
-              <span>
-                Secondary Display: {displays.find((d) => !d.isOperator)?.name || 'Monitor 2'} (Auto Fullscreen)
-              </span>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '6px' }}>
             <button
               type="button"
-              className="console-mini-btn"
-              onClick={handleOpenOutput}
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                gap: '8px',
-                borderColor: isProjectorActive ? '#22c55e' : undefined,
-                color: isProjectorActive ? '#22c55e' : undefined,
-              }}
-              title={
-                displays.length > 1
-                  ? 'Present directly to secondary monitor/projector in borderless full screen'
-                  : 'Present to primary screen in borderless full screen over taskbar (Esc to exit)'
-              }
+              className={`output-source-btn is-live ${
+                projectorSource === 'LIVE' ? 'is-active' : ''
+              }`}
+              onClick={() => setProjectorSource('LIVE')}
+              title="Send Live Program to output"
+              aria-pressed={projectorSource === 'LIVE'}
             >
-              <MonitorIcon size={13} />
-              <span>
-                {isProjectorActive
-                  ? `Projector Live (${displays.length > 1 ? 'Monitor 2' : 'Fullscreen'})`
-                  : displays.length > 1
-                  ? `Present to Monitor 2 (Fullscreen)`
-                  : `Present Fullscreen (${projectorSource === 'LIVE' ? 'Live' : 'Preview'} - Esc to Exit)`}
-              </span>
+              <span /> Live
             </button>
-
-            {isProjectorActive && (
-              <button
-                type="button"
-                className="console-mini-btn"
-                onClick={() => {
-                  if (window.electronAPI?.closeProjectorWindow) {
-                    window.electronAPI.closeProjectorWindow();
-                  }
-                }}
-                style={{
-                  padding: '4px 10px',
-                  borderColor: '#ef4444',
-                  color: '#ef4444',
-                }}
-                title="Close Projector Output (Esc)"
-              >
-                Close Output
-              </button>
-            )}
+            <button
+              type="button"
+              className={`output-source-btn is-preview ${
+                projectorSource === 'PREVIEW' ? 'is-active' : ''
+              }`}
+              onClick={() => setProjectorSource('PREVIEW')}
+              title="Send Next Preview to output"
+              aria-pressed={projectorSource === 'PREVIEW'}
+            >
+              <span /> Next
+            </button>
           </div>
+          <button
+            type="button"
+            className={`output-present-btn ${isProjectorActive ? 'is-connected' : ''}`}
+            onClick={handleOpenOutput}
+            title={
+              displays.length > 1
+                ? `Present ${projectorSource === 'LIVE' ? 'Live' : 'Next'} to ${
+                    displays.find((display) => !display.isOperator)?.name || 'secondary display'
+                  }`
+                : `Present ${projectorSource === 'LIVE' ? 'Live' : 'Next'} fullscreen`
+            }
+          >
+            <MonitorIcon size={15} />
+            <span>{isProjectorActive ? 'Output active' : 'Present'}</span>
+          </button>
+          {isProjectorActive && (
+            <button
+              type="button"
+              className="output-close-btn"
+              onClick={() => {
+                if (window.electronAPI?.closeProjectorWindow) {
+                  window.electronAPI.closeProjectorWindow();
+                } else if (projectorWindowRef.current && !projectorWindowRef.current.closed) {
+                  projectorWindowRef.current.close();
+                  projectorWindowRef.current = null;
+                  dispatch(setProjectorActive(false));
+                } else {
+                  dispatch(setProjectorActive(false));
+                }
+              }}
+              title="Close output"
+              aria-label="Close output"
+            >
+              Close
+            </button>
+          )}
         </div>
+      </section>
+
+      <div className="monitor-pair">
+        <section className="monitor-card program-monitor-card">
+          <div className="monitor-header">
+            <div className="monitor-heading-copy">
+              <h4 className="monitor-title">
+                <span className="monitor-title-dot" />
+                Live
+              </h4>
+              <span className="monitor-context" title={liveItem?.title || 'No active item'}>
+                {liveItem?.title || 'No active item'}
+              </span>
+            </div>
+            <span className="monitor-badge badge-live">On air</span>
+          </div>
+          <ScaledRealityMonitor
+            slide={liveSlide}
+            backgroundGradient={activeBackground.gradient}
+            isBlackout={isBlackout}
+            isTextCleared={isTextCleared}
+            isLogoActive={isLogoActive}
+            transitionType={transitionType}
+            fadeDuration={fadeDuration}
+            emptyLabel="No live slide"
+            isLive={true}
+          />
+        </section>
+
+        <section className="monitor-card preview-monitor-card">
+          <div className="monitor-header">
+            <div className="monitor-heading-copy">
+              <h4 className="monitor-title">
+                <span className="monitor-title-dot" />
+                Next
+              </h4>
+              <span className="monitor-context" title={previewSlide?.section || 'Nothing queued'}>
+                {previewSlide?.section || 'Nothing queued'}
+              </span>
+            </div>
+            <span className="monitor-badge badge-preview">Preview</span>
+          </div>
+          <ScaledRealityMonitor
+            slide={previewSlide}
+            backgroundGradient={activeBackground.gradient}
+            transitionType="CUT"
+            emptyLabel="Nothing queued"
+            isLive={false}
+          />
+        </section>
       </div>
+
+      <VideoControlDeck slide={liveSlide} isLive={true} />
+
+      <details className="shortcut-details">
+        <summary>
+          <span>Keyboard shortcuts</span>
+          <span>6 commands</span>
+        </summary>
+        <div className="shortcut-grid">
+          <div><kbd>Enter</kbd><span>Go live</span></div>
+          <div><kbd>Space</kbd><span>Next</span></div>
+          <div><kbd>Up</kbd><span>Previous</span></div>
+          <div><kbd>1</kbd><span>Cut</span></div>
+          <div><kbd>2</kbd><span>Fade</span></div>
+          <div><kbd>F</kbd><span>Fade time</span></div>
+        </div>
+      </details>
     </div>
   );
 };

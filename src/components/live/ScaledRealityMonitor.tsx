@@ -22,6 +22,11 @@ import {
 import { YouTubePlayer } from './YouTubePlayer';
 import { EmbeddedDeckView } from './EmbeddedDeckView';
 
+export const getRealityStageScale = (width: number, height: number) => {
+  if (width <= 0 || height <= 0) return 0;
+  return Math.min(width / 1920, height / 1080);
+};
+
 export interface ScaledRealityMonitorProps {
   slide: Slide | null;
   backgroundGradient: string;
@@ -66,9 +71,13 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     if (!el) return;
 
     const updateScale = () => {
-      const width = el.clientWidth || el.getBoundingClientRect().width;
-      if (width > 0) {
-        setScale(width / 1920);
+      const bounds = el.getBoundingClientRect();
+      const nextScale = getRealityStageScale(
+        el.clientWidth || bounds.width,
+        el.clientHeight || bounds.height
+      );
+      if (nextScale > 0) {
+        setScale(nextScale);
       }
     };
 

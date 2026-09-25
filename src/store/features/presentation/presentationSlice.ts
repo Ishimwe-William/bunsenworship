@@ -54,7 +54,7 @@ export const DEFAULT_RUNDOWN: RundownItem[] = [
     id: 'rd-video-motion',
     time: '09:05',
     title: 'Cinematic Particles Video',
-    subtitle: 'Motion Loop • 4K MP4 Video',
+    subtitle: 'Motion loop video',
     type: 'VIDEO',
     slides: [
       {
