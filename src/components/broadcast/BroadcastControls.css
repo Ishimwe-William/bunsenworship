@@ -96,50 +96,59 @@
    Go Live Master State (On Air vs Standby)
    -------------------------------------------------------------------------- */
 
-.broadcast-btn.broadcast-live.is-live {
-  background-color: rgba(34, 197, 94, 0.16);
-  border-color: rgba(34, 197, 94, 0.45);
-  color: var(--color-success);
-  font-weight: 700;
-}
-
-.broadcast-btn.broadcast-live.is-on-air {
-  background-color: rgba(239, 68, 68, 0.18);
-  border-color: rgba(239, 68, 68, 0.55);
-  color: #ef4444;
-  font-weight: 800;
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
-}
-
-.broadcast-btn.broadcast-live.is-live .broadcast-btn-icon {
-  color: var(--color-success);
-  animation: livePulse 2s infinite ease-in-out;
-}
-
-.broadcast-btn.broadcast-live.is-on-air .broadcast-btn-icon {
-  color: #ef4444;
-  animation: livePulse 1.4s infinite ease-in-out;
-}
-
-.broadcast-btn.broadcast-live.is-live .broadcast-hotkey-tag {
-  background: rgba(34, 197, 94, 0.25);
-  color: var(--color-success);
-}
-
-.broadcast-btn.broadcast-live.is-on-air .broadcast-hotkey-tag {
-  background: rgba(239, 68, 68, 0.25);
-  color: #ef4444;
-}
-
+/* Default / Standby: Brown by default to show it is not live */
 .broadcast-btn.broadcast-live.is-standby {
-  background-color: transparent;
-  border-color: var(--border-subtle);
-  color: var(--text-muted);
+  background-color: #451a03;
+  border-color: #78350f;
+  color: #fde68a;
+  box-shadow: 0 1px 4px rgba(69, 26, 3, 0.4);
+}
+
+.broadcast-btn.broadcast-live.is-standby .broadcast-btn-icon {
+  color: #fbbf24;
+}
+
+.broadcast-btn.broadcast-live.is-standby .broadcast-hotkey-tag {
+  background: rgba(0, 0, 0, 0.4);
+  color: #fde68a;
 }
 
 .broadcast-btn.broadcast-live.is-standby:hover {
-  background-color: var(--bg-hover);
-  color: var(--text-primary);
+  background-color: #78350f;
+  border-color: #92400e;
+  color: #ffffff;
+}
+
+.broadcast-btn.broadcast-live.is-standby:hover .broadcast-btn-icon {
+  color: #ffffff;
+}
+
+/* Toggled ON AIR / Live State: Red when live */
+.broadcast-btn.broadcast-live.is-on-air,
+.broadcast-btn.broadcast-live.is-live {
+  background-color: #dc2626 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.55) !important;
+}
+
+.broadcast-btn.broadcast-live.is-on-air .broadcast-btn-icon,
+.broadcast-btn.broadcast-live.is-live .broadcast-btn-icon {
+  color: #ffffff !important;
+  animation: livePulse 1.2s infinite ease-in-out;
+}
+
+.broadcast-btn.broadcast-live.is-on-air .broadcast-hotkey-tag,
+.broadcast-btn.broadcast-live.is-live .broadcast-hotkey-tag {
+  background: rgba(0, 0, 0, 0.35) !important;
+  color: #ffffff !important;
+}
+
+.broadcast-btn.broadcast-live.is-on-air:hover,
+.broadcast-btn.broadcast-live.is-live:hover {
+  background-color: #b91c1c !important;
+  border-color: #dc2626 !important;
 }
 
 @keyframes livePulse {

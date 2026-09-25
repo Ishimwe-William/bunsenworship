@@ -378,21 +378,26 @@ export const LiveShowScreen: React.FC = () => {
         return;
       }
 
-      if (e.key === 'Enter' || e.key === 'F4' || e.key === ' ' || e.key === 'PageDown') {
+      if (e.key === 'Enter' || e.key === 'F4') {
         e.preventDefault();
         if (hasActiveOverride) {
           dispatch(clearAllOverrides());
         }
         dispatch(takeLive());
-      } else if (e.key === 'ArrowDown') {
+      } else if (e.key === ' ' || e.key === 'ArrowDown' || e.key === 'PageDown') {
         e.preventDefault();
-        dispatch(advanceSlide());
-      } else if (e.key === 'ArrowUp') {
+        if (isLive && liveSlideId) {
+          dispatch(advanceLiveSlide());
+        } else {
+          dispatch(advanceSlide());
+        }
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
         e.preventDefault();
-        dispatch(previousSlide());
-      } else if (e.key === 'PageUp') {
-        e.preventDefault();
-        dispatch(previousLiveSlide());
+        if (isLive && liveSlideId) {
+          dispatch(previousLiveSlide());
+        } else {
+          dispatch(previousSlide());
+        }
       } else if (e.key === 'Home') {
         e.preventDefault();
         const currentItem = rundown.find((r) => r.id === selectedRundownId);

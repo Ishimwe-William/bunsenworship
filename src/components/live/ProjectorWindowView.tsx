@@ -67,18 +67,20 @@ export const ProjectorWindowView: React.FC = () => {
     const channel = new BroadcastChannel('bunsenworship_projector_channel');
 
     const reportDimensions = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const w = window.innerWidth || 1920;
+      const h = window.innerHeight || 1080;
       const sw = window.screen?.width || w;
       const sh = window.screen?.height || h;
-      setViewportSize({ width: w, height: h });
-      try {
-        channel.postMessage({
-          type: 'PROJECTOR_DIMENSIONS',
-          payload: { width: w, height: h, screenWidth: sw, screenHeight: sh },
-        });
-      } catch {
-        // ignore
+      if (w > 10 && h > 10) {
+        setViewportSize({ width: w, height: h });
+        try {
+          channel.postMessage({
+            type: 'PROJECTOR_DIMENSIONS',
+            payload: { width: w, height: h, screenWidth: sw, screenHeight: sh },
+          });
+        } catch {
+          // ignore
+        }
       }
     };
 
@@ -225,7 +227,7 @@ export const ProjectorWindowView: React.FC = () => {
   const outW = viewportSize.width > 0 ? viewportSize.width : 1920;
   const outH = viewportSize.height > 0 ? viewportSize.height : 1080;
   const stageWidth = 1920;
-  const stageHeight = Math.round(1920 * (outH / outW));
+  const stageHeight = Math.round(1920 * (outH / outW)) || 1080;
   const scale = getRealityStageScale(viewportSize.width, viewportSize.height, stageWidth, stageHeight);
 
   const lines = slide?.lines || [];

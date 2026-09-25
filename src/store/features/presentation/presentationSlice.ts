@@ -400,13 +400,25 @@ export const presentationSlice = createSlice({
           state.liveSlideId = state.previewSlideId;
           state.liveRundownId = state.selectedRundownId;
           state.isLive = true;
+        } else if (state.rundown.length > 0 && state.rundown[0].slides.length > 0) {
+          state.liveRundownId = state.rundown[0].id;
+          state.liveSlideId = state.rundown[0].slides[0].id;
+          state.selectedRundownId = state.rundown[0].id;
+          state.isLive = true;
+          if (state.rundown[0].slides.length > 1) {
+            state.previewSlideId = state.rundown[0].slides[1].id;
+          } else if (state.rundown.length > 1 && state.rundown[1].slides.length > 0) {
+            state.selectedRundownId = state.rundown[1].id;
+            state.previewSlideId = state.rundown[1].slides[0].id;
+          }
         }
         return;
       }
 
       const currentIdx = liveItem.slides.findIndex((s) => s.id === state.liveSlideId);
       if (currentIdx >= 0 && currentIdx < liveItem.slides.length - 1) {
-        const nextSlide = liveItem.slides[currentIdx + 1];
+        const nextSlideIdx = currentIdx + 1;
+        const nextSlide = liveItem.slides[nextSlideIdx];
         state.liveSlideId = nextSlide.id;
         state.isLive = true;
 
@@ -430,9 +442,26 @@ export const presentationSlice = createSlice({
           }
           if (nextSlide.videoMuted !== undefined) {
             state.videoPlayback.isMuted = nextSlide.videoMuted;
-          } else {
-            state.videoPlayback.isMuted = true;
           }
+          if (nextSlide.videoPlaybackRate !== undefined) {
+            state.videoPlayback.playbackRate = nextSlide.videoPlaybackRate;
+          }
+        }
+
+        // When reached the end of that doc/ppt, in preview bring the next item in rundown to let user know it will be next:
+        if (nextSlideIdx === liveItem.slides.length - 1) {
+          const currentRundownIdx = state.rundown.findIndex((r) => r.id === state.liveRundownId);
+          if (currentRundownIdx >= 0 && currentRundownIdx < state.rundown.length - 1) {
+            const nextRundown = state.rundown[currentRundownIdx + 1];
+            state.selectedRundownId = nextRundown.id;
+            if (nextRundown.slides.length > 0) {
+              state.previewSlideId = nextRundown.slides[0].id;
+            }
+          }
+        } else {
+          // Keep preview showing upcoming slide
+          state.selectedRundownId = liveItem.id;
+          state.previewSlideId = liveItem.slides[nextSlideIdx + 1].id;
         }
       } else {
         // Next rundown item
@@ -441,8 +470,49 @@ export const presentationSlice = createSlice({
           const nextRundown = state.rundown[currentRundownIdx + 1];
           state.liveRundownId = nextRundown.id;
           if (nextRundown.slides.length > 0) {
-            state.liveSlideId = nextRundown.slides[0].id;
+            const firstSlide = nextRundown.slides[0];
+            state.liveSlideId = firstSlide.id;
             state.isLive = true;
+
+            const isTargetVideo = Boolean(
+              firstSlide &&
+                (Boolean(extractYouTubeId(firstSlide)) ||
+                  firstSlide.videoType === 'local' ||
+                  firstSlide.videoUrl ||
+                  firstSlide.videoPath) &&
+                firstSlide.videoType !== 'none'
+            );
+
+            if (isTargetVideo && firstSlide) {
+              state.videoPlayback.videoError = false;
+              state.videoPlayback.videoErrorMessage = '';
+              state.videoPlayback.currentTime = firstSlide.videoStartTime || 0;
+              state.videoPlayback.isPlaying = firstSlide.autoPlay !== false;
+              state.videoPlayback.isLooping = Boolean(firstSlide.loop || firstSlide.videoLoop);
+              if (firstSlide.videoVolume !== undefined) {
+                state.videoPlayback.volume = firstSlide.videoVolume;
+              }
+              if (firstSlide.videoMuted !== undefined) {
+                state.videoPlayback.isMuted = firstSlide.videoMuted;
+              }
+              if (firstSlide.videoPlaybackRate !== undefined) {
+                state.videoPlayback.playbackRate = firstSlide.videoPlaybackRate;
+              }
+            }
+
+            if (nextRundown.slides.length === 1) {
+              // Only 1 slide in this item, so we reached the end! Bring the next item in rundown to Preview:
+              if (currentRundownIdx + 1 < state.rundown.length - 1) {
+                const afterNext = state.rundown[currentRundownIdx + 2];
+                state.selectedRundownId = afterNext.id;
+                if (afterNext.slides.length > 0) {
+                  state.previewSlideId = afterNext.slides[0].id;
+                }
+              }
+            } else {
+              state.selectedRundownId = nextRundown.id;
+              state.previewSlideId = nextRundown.slides[1].id;
+            }
           }
         }
       }
@@ -455,8 +525,8 @@ export const presentationSlice = createSlice({
       if (currentIdx > 0) {
         const prevSlide = liveItem.slides[currentIdx - 1];
         state.liveSlideId = prevSlide.id;
-        state.previewSlideId = prevSlide.id;
         state.selectedRundownId = liveItem.id;
+        state.previewSlideId = liveItem.slides[currentIdx].id;
         state.isLive = true;
       } else {
         const currentRundownIdx = state.rundown.findIndex((r) => r.id === state.liveRundownId);

@@ -29,9 +29,7 @@ export const BroadcastControls: React.FC = () => {
 
   const handleToggleOnAir = () => {
     window.dispatchEvent(new CustomEvent('bunsenworship:toggle-onair'));
-    if (!isLive) {
-      dispatch(toggleLive());
-    }
+    dispatch(toggleLive());
   };
 
   // Global hotkeys for master broadcast controls:

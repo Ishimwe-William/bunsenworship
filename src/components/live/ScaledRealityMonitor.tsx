@@ -28,8 +28,20 @@ export const getRealityStageScale = (
   stageWidth = 1920,
   stageHeight = 1080
 ) => {
-  if (width <= 0 || height <= 0 || stageWidth <= 0 || stageHeight <= 0) return 0;
-  return Math.min(width / stageWidth, height / stageHeight);
+  if (
+    !width ||
+    !height ||
+    width <= 0 ||
+    height <= 0 ||
+    !stageWidth ||
+    !stageHeight ||
+    stageWidth <= 0 ||
+    stageHeight <= 0
+  ) {
+    return 0.1875;
+  }
+  const computed = Math.min(width / stageWidth, height / stageHeight);
+  return isNaN(computed) || computed <= 0 ? 0.1875 : computed;
 };
 
 export interface ScaledRealityMonitorProps {
@@ -85,10 +97,10 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
   const videoPlayback = useAppSelector(selectVideoPlayback);
   const isProjectorActive = useAppSelector(selectIsProjectorActive);
 
-  const outW = outputDimensions?.width || 1920;
-  const outH = outputDimensions?.height || 1080;
+  const outW = outputDimensions?.width && outputDimensions.width > 0 ? outputDimensions.width : 1920;
+  const outH = outputDimensions?.height && outputDimensions.height > 0 ? outputDimensions.height : 1080;
   const stageWidth = 1920;
-  const stageHeight = Math.round(1920 * (outH / outW));
+  const stageHeight = Math.round(1920 * (outH / outW)) || 1080;
   const stageAspectRatio = `${outW} / ${outH}`;
 
   // When projector is active, mute operator preview to prevent dual sound / echo.
@@ -109,14 +121,13 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
 
     const updateScale = () => {
       const bounds = el.getBoundingClientRect();
-      const nextScale = getRealityStageScale(
-        el.clientWidth || bounds.width,
-        el.clientHeight || bounds.height,
-        stageWidth,
-        stageHeight
-      );
-      if (nextScale > 0) {
-        setScale(nextScale);
+      const w = el.clientWidth || bounds.width;
+      const h = el.clientHeight || bounds.height;
+      if (w > 10 && h > 10) {
+        const nextScale = getRealityStageScale(w, h, stageWidth, stageHeight);
+        if (nextScale > 0 && !isNaN(nextScale)) {
+          setScale(nextScale);
+        }
       }
     };
 
@@ -124,7 +135,12 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     const resizeObserver = new ResizeObserver(updateScale);
     resizeObserver.observe(el);
 
-    return () => resizeObserver.disconnect();
+    window.addEventListener('resize', updateScale);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateScale);
+    };
   }, [stageWidth, stageHeight]);
 
   const youtubeVideoId = extractYouTubeId(slide);
