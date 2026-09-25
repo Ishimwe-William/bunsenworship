@@ -11,6 +11,7 @@ import {
   selectIsTextCleared,
   selectIsLogoActive,
   setPreviewSlide,
+  takeSlideDirectlyLive,
   takeLive,
   clearAllOverrides,
 } from '../../store/features/presentation';
@@ -83,20 +84,35 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
     }
   }, [liveSlide?.id]);
 
+  const lastLiveClickRef = useRef<{ slideId: string; time: number }>({ slideId: '', time: 0 });
+  const lastLiveDoubleDispatchedRef = useRef<{ slideId: string; time: number }>({ slideId: '', time: 0 });
+
+  // Double-clicking cues it in preview and takes it directly live
+  const handleLiveSlideDoubleClick = (slideId: string) => {
+    if (!liveItem) return;
+    const now = Date.now();
+    if (
+      lastLiveDoubleDispatchedRef.current.slideId === slideId &&
+      now - lastLiveDoubleDispatchedRef.current.time < 350
+    ) {
+      return;
+    }
+    lastLiveDoubleDispatchedRef.current = { slideId, time: now };
+    dispatch(clearAllOverrides());
+    dispatch(takeSlideDirectlyLive({ rundownId: liveItem.id, slideId }));
+  };
+
   // Single-clicking any slide cues it into the Preview Section first
   const handleLiveSlideClick = (slideId: string) => {
     if (!liveItem) return;
-    dispatch(setPreviewSlide({ rundownId: liveItem.id, slideId }));
-  };
-
-  // Double-clicking cues it in preview and takes it live
-  const handleLiveSlideDoubleClick = (slideId: string) => {
-    if (!liveItem) return;
-    if (isBlackout || isLogoActive) {
-      dispatch(clearAllOverrides());
+    const now = Date.now();
+    if (lastLiveClickRef.current.slideId === slideId && now - lastLiveClickRef.current.time < 350) {
+      lastLiveClickRef.current = { slideId: '', time: 0 };
+      handleLiveSlideDoubleClick(slideId);
+      return;
     }
+    lastLiveClickRef.current = { slideId, time: now };
     dispatch(setPreviewSlide({ rundownId: liveItem.id, slideId }));
-    dispatch(takeLive());
   };
 
   const hasLiveVideo = Boolean(

@@ -262,6 +262,9 @@ export const presentationSlice = createSlice({
         state.liveSlideId = state.previewSlideId;
         state.liveRundownId = state.selectedRundownId;
         state.isLive = true;
+        state.isBlackout = false;
+        state.isTextCleared = false;
+        state.isLogoActive = false;
 
         const currentItem = state.rundown.find((r) => r.id === state.selectedRundownId);
         if (currentItem) {
@@ -318,6 +321,9 @@ export const presentationSlice = createSlice({
       state.liveRundownId = action.payload.rundownId;
       state.liveSlideId = action.payload.slideId;
       state.isLive = true;
+      state.isBlackout = false;
+      state.isTextCleared = false;
+      state.isLogoActive = false;
 
       const currentItem = state.rundown.find((r) => r.id === action.payload.rundownId);
       if (currentItem) {

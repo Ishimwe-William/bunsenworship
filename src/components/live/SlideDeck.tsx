@@ -114,6 +114,10 @@ export const SlideDeck: React.FC = () => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [dropPosition, setDropPosition] = useState<'above' | 'below' | null>(null);
+  const [dragEnabledIndex, setDragEnabledIndex] = useState<number | null>(null);
+
+  const lastDeckClickRef = useRef<{ slideId: string; time: number }>({ slideId: '', time: 0 });
+  const lastDeckDoubleDispatchedRef = useRef<{ slideId: string; time: number }>({ slideId: '', time: 0 });
 
   if (!currentItem) {
     return (
@@ -138,15 +142,28 @@ export const SlideDeck: React.FC = () => {
     );
   }
 
-  const handleSlideClick = (slideId: string) => {
-    dispatch(setPreviewSlide({ rundownId: currentItem.id, slideId }));
+  const handleSlideDoubleClick = (slideId: string) => {
+    const now = Date.now();
+    if (
+      lastDeckDoubleDispatchedRef.current.slideId === slideId &&
+      now - lastDeckDoubleDispatchedRef.current.time < 350
+    ) {
+      return;
+    }
+    lastDeckDoubleDispatchedRef.current = { slideId, time: now };
+    dispatch(clearAllOverrides());
+    dispatch(takeSlideDirectlyLive({ rundownId: currentItem.id, slideId }));
   };
 
-  const handleSlideDoubleClick = (slideId: string) => {
-    if (isBlackout || isLogoActive) {
-      dispatch(clearAllOverrides());
+  const handleSlideClick = (slideId: string) => {
+    const now = Date.now();
+    if (lastDeckClickRef.current.slideId === slideId && now - lastDeckClickRef.current.time < 350) {
+      lastDeckClickRef.current = { slideId: '', time: 0 };
+      handleSlideDoubleClick(slideId);
+      return;
     }
-    dispatch(takeSlideDirectlyLive({ rundownId: currentItem.id, slideId }));
+    lastDeckClickRef.current = { slideId, time: now };
+    dispatch(setPreviewSlide({ rundownId: currentItem.id, slideId }));
   };
 
   const handleAddSlide = () => {
@@ -212,12 +229,14 @@ export const SlideDeck: React.FC = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
     setDropPosition(null);
+    setDragEnabledIndex(null);
   };
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
     setDropPosition(null);
+    setDragEnabledIndex(null);
   };
 
   const getDeckTypeLabel = () => {
@@ -335,7 +354,7 @@ export const SlideDeck: React.FC = () => {
           return (
             <div
               key={slide.id}
-              draggable
+              draggable={dragEnabledIndex === index}
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragLeave={handleDragLeave}
@@ -366,7 +385,16 @@ export const SlideDeck: React.FC = () => {
             >
               <div className="slide-item-top">
                 <div className="slide-item-info">
-                  <span className="card-drag-handle" title="Drag to rearrange slide">
+                  <span
+                    className="card-drag-handle"
+                    title="Drag to rearrange slide"
+                    onMouseEnter={() => setDragEnabledIndex(index)}
+                    onMouseLeave={() => {
+                      if (draggedIndex === null) setDragEnabledIndex(null);
+                    }}
+                    onMouseDown={() => setDragEnabledIndex(index)}
+                    onTouchStart={() => setDragEnabledIndex(index)}
+                  >
                     <GripVerticalIcon size={13} />
                   </span>
                   <span className="slide-number">{index + 1}</span>

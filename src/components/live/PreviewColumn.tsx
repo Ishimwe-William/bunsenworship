@@ -105,6 +105,10 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [dropPosition, setDropPosition] = useState<'above' | 'below' | null>(null);
+  const [dragEnabledIndex, setDragEnabledIndex] = useState<number | null>(null);
+
+  const lastClickRef = useRef<{ slideId: string; time: number }>({ slideId: '', time: 0 });
+  const lastDoubleDispatchedRef = useRef<{ slideId: string; time: number }>({ slideId: '', time: 0 });
 
   const handleRelinkSlide = async (slideId: string) => {
     if (!currentItem) return;
@@ -157,18 +161,30 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
     }
   }, [currentItem?.id, dispatch]);
 
-  const handleSlideClick = (slideId: string) => {
-    if (!currentItem) return;
-    dispatch(setPreviewSlide({ rundownId: currentItem.id, slideId }));
-  };
-
   const handleSlideDoubleClick = (slideId: string) => {
     if (!currentItem) return;
-    if (isBlackout || isLogoActive) {
-      dispatch(clearAllOverrides());
+    const now = Date.now();
+    if (
+      lastDoubleDispatchedRef.current.slideId === slideId &&
+      now - lastDoubleDispatchedRef.current.time < 350
+    ) {
+      return;
     }
+    lastDoubleDispatchedRef.current = { slideId, time: now };
+    dispatch(clearAllOverrides());
+    dispatch(takeSlideDirectlyLive({ rundownId: currentItem.id, slideId }));
+  };
+
+  const handleSlideClick = (slideId: string) => {
+    if (!currentItem) return;
+    const now = Date.now();
+    if (lastClickRef.current.slideId === slideId && now - lastClickRef.current.time < 350) {
+      lastClickRef.current = { slideId: '', time: 0 };
+      handleSlideDoubleClick(slideId);
+      return;
+    }
+    lastClickRef.current = { slideId, time: now };
     dispatch(setPreviewSlide({ rundownId: currentItem.id, slideId }));
-    dispatch(takeLive());
   };
 
   const handleGoLive = () => {
@@ -252,12 +268,14 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
     setDraggedIndex(null);
     setDragOverIndex(null);
     setDropPosition(null);
+    setDragEnabledIndex(null);
   };
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
     setDropPosition(null);
+    setDragEnabledIndex(null);
   };
 
   const getDeckTypeLabel = () => {
@@ -388,7 +406,7 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
             return (
               <div
                 key={slide.id}
-                draggable
+                draggable={dragEnabledIndex === index}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragLeave={handleDragLeave}
@@ -419,7 +437,16 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
               >
                 <div className="slide-item-top">
                   <div className="slide-item-info">
-                    <span className="card-drag-handle" title="Drag to reorder slide">
+                    <span
+                      className="card-drag-handle"
+                      title="Drag to reorder slide"
+                      onMouseEnter={() => setDragEnabledIndex(index)}
+                      onMouseLeave={() => {
+                        if (draggedIndex === null) setDragEnabledIndex(null);
+                      }}
+                      onMouseDown={() => setDragEnabledIndex(index)}
+                      onTouchStart={() => setDragEnabledIndex(index)}
+                    >
                       <GripVerticalIcon size={12} />
                     </span>
                     <span className="slide-number">{index + 1}</span>
