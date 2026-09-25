@@ -219,15 +219,6 @@ export const ServiceRundown: React.FC<ServiceRundownProps> = ({
   };
 
   const handleDeleteItem = (itemId: string) => {
-    if (rundown.length <= 1) {
-      alert('Cannot delete the last item. Add a new item first.');
-      return;
-    }
-    const item = rundown.find((i) => i.id === itemId);
-    const itemTitle = item?.title ? `"${item.title}"` : 'this item';
-    if (!window.confirm(`Are you sure you want to remove ${itemTitle} from the service rundown?`)) {
-      return;
-    }
     dispatch(deleteRundownItem(itemId));
   };
 
