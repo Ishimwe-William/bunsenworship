@@ -32,7 +32,7 @@ import {
 } from '../../store/features/presentation';
 import { extractYouTubeId } from '../../utils/videoHelpers';
 import { DisplayInfo } from '../../types/electron';
-import { ArrowDownIcon, ArrowUpIcon, MonitorIcon, PlayIcon, SlidersIcon } from '../common/Icons';
+import { ArrowDownIcon, ArrowUpIcon, MonitorIcon, PlayIcon, SlidersIcon, GoLiveIcon, RadioIcon } from '../common/Icons';
 import { ScaledRealityMonitor } from './ScaledRealityMonitor';
 import { VideoControlDeck } from './VideoControlDeck';
 
@@ -204,6 +204,50 @@ export const ProgramPreviewMonitor: React.FC = () => {
     };
   }, [broadcastProjectorState, dispatch]);
 
+  const handleCloseOutput = useCallback(() => {
+    if (window.electronAPI?.closeProjectorWindow) {
+      window.electronAPI.closeProjectorWindow();
+    } else if (projectorWindowRef.current && !projectorWindowRef.current.closed) {
+      projectorWindowRef.current.close();
+      projectorWindowRef.current = null;
+      dispatch(setProjectorActive(false));
+    } else {
+      dispatch(setProjectorActive(false));
+    }
+  }, [dispatch]);
+
+  const handleOpenOutput = useCallback(async () => {
+    broadcastProjectorState();
+
+    // 1. Try native Electron IPC if running in desktop app
+    if (window.electronAPI?.openProjectorWindow) {
+      try {
+        await window.electronAPI.openProjectorWindow();
+        return;
+      } catch (err) {
+        console.warn('Native openProjectorWindow failed, falling back to window.open', err);
+      }
+    }
+
+    // 2. Fallback: window.open with ?mode=projector
+    const currentBase = window.location.href.split('?')[0].split('#')[0];
+    const projectorUrl = `${currentBase}?mode=projector`;
+    const win = window.open(
+      projectorUrl,
+      'BunsenWorship_Projector',
+      'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no'
+    );
+    projectorWindowRef.current = win;
+  }, [broadcastProjectorState]);
+
+  const handleToggleOnAir = useCallback(() => {
+    if (isProjectorActive) {
+      handleCloseOutput();
+    } else {
+      handleOpenOutput();
+    }
+  }, [isProjectorActive, handleCloseOutput, handleOpenOutput]);
+
   // Global hotkeys for worship console operator
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -250,7 +294,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
         }
       } else if (e.key === 'F5' || e.key === 'F6') {
         e.preventDefault();
-        handleOpenOutput();
+        handleToggleOnAir();
       } else if (e.key === '1') {
         e.preventDefault();
         dispatch(setTransitionType('CUT'));
@@ -293,7 +337,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, fadeDuration, hasActiveOverride, rundown, selectedRundownId]);
+  }, [dispatch, fadeDuration, handleToggleOnAir, hasActiveOverride, rundown, selectedRundownId]);
 
   const handleGoLive = () => {
     if (hasActiveOverride) {
@@ -309,30 +353,6 @@ export const ProgramPreviewMonitor: React.FC = () => {
     } else {
       dispatch(setTransitionType('FADE'));
     }
-  };
-
-  const handleOpenOutput = async () => {
-    broadcastProjectorState();
-
-    // 1. Try native Electron IPC if running in desktop app
-    if (window.electronAPI?.openProjectorWindow) {
-      try {
-        await window.electronAPI.openProjectorWindow();
-        return;
-      } catch (err) {
-        console.warn('Native openProjectorWindow failed, falling back to window.open', err);
-      }
-    }
-
-    // 2. Fallback: window.open with ?mode=projector
-    const currentBase = window.location.href.split('?')[0].split('#')[0];
-    const projectorUrl = `${currentBase}?mode=projector`;
-    const win = window.open(
-      projectorUrl,
-      'BunsenWorship_Projector',
-      'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no'
-    );
-    projectorWindowRef.current = win;
   };
 
   return (
@@ -510,40 +530,23 @@ export const ProgramPreviewMonitor: React.FC = () => {
           </div>
           <button
             type="button"
-            className={`output-present-btn ${isProjectorActive ? 'is-connected' : ''}`}
-            onClick={handleOpenOutput}
+            className={`output-onair-btn ${isProjectorActive ? 'is-active' : 'is-standby'}`}
+            onClick={handleToggleOnAir}
             title={
-              displays.length > 1
-                ? `Present ${projectorSource === 'LIVE' ? 'Live' : 'Next'} to ${
+              isProjectorActive
+                ? `Sanctuary output is ON AIR (${
+                    outputDimensions ? `${outputDimensions.width}×${outputDimensions.height}` : 'Active'
+                  }). Click or press F5 to take Off Air`
+                : `Take sanctuary output ON AIR (F5) - Project to ${
                     displays.find((display) => !display.isOperator)?.name || 'secondary display'
                   }`
-                : `Present ${projectorSource === 'LIVE' ? 'Live' : 'Next'} fullscreen`
             }
+            aria-pressed={isProjectorActive}
           >
-            <MonitorIcon size={15} />
-            <span>{isProjectorActive ? 'Output active' : 'Present'}</span>
+            <span className={`onair-pulse-dot ${isProjectorActive ? 'is-pulsing' : ''}`} />
+            <GoLiveIcon size={15} />
+            <span>{isProjectorActive ? 'ON AIR' : 'ON AIR'}</span>
           </button>
-          {isProjectorActive && (
-            <button
-              type="button"
-              className="output-close-btn"
-              onClick={() => {
-                if (window.electronAPI?.closeProjectorWindow) {
-                  window.electronAPI.closeProjectorWindow();
-                } else if (projectorWindowRef.current && !projectorWindowRef.current.closed) {
-                  projectorWindowRef.current.close();
-                  projectorWindowRef.current = null;
-                  dispatch(setProjectorActive(false));
-                } else {
-                  dispatch(setProjectorActive(false));
-                }
-              }}
-              title="Close output"
-              aria-label="Close output"
-            >
-              Close
-            </button>
-          )}
         </div>
       </section>
 
@@ -559,7 +562,20 @@ export const ProgramPreviewMonitor: React.FC = () => {
                 {liveItem?.title || 'No active item'}
               </span>
             </div>
-            <span className="monitor-badge badge-live">On air</span>
+            <button
+              type="button"
+              className={`monitor-badge badge-live ${isProjectorActive ? 'is-active' : 'is-standby'}`}
+              onClick={handleToggleOnAir}
+              title={
+                isProjectorActive
+                  ? 'Sanctuary output is ON AIR. Click or press F5 to take Off Air'
+                  : 'Sanctuary output is standby. Click or press F5 to take ON AIR'
+              }
+              aria-label="Toggle sanctuary output on air"
+            >
+              <span className={`onair-pulse-dot ${isProjectorActive ? 'is-pulsing' : ''}`} />
+              <span>ON AIR</span>
+            </button>
           </div>
           <ScaledRealityMonitor
             slide={liveSlide}
@@ -586,7 +602,9 @@ export const ProgramPreviewMonitor: React.FC = () => {
                 {previewSlide?.section || 'Nothing queued'}
               </span>
             </div>
-            <span className="monitor-badge badge-preview">Preview</span>
+            <span className="monitor-badge badge-preview" title="Cued in operator preview">
+              Preview
+            </span>
           </div>
           <ScaledRealityMonitor
             slide={previewSlide}
@@ -630,7 +648,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
           <div><kbd>Space / Down / PgDn</kbd><span>Next slide</span></div>
           <div><kbd>Up / PgUp</kbd><span>Previous slide</span></div>
           <div><kbd>Home / End</kbd><span>First / Last slide</span></div>
-          <div><kbd>F5 / F6</kbd><span>Present output</span></div>
+          <div><kbd>F5 / F6</kbd><span>Toggle ON AIR output</span></div>
           <div><kbd>1 / 2</kbd><span>Cut / Fade</span></div>
           <div><kbd>F</kbd><span>Fade time</span></div>
           <div><kbd>B / F1</kbd><span>Black screen</span></div>

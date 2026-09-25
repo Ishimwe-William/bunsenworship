@@ -6,7 +6,7 @@ export const convertSongToAsset = (song: SongRecord): ProMediaAsset => {
     id: `song-${song.id}`,
     title: song.title,
     format: 'SONG',
-    resolution: song.key ? `Key of ${song.key}` : 'Worship',
+    resolution: 'Lyrics',
     durationOrSlides: `${song.slides.length} Slides`,
     sourceCategory: 'SONGS',
     thumbnailUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -39,7 +39,7 @@ export const convertDeckToAsset = (deck: ExternalPresentationRecord): ProMediaAs
     id: `deck-${deck.id}`,
     title: deck.title,
     format: deck.type === 'PPT' ? 'PPTX' : 'CANVA',
-    resolution: deck.type === 'PPT' ? '16:9' : 'Cloud',
+    resolution: deck.type === 'PPT' ? 'PowerPoint' : 'Canva',
     durationOrSlides: `${deck.slideCount || deck.slides.length} Slides`,
     sourceCategory: deck.type === 'PPT' ? 'POWERPOINT' : 'CANVA',
     thumbnailUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`

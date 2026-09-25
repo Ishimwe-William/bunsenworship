@@ -11,7 +11,20 @@ import {
   RundownItemType,
 } from '../../store/features/presentation';
 import { RundownItem } from '../../store/features/presentation/types';
-import { PlusIcon, GripVerticalIcon, ClockIcon, TrashIcon, VideoIcon, YoutubeIcon } from '../common/Icons';
+import {
+  PlusIcon,
+  GripVerticalIcon,
+  ClockIcon,
+  TrashIcon,
+  VideoIcon,
+  YoutubeIcon,
+  MusicIcon,
+  PresentationIcon,
+  RepeatIcon,
+  FileTextIcon,
+  ImageIcon,
+  LayersIcon,
+} from '../common/Icons';
 import { createNewRundownItem } from '../../utils/liveShowHelpers';
 import {
   normalizeVideoSource,
@@ -262,12 +275,13 @@ export const ServiceRundown: React.FC = () => {
         </div>
         <div className="rundown-header-controls">
           <div className="rundown-stats">
-            <span className="rundown-stat" title="Estimated service duration">
+            <span className="rundown-stat" title={`Estimated service duration: ${calculateEstimatedDuration()} minutes`}>
               <ClockIcon size={12} />
-              {calculateEstimatedDuration()} min
+              {calculateEstimatedDuration()}m
             </span>
-            <span className="rundown-stat" title="Total slides in this service">
-              {calculateTotalSlides()} {calculateTotalSlides() === 1 ? 'slide' : 'slides'}
+            <span className="rundown-stat" title={`Total slides in this service: ${calculateTotalSlides()}`}>
+              <LayersIcon size={12} />
+              {calculateTotalSlides()}
             </span>
           </div>
           <button
@@ -292,6 +306,17 @@ export const ServiceRundown: React.FC = () => {
             (s) => (s.videoType && s.videoType !== 'none') || s.videoUrl || s.youtubeUrl
           );
           const isYouTubeItem = item.slides.some((s) => Boolean(extractYouTubeId(s)));
+          const cleanSubtitle = item.subtitle
+            ? item.subtitle
+                .replace(/\(Key\s+[A-Ga-g][b#]?\)/gi, '')
+                .replace(/Key\s+of\s+[A-Ga-g][b#]?\s*•?\s*/gi, '')
+                .replace(/\b(4K|1080p|720p|16:9|UHD)\b\s*•?\s*/gi, '')
+                .replace(/\b\d+:\d+\b\s*•?\s*/gi, '')
+                .replace(/\b\d+\s*Min\b\s*/gi, '')
+                .replace(/\s*•\s*(Hymn|Lyrics|Media|Static)\b/gi, '')
+                .replace(/^\s*[•\-–]\s*|\s*[•\-–]\s*$/g, '')
+                .trim()
+            : '';
 
           return (
             <div
@@ -332,20 +357,23 @@ export const ServiceRundown: React.FC = () => {
                   <span className="rundown-time">{item.time}</span>
                 </div>
                 <div className="rundown-card-right">
-                  <span className={`rundown-type-pill ${getTypeClass(item.type)}`}>
-                    {item.type === 'VIDEO' ? (
-                      <span className="rundown-type-content">
-                        {isYouTubeItem ? <YoutubeIcon size={10} /> : <VideoIcon size={10} />}
-                        VIDEO
-                      </span>
-                    ) : hasVideoSlide ? (
-                      <span className="rundown-type-content">
-                        <VideoIcon size={10} />
-                        {item.type}
-                      </span>
-                    ) : (
-                      item.type
-                    )}
+                  <span className={`rundown-type-pill ${getTypeClass(item.type)}`} title={`Type: ${item.type}`}>
+                    <span className="rundown-type-content">
+                      {item.type === 'VIDEO' ? (
+                        isYouTubeItem ? <YoutubeIcon size={10} /> : <VideoIcon size={10} />
+                      ) : item.type === 'SONG' ? (
+                        <MusicIcon size={10} />
+                      ) : item.type === 'PPT' || item.type === 'CANVA' ? (
+                        <PresentationIcon size={10} />
+                      ) : item.type === 'LOOP' ? (
+                        <RepeatIcon size={10} />
+                      ) : item.type === 'SERMON' ? (
+                        <FileTextIcon size={10} />
+                      ) : (
+                        <ImageIcon size={10} />
+                      )}
+                      <span>{item.type}</span>
+                    </span>
                   </span>
                   <button
                     type="button"
@@ -364,21 +392,21 @@ export const ServiceRundown: React.FC = () => {
               <h4 className="rundown-item-title" title={item.title}>
                 {item.title}
               </h4>
-              <p className="rundown-item-subtitle" title={item.subtitle}>
-                {item.subtitle}
-              </p>
+              {cleanSubtitle && (
+                <p className="rundown-item-subtitle" title={cleanSubtitle}>
+                  {cleanSubtitle}
+                </p>
+              )}
               <div className="rundown-card-footer">
-                <span className="rundown-slide-count">
-                  {item.slides.length} {item.slides.length === 1 ? 'slide' : 'slides'}
+                <span className="rundown-slide-count" title={`${item.slides.length} slides`}>
+                  <LayersIcon size={11} /> {item.slides.length}
                 </span>
-                {hasLive ? (
-                  <span className="rundown-live-badge">
+                {hasLive && (
+                  <span className="rundown-live-badge" title="Currently on air on sanctuary output">
                     <span />
                     On air
                   </span>
-                ) : isSelected ? (
-                  <span className="rundown-selected-badge">Selected</span>
-                ) : null}
+                )}
               </div>
             </div>
           );

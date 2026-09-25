@@ -261,7 +261,7 @@ export const MediaLibraryScreen: React.FC = () => {
           id: `song-${song.id}`,
           title: song.title,
           format: 'SONG',
-          resolution: song.key ? `Key of ${song.key}` : 'Worship',
+          resolution: 'Lyrics',
           durationOrSlides: `${song.slides.length} Slides`,
           sourceCategory: 'SONGS',
           thumbnailUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -298,7 +298,7 @@ export const MediaLibraryScreen: React.FC = () => {
           id: `deck-${deck.id}`,
           title: deck.title,
           format: deck.type === 'PPT' ? 'PPTX' : 'CANVA',
-          resolution: deck.type === 'PPT' ? '16:9' : 'Cloud',
+          resolution: deck.type === 'PPT' ? 'PowerPoint' : 'Canva',
           durationOrSlides: `${deck.slideCount || deck.slides.length} Slides`,
           sourceCategory: deck.type === 'PPT' ? 'POWERPOINT' : 'CANVA',
           thumbnailUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -324,7 +324,7 @@ export const MediaLibraryScreen: React.FC = () => {
           id: `img-${img.id}`,
           title: img.title,
           format: 'PNG',
-          resolution: '4K',
+          resolution: 'HD Image',
           durationOrSlides: 'Static',
           sourceCategory:
             img.category === 'ANNOUNCEMENT'
@@ -412,7 +412,7 @@ export const MediaLibraryScreen: React.FC = () => {
       );
       itemToCreate = {
         title: asset.title,
-        subtitle: `${asset.resolution || 'Lyrics'} • ${asset.durationOrSlides || 'Hymn'}`,
+        subtitle: matchedSong?.artist || 'Worship',
         time: '09:15',
         type: 'SONG',
         slides:
@@ -437,7 +437,7 @@ export const MediaLibraryScreen: React.FC = () => {
           : [];
       itemToCreate = {
         title: asset.title,
-        subtitle: `PowerPoint Deck • ${deck?.slideCount || deckSlides.length || asset.durationOrSlides}`,
+        subtitle: 'PowerPoint Deck',
         time: '09:45',
         type: 'PPT',
         externalMeta: {
@@ -507,9 +507,7 @@ export const MediaLibraryScreen: React.FC = () => {
 
       itemToCreate = {
         title: asset.title,
-        subtitle: isVideoAsset
-          ? `Video • ${asset.durationOrSlides || 'Media'}`
-          : 'Image',
+        subtitle: isVideoAsset ? 'Video' : 'Image',
         time: '09:00',
         type: isVideoAsset ? 'VIDEO' : 'IMAGE',
         slides: [

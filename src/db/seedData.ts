@@ -246,7 +246,7 @@ export const SEED_SERVICE: ServiceRecord = {
       id: 'rd-preservice',
       time: '09:00',
       title: 'Pre-service Loop',
-      subtitle: '5 Min Countdown & Music',
+      subtitle: 'Countdown & Music',
       type: 'LOOP',
       slides: [
         {
@@ -260,7 +260,7 @@ export const SEED_SERVICE: ServiceRecord = {
       id: 'rd-call-to-worship',
       time: '09:05',
       title: 'Call to Worship',
-      subtitle: 'Psalm 100:1-5 Reading',
+      subtitle: 'Psalm 100:1-5',
       type: 'SERMON',
       slides: [
         {
@@ -277,7 +277,7 @@ export const SEED_SERVICE: ServiceRecord = {
       id: 'rd-glorious-day',
       time: '09:08',
       title: 'Glorious Day',
-      subtitle: 'Passion Set (Key D)',
+      subtitle: 'Passion Set',
       type: 'SONG',
       slides: [
         {
@@ -310,7 +310,7 @@ export const SEED_SERVICE: ServiceRecord = {
       id: 'rd-living-hope',
       time: '09:13',
       title: 'Living Hope',
-      subtitle: 'Phil Wickham Set (Key Eb)',
+      subtitle: 'Phil Wickham Set',
       type: 'SONG',
       slides: [
         {
@@ -335,7 +335,7 @@ export const SEED_SERVICE: ServiceRecord = {
       id: 'rd-announcements-canva',
       time: '09:20',
       title: 'Church Announcements',
-      subtitle: 'Linked from Canva Presentation',
+      subtitle: 'Announcements',
       type: 'CANVA',
       externalMeta: {
         type: 'CANVA',
@@ -366,7 +366,7 @@ export const SEED_SERVICE: ServiceRecord = {
       id: 'rd-scripture',
       time: '09:25',
       title: 'Scripture Reading & PowerPoint Sermon',
-      subtitle: 'Matthew 6:19-24 (Linked from PPT)',
+      subtitle: 'Matthew 6:19-24',
       type: 'PPT',
       externalMeta: {
         type: 'PPT',

@@ -27,6 +27,9 @@ import {
   PlayIcon,
   PauseIcon,
   PresentationIcon,
+  MusicIcon,
+  LayersIcon,
+  GoLiveIcon,
 } from '../common/Icons';
 import { QuickEditModal } from './QuickEditModal';
 import { createNewSlide } from '../../utils/liveShowHelpers';
@@ -266,9 +269,20 @@ export const SlideDeck: React.FC = () => {
           </div>
         </div>
         <div className="deck-header-actions">
-          <span className="deck-type-badge">{getDeckTypeLabel()}</span>
-          <span className="deck-slide-count">
-            {currentItem.slides.length} {currentItem.slides.length === 1 ? 'slide' : 'slides'}
+          <span className="deck-type-badge" title={getDeckTypeLabel()}>
+            {currentItem.type === 'SONG' ? (
+              <MusicIcon size={12} />
+            ) : currentItem.type === 'VIDEO' ? (
+              <VideoIcon size={12} />
+            ) : currentItem.type === 'PPT' || currentItem.type === 'CANVA' ? (
+              <PresentationIcon size={12} />
+            ) : (
+              <LayersIcon size={12} />
+            )}
+            <span className="deck-type-label">{currentItem.type}</span>
+          </span>
+          <span className="deck-slide-count" title={`${currentItem.slides.length} slides in this deck`}>
+            <LayersIcon size={12} /> {currentItem.slides.length}
           </span>
           <button
             type="button"
@@ -497,10 +511,12 @@ export const SlideDeck: React.FC = () => {
       </div>
 
       <div className="deck-footer-hint">
-        <span>
-          <PlayIcon size={11} /> Click to preview
+        <span title="Click slide to preview">
+          <PlayIcon size={10} /> Preview
         </span>
-        <span>Double-click to take live</span>
+        <span title="Double click slide to take live immediately">
+          <GoLiveIcon size={10} /> Live (Dbl-click)
+        </span>
       </div>
 
       {showAddSlide && (
