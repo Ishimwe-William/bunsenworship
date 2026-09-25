@@ -37,6 +37,7 @@ import {
   getFileNameFromPath,
   extractYouTubeId,
   getSlideThumbnail,
+  isVideoFile,
 } from '../../utils/videoHelpers';
 
 export const SlideDeck: React.FC = () => {
@@ -307,6 +308,11 @@ export const SlideDeck: React.FC = () => {
               slide.videoPath) &&
               slide.videoType !== 'none'
           );
+          const hasMedia = Boolean(
+            hasVideo ||
+              (slide.imageUrl && !isVideoFile(slide.imageUrl)) ||
+              slide.embedUrl
+          );
           const videoTitleText =
             slide.videoTitle ||
             (isYouTube ? 'YouTube Stream' : slide.videoUrl || slide.videoPath ? 'Video Playback' : '');
@@ -444,7 +450,7 @@ export const SlideDeck: React.FC = () => {
                 </div>
               )}
 
-              {(slideThumb || hasVideo) && (
+              {hasMedia && (slideThumb || hasVideo || slide.embedUrl) && (
                 <div className="slide-thumbnail-wrap">
                   <img
                     src={
@@ -473,7 +479,7 @@ export const SlideDeck: React.FC = () => {
               )}
 
               {slide.lines && slide.lines.length > 0 && (
-                <div className="slide-content-preview">
+                <div className={`slide-content-preview ${!hasMedia ? 'is-text-slide' : ''}`}>
                   {slide.lines.map((line, lineIndex) => (
                     <p key={lineIndex} className="slide-line">
                       {line}

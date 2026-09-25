@@ -45,6 +45,12 @@ export const ProgramPreviewMonitor: React.FC = () => {
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [projectorSource, setProjectorSource] = useState<'LIVE' | 'PREVIEW'>('LIVE');
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
+  const [projectorDimensions, setProjectorDimensions] = useState<{
+    width: number;
+    height: number;
+    screenWidth?: number;
+    screenHeight?: number;
+  } | null>(null);
   const projectorWindowRef = useRef<Window | null>(null);
 
   useEffect(() => {
@@ -128,12 +134,17 @@ export const ProgramPreviewMonitor: React.FC = () => {
         markProjectorActive();
       } else if (
         event.data?.type === 'PROJECTOR_CONNECTED' ||
-        event.data?.type === 'PROJECTOR_HEARTBEAT'
+        event.data?.type === 'PROJECTOR_HEARTBEAT' ||
+        event.data?.type === 'PROJECTOR_DIMENSIONS'
       ) {
+        if (event.data?.payload?.width && event.data?.payload?.height) {
+          setProjectorDimensions(event.data.payload);
+        }
         markProjectorActive();
       } else if (event.data?.type === 'PROJECTOR_DISCONNECTED') {
         if (disconnectTimer) clearTimeout(disconnectTimer);
         dispatch(setProjectorActive(false));
+        setProjectorDimensions(null);
       } else if (event.data?.type === 'PROJECTOR_VIDEO_ERROR') {
         dispatch(setVideoError(true));
       }
@@ -273,13 +284,27 @@ export const ProgramPreviewMonitor: React.FC = () => {
             isProjectorActive ? 'is-connected' : 'is-ready'
           }`}
           title={
-            displays.length > 1
+            isProjectorActive
+              ? `Sanctuary Output Active: ${
+                  projectorDimensions
+                    ? `${projectorDimensions.width}×${projectorDimensions.height}`
+                    : displays.find((d) => !d.isOperator)
+                    ? `${displays.find((d) => !d.isOperator)?.bounds.width}×${displays.find((d) => !d.isOperator)?.bounds.height}`
+                    : '1920×1080 synced'
+                } (${
+                  displays.find((display) => !display.isOperator)?.name || 'Projector'
+                })`
+              : displays.length > 1
               ? displays.find((display) => !display.isOperator)?.name || 'Secondary display'
               : 'Primary display'
           }
         >
           <span />
-          {isProjectorActive ? 'Connected' : 'Ready'}
+          {isProjectorActive
+            ? projectorDimensions
+              ? `${projectorDimensions.width}×${projectorDimensions.height}`
+              : 'Connected'
+            : 'Ready'}
         </span>
       </div>
 

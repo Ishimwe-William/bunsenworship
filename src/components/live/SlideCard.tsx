@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Slide } from '../../store/features/presentation/types';
 import { GripVerticalIcon, PlayIcon, YoutubeIcon } from '../common/Icons';
-import { getSlideThumbnail, extractYouTubeId, generateVideoThumbnail } from '../../utils/videoHelpers';
+import { getSlideThumbnail, extractYouTubeId, generateVideoThumbnail, isVideoFile } from '../../utils/videoHelpers';
 
 interface SlideCardProps {
   slide: Slide;
@@ -45,6 +45,11 @@ export const SlideCard: React.FC<SlideCardProps> = ({
     slide.videoPath
   ) && slide.videoType !== 'none';
 
+  const hasMedia = Boolean(
+    hasVideo ||
+    (slide.imageUrl && !isVideoFile(slide.imageUrl))
+  );
+
   const thumbUrl = getSlideThumbnail(slide);
   const displayThumb = imgError
     ? generateVideoThumbnail(slide.videoTitle || slide.section || 'Video')
@@ -85,7 +90,7 @@ export const SlideCard: React.FC<SlideCardProps> = ({
         )}
       </div>
 
-      {(thumbUrl || hasVideo) && (
+      {hasMedia && (thumbUrl || hasVideo) && (
         <div className="slide-thumbnail-wrap" style={{ position: 'relative', overflow: 'hidden' }}>
           <img
             src={displayThumb}
@@ -125,9 +130,13 @@ export const SlideCard: React.FC<SlideCardProps> = ({
       )}
 
       {slide.lines && slide.lines.length > 0 && (
-        <p className="slide-lyrics-body">
-          {slide.lines.join(' / ')}
-        </p>
+        <div className={`slide-content-preview ${!hasMedia ? 'is-text-slide' : ''}`}>
+          {slide.lines.map((line, idx) => (
+            <p key={idx} className="slide-line">
+              {line}
+            </p>
+          ))}
+        </div>
       )}
     </div>
   );

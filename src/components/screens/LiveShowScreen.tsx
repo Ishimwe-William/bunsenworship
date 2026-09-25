@@ -1,13 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import {
-  clearAllOverrides,
-  selectIsBlackout,
-  selectIsLogoActive,
-  selectIsTextCleared,
-} from '../../store/features/presentation';
-import { useLanguage } from '../language';
-import { BlackoutIcon, ClearTextIcon, LogoDisplayIcon } from '../common/Icons';
 import { ServiceRundown, SlideDeck, ProgramPreviewMonitor } from '../live';
 import '../live/LiveConsole.css';
 
@@ -28,11 +19,6 @@ const persistColumnWidth = (key: string, width: number) => {
 };
 
 export const LiveShowScreen: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const isBlackout = useAppSelector(selectIsBlackout);
-  const isTextCleared = useAppSelector(selectIsTextCleared);
-  const isLogoActive = useAppSelector(selectIsLogoActive);
-  const { language } = useLanguage();
   // Column width states with localStorage persistence
   const [rundownWidth, setRundownWidth] = useState<number>(() => {
     try {
@@ -185,44 +171,6 @@ export const LiveShowScreen: React.FC = () => {
 
   return (
     <div className="live-show-screen">
-      {/* Active Global Override Banner */}
-      {(isBlackout || isTextCleared || isLogoActive) && (
-        <div
-          className={`broadcast-override-banner ${
-            isBlackout ? 'blackout' : isLogoActive ? 'logo-active' : 'clear-text'
-          }`}
-          role="alert"
-        >
-          <div className="broadcast-override-info">
-            {isBlackout && <BlackoutIcon size={18} />}
-            {isLogoActive && !isBlackout && <LogoDisplayIcon size={18} />}
-            {isTextCleared && !isBlackout && !isLogoActive && <ClearTextIcon size={18} />}
-            <span>
-              {isBlackout
-                ? language === 'rw'
-                  ? 'Ekrani yose irabura kuri ubu ku byerekanirwaho byose (Kanda F1 cyangwa Umukara hejuru).'
-                  : 'Blackout is active on sanctuary outputs (Press F1 or Black in topbar to resume).'
-                : isLogoActive
-                ? language === 'rw'
-                  ? 'Ikimenyetso cy’itorero kiri kwerekanwa (Kanda F3 cyangwa Ikimenyetso hejuru).'
-                  : 'Church emblem is currently projected on all screens (Press F3 or Logo in topbar).'
-                : language === 'rw'
-                ? 'Amagambo yakuweho, amashusho gusa niyo ari kugaragara (Kanda F2 hejuru).'
-                : 'Lyrics cleared, ambient motion background only (Press F2 or Clear in topbar).'}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="override-resume-btn"
-            onClick={() => dispatch(clearAllOverrides())}
-            title={language === 'rw' ? 'Subiza Bisanzwe (Esc)' : 'Resume Presentation (Esc)'}
-            aria-keyshortcuts="Escape"
-          >
-            {language === 'rw' ? 'Subiza Bisanzwe' : 'Resume Presentation'}
-          </button>
-        </div>
-      )}
-
       <div
         className={`live-console-container ${activeResizer ? 'is-resizing' : ''}`}
         aria-label="Live presentation workspace"

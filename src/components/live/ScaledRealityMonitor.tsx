@@ -39,6 +39,30 @@ export interface ScaledRealityMonitorProps {
   isLive?: boolean;
 }
 
+export const getStageTypographicMetrics = (lines: string[]) => {
+  const lineCount = lines.length;
+  const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
+
+  let fontSize = 104;
+  let lineHeight = 1.3;
+
+  if (lineCount > 5 || maxLineLength > 55) {
+    fontSize = 68;
+    lineHeight = 1.32;
+  } else if (lineCount > 3 || maxLineLength > 42) {
+    fontSize = 82;
+    lineHeight = 1.3;
+  } else if (lineCount === 3) {
+    fontSize = 92;
+    lineHeight = 1.28;
+  } else if (lineCount === 1 && maxLineLength <= 28) {
+    fontSize = 118;
+    lineHeight = 1.25;
+  }
+
+  return { fontSize, lineHeight };
+};
+
 export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
   slide,
   backgroundGradient,
@@ -253,25 +277,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
 
   // Compute responsive typographic scale for 1920x1080 canvas
   const lines = slide?.lines || [];
-  const lineCount = lines.length;
-  const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
-
-  let fontSize = 104;
-  let lineHeight = 1.3;
-
-  if (lineCount > 5 || maxLineLength > 55) {
-    fontSize = 68;
-    lineHeight = 1.32;
-  } else if (lineCount > 3 || maxLineLength > 42) {
-    fontSize = 82;
-    lineHeight = 1.3;
-  } else if (lineCount === 3) {
-    fontSize = 92;
-    lineHeight = 1.28;
-  } else if (lineCount === 1 && maxLineLength <= 28) {
-    fontSize = 118;
-    lineHeight = 1.25;
-  }
+  const { fontSize, lineHeight } = getStageTypographicMetrics(lines);
 
   // Compute reliable video poster thumbnail
   const videoPoster = getSlideThumbnail(slide);

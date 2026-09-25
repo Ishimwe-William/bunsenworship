@@ -149,12 +149,24 @@ export function getSlideThumbnail(slide?: {
     return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
   }
 
-  // 3. Fallback to generated title badge
-  return generateVideoThumbnail(
-    slide.videoTitle ||
-      slide.section ||
-      getFileNameFromPath(slide.videoPath || slide.videoUrl || 'Video Media')
+  // 3. Fallback to generated title badge ONLY if the slide represents actual video media
+  const hasVideoMedia = Boolean(
+    slide.videoType === 'local' ||
+      slide.videoUrl ||
+      slide.videoPath ||
+      (slide.videoType && slide.videoType !== 'none')
   );
+
+  if (hasVideoMedia) {
+    return generateVideoThumbnail(
+      slide.videoTitle ||
+        slide.section ||
+        getFileNameFromPath(slide.videoPath || slide.videoUrl || 'Video Media')
+    );
+  }
+
+  // Pure text slide has no thumbnail
+  return '';
 }
 
 /**

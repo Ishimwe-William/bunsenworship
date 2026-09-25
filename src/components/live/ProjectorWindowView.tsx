@@ -8,7 +8,8 @@ import {
 } from '../../utils/videoHelpers';
 import { YouTubePlayer } from './YouTubePlayer';
 import { EmbeddedDeckView } from './EmbeddedDeckView';
-import { getRealityStageScale } from './ScaledRealityMonitor';
+import { getRealityStageScale, getStageTypographicMetrics } from './ScaledRealityMonitor';
+import './LiveConsole.css';
 
 export interface ProjectorPayload {
   slide: Slide | null;
@@ -63,17 +64,26 @@ export const ProjectorWindowView: React.FC = () => {
     document.body.style.overflow = 'hidden';
     document.body.style.backgroundColor = '#000000';
 
-    const handleResize = () => {
-      setViewportSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+    const channel = new BroadcastChannel('bunsenworship_projector_channel');
+
+    const reportDimensions = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const sw = window.screen?.width || w;
+      const sh = window.screen?.height || h;
+      setViewportSize({ width: w, height: h });
+      try {
+        channel.postMessage({
+          type: 'PROJECTOR_DIMENSIONS',
+          payload: { width: w, height: h, screenWidth: sw, screenHeight: sh },
+        });
+      } catch {
+        // ignore
+      }
     };
 
-    window.addEventListener('resize', handleResize);
-    handleResize();
-
-    const channel = new BroadcastChannel('bunsenworship_projector_channel');
+    window.addEventListener('resize', reportDimensions);
+    reportDimensions();
 
     channel.onmessage = (event) => {
       if (event.data?.type === 'UPDATE_PROJECTOR_STATE') {
@@ -81,14 +91,28 @@ export const ProjectorWindowView: React.FC = () => {
       }
     };
 
-    // Announce projector is active and request latest state from main window
-    channel.postMessage({ type: 'PROJECTOR_CONNECTED' });
+    // Announce projector is active with dimensions and request latest state from main window
+    const currentDims = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      screenWidth: window.screen?.width || window.innerWidth,
+      screenHeight: window.screen?.height || window.innerHeight,
+    };
+    channel.postMessage({ type: 'PROJECTOR_CONNECTED', payload: currentDims });
     channel.postMessage({ type: 'REQUEST_PROJECTOR_STATE' });
 
-    // Send periodic heartbeat so main window knows projector window is alive
+    // Send periodic heartbeat with dimensions so main window knows projector window is alive
     const heartbeatTimer = window.setInterval(() => {
       try {
-        channel.postMessage({ type: 'PROJECTOR_HEARTBEAT' });
+        channel.postMessage({
+          type: 'PROJECTOR_HEARTBEAT',
+          payload: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            screenWidth: window.screen?.width || window.innerWidth,
+            screenHeight: window.screen?.height || window.innerHeight,
+          },
+        });
       } catch {
         // ignore
       }
@@ -139,7 +163,7 @@ export const ProjectorWindowView: React.FC = () => {
       }
       channel.close();
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', reportDimensions);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -200,25 +224,7 @@ export const ProjectorWindowView: React.FC = () => {
   const scale = getRealityStageScale(viewportSize.width, viewportSize.height);
 
   const lines = slide?.lines || [];
-  const lineCount = lines.length;
-  const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
-
-  let fontSize = 104;
-  let lineHeight = 1.3;
-
-  if (lineCount > 5 || maxLineLength > 55) {
-    fontSize = 68;
-    lineHeight = 1.32;
-  } else if (lineCount > 3 || maxLineLength > 42) {
-    fontSize = 82;
-    lineHeight = 1.3;
-  } else if (lineCount === 3) {
-    fontSize = 92;
-    lineHeight = 1.28;
-  } else if (lineCount === 1 && maxLineLength <= 28) {
-    fontSize = 118;
-    lineHeight = 1.25;
-  }
+  const { fontSize, lineHeight } = getStageTypographicMetrics(lines);
   return (
     <div
       style={{
@@ -428,41 +434,28 @@ export const ProjectorWindowView: React.FC = () => {
         ) : slide && lines.length > 0 ? (
           <div
             key={slide.id}
+            className={`stage-lyrics-wrap ${
+              state.transitionType === 'FADE' ? 'is-fade' : 'is-cut'
+            }`}
             style={{
-              position: 'relative',
+              animationDuration: `${state.fadeDuration}s`,
               zIndex: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              height: '100%',
-              padding: '40px 72px',
-              color: '#ffffff',
-              fontWeight: 800,
-              textAlign: 'center',
-              fontSize: `${fontSize}px`,
-              lineHeight: lineHeight,
-              letterSpacing: '-0.015em',
-              textShadow:
-                '0 8px 32px rgba(0, 0, 0, 0.95), 0 2px 10px rgba(0, 0, 0, 0.9)',
-              boxSizing: 'border-box',
-              wordWrap: 'break-word',
-              animation:
-                state.transitionType === 'FADE'
-                  ? `stageFadeIn ${state.fadeDuration}s ease-out`
-                  : 'none',
+              position: 'relative',
             }}
           >
-            {lines.map((line, idx) => (
-              <div
-                key={idx}
-                style={{
-                  marginBottom: idx < lines.length - 1 ? '24px' : 0,
-                }}
-              >
-                {line}
-              </div>
-            ))}
+            <div
+              className="stage-lyrics-text"
+              style={{
+                fontSize: `${fontSize}px`,
+                lineHeight: lineHeight,
+              }}
+            >
+              {lines.map((line, idx) => (
+                <div key={idx} className="stage-lyric-line">
+                  {line}
+                </div>
+              ))}
+            </div>
           </div>
         ) : slide?.imageUrl || slide?.embedUrl || hasVideo ? null : (
           <div
