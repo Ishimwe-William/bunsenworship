@@ -390,6 +390,16 @@ export const presentationSlice = createSlice({
       const currentIdx = currentItem.slides.findIndex((s) => s.id === state.previewSlideId);
       if (currentIdx > 0) {
         state.previewSlideId = currentItem.slides[currentIdx - 1].id;
+      } else {
+        // Moving backwards to previous show: start from top of the slide
+        const currentRundownIdx = state.rundown.findIndex((r) => r.id === state.selectedRundownId);
+        if (currentRundownIdx > 0) {
+          const prevRundown = state.rundown[currentRundownIdx - 1];
+          state.selectedRundownId = prevRundown.id;
+          if (prevRundown.slides.length > 0) {
+            state.previewSlideId = prevRundown.slides[0].id;
+          }
+        }
       }
     },
     advanceLiveSlide: (state) => {
@@ -528,6 +538,32 @@ export const presentationSlice = createSlice({
         state.selectedRundownId = liveItem.id;
         state.previewSlideId = liveItem.slides[currentIdx].id;
         state.isLive = true;
+
+        const isTargetVideo = Boolean(
+          prevSlide &&
+            (Boolean(extractYouTubeId(prevSlide)) ||
+              prevSlide.videoType === 'local' ||
+              prevSlide.videoUrl ||
+              prevSlide.videoPath) &&
+            prevSlide.videoType !== 'none'
+        );
+
+        if (isTargetVideo && prevSlide) {
+          state.videoPlayback.videoError = false;
+          state.videoPlayback.videoErrorMessage = '';
+          state.videoPlayback.currentTime = prevSlide.videoStartTime || 0;
+          state.videoPlayback.isPlaying = prevSlide.autoPlay !== false;
+          state.videoPlayback.isLooping = Boolean(prevSlide.loop || prevSlide.videoLoop);
+          if (prevSlide.videoVolume !== undefined) {
+            state.videoPlayback.volume = prevSlide.videoVolume;
+          }
+          if (prevSlide.videoMuted !== undefined) {
+            state.videoPlayback.isMuted = prevSlide.videoMuted;
+          }
+          if (prevSlide.videoPlaybackRate !== undefined) {
+            state.videoPlayback.playbackRate = prevSlide.videoPlaybackRate;
+          }
+        }
       } else {
         const currentRundownIdx = state.rundown.findIndex((r) => r.id === state.liveRundownId);
         if (currentRundownIdx > 0) {
@@ -535,10 +571,38 @@ export const presentationSlice = createSlice({
           state.liveRundownId = prevRundown.id;
           state.selectedRundownId = prevRundown.id;
           if (prevRundown.slides.length > 0) {
-            const prevSlide = prevRundown.slides[prevRundown.slides.length - 1];
-            state.liveSlideId = prevSlide.id;
-            state.previewSlideId = prevSlide.id;
+            // Moving backwards to previous show: start from top of the slide
+            const topSlide = prevRundown.slides[0];
+            state.liveSlideId = topSlide.id;
+            state.previewSlideId =
+              prevRundown.slides.length > 1 ? prevRundown.slides[1].id : topSlide.id;
             state.isLive = true;
+
+            const isTargetVideo = Boolean(
+              topSlide &&
+                (Boolean(extractYouTubeId(topSlide)) ||
+                  topSlide.videoType === 'local' ||
+                  topSlide.videoUrl ||
+                  topSlide.videoPath) &&
+                topSlide.videoType !== 'none'
+            );
+
+            if (isTargetVideo && topSlide) {
+              state.videoPlayback.videoError = false;
+              state.videoPlayback.videoErrorMessage = '';
+              state.videoPlayback.currentTime = topSlide.videoStartTime || 0;
+              state.videoPlayback.isPlaying = topSlide.autoPlay !== false;
+              state.videoPlayback.isLooping = Boolean(topSlide.loop || topSlide.videoLoop);
+              if (topSlide.videoVolume !== undefined) {
+                state.videoPlayback.volume = topSlide.videoVolume;
+              }
+              if (topSlide.videoMuted !== undefined) {
+                state.videoPlayback.isMuted = topSlide.videoMuted;
+              }
+              if (topSlide.videoPlaybackRate !== undefined) {
+                state.videoPlayback.playbackRate = topSlide.videoPlaybackRate;
+              }
+            }
           }
         }
       }

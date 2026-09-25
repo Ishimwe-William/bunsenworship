@@ -83,6 +83,23 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
   const [brokenThumbs, setBrokenThumbs] = useState<Record<string, boolean>>({});
   const slideRelinkInputRef = useRef<HTMLInputElement>(null);
   const pendingRelinkSlideIdRef = useRef<string | null>(null);
+  const slideListRef = useRef<HTMLDivElement>(null);
+
+  // When moving to a different show, reset scroll position to top
+  useEffect(() => {
+    if (slideListRef.current) {
+      slideListRef.current.scrollTop = 0;
+    }
+  }, [currentItem?.id]);
+
+  // When on top slide, ensure view is scrolled to top
+  useEffect(() => {
+    if (currentItem && currentItem.slides[0]?.id === previewSlideId) {
+      if (slideListRef.current) {
+        slideListRef.current.scrollTop = 0;
+      }
+    }
+  }, [previewSlideId]);
 
   // Drag and drop state for slides
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -334,7 +351,7 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
       </div>
 
       {/* Middle: Scrollable Slide List */}
-      <div className="column-slide-list preview-slide-list">
+      <div ref={slideListRef} className="column-slide-list preview-slide-list">
         {!currentItem ? (
           <div className="deck-empty-state">
             <div className="deck-empty-icon">

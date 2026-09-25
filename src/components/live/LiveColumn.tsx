@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectLiveSlide,
@@ -65,6 +65,23 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
 
   const [brokenThumbs, setBrokenThumbs] = useState<Record<string, boolean>>({});
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const liveSlideListRef = useRef<HTMLDivElement>(null);
+
+  // When moving to a different show, reset live slide list scroll to top
+  useEffect(() => {
+    if (liveSlideListRef.current) {
+      liveSlideListRef.current.scrollTop = 0;
+    }
+  }, [liveItem?.id]);
+
+  // When on top live slide, ensure view is scrolled to top
+  useEffect(() => {
+    if (liveSlide && liveItem && liveItem.slides[0]?.id === liveSlide.id) {
+      if (liveSlideListRef.current) {
+        liveSlideListRef.current.scrollTop = 0;
+      }
+    }
+  }, [liveSlide?.id]);
 
   // Single-clicking any slide cues it into the Preview Section first
   const handleLiveSlideClick = (slideId: string) => {
@@ -139,7 +156,7 @@ export const LiveColumn: React.FC<LiveColumnProps> = ({
       </div>
 
       {/* Middle: Scrollable Live Slide Deck */}
-      <div className="column-slide-list live-slide-list">
+      <div ref={liveSlideListRef} className="column-slide-list live-slide-list">
         {!liveItem ? (
           <div className="deck-empty-state">
             <div className="deck-empty-icon is-live-empty">
