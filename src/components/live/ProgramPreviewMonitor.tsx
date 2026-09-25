@@ -11,6 +11,10 @@ import {
   selectIsTextCleared,
   selectIsLogoActive,
   selectVideoPlayback,
+  selectRundown,
+  selectSelectedRundownId,
+  setSelectedRundownId,
+  setPreviewSlide,
   takeLive,
   advanceSlide,
   previousSlide,
@@ -18,10 +22,15 @@ import {
   setFadeDuration,
   setActiveBackground,
   clearAllOverrides,
+  toggleBlackout,
+  toggleClearText,
+  toggleLogo,
+  toggleVideoMute,
   setVideoError,
   setProjectorActive,
   selectIsProjectorActive,
 } from '../../store/features/presentation';
+import { extractYouTubeId } from '../../utils/videoHelpers';
 import { DisplayInfo } from '../../types/electron';
 import { ArrowDownIcon, ArrowUpIcon, MonitorIcon, PlayIcon, SlidersIcon } from '../common/Icons';
 import { ScaledRealityMonitor } from './ScaledRealityMonitor';
@@ -41,6 +50,8 @@ export const ProgramPreviewMonitor: React.FC = () => {
   const hasActiveOverride = isBlackout || isTextCleared || isLogoActive;
   const videoPlayback = useAppSelector(selectVideoPlayback);
   const isProjectorActive = useAppSelector(selectIsProjectorActive);
+  const rundown = useAppSelector(selectRundown);
+  const selectedRundownId = useAppSelector(selectSelectedRundownId);
 
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [projectorSource, setProjectorSource] = useState<'LIVE' | 'PREVIEW'>('LIVE');
@@ -52,6 +63,11 @@ export const ProgramPreviewMonitor: React.FC = () => {
     screenHeight?: number;
   } | null>(null);
   const projectorWindowRef = useRef<Window | null>(null);
+
+  const secondaryDisplay = displays.find((d) => !d.isOperator);
+  const outWidth = projectorDimensions?.width || secondaryDisplay?.bounds.width || 1920;
+  const outHeight = projectorDimensions?.height || secondaryDisplay?.bounds.height || 1080;
+  const outputDimensions = { width: outWidth, height: outHeight };
 
   useEffect(() => {
     if (window.electronAPI?.getDisplays) {
@@ -67,6 +83,11 @@ export const ProgramPreviewMonitor: React.FC = () => {
     const isLiveSource = projectorSource === 'LIVE';
     const targetSlide = isLiveSource ? liveSlide : previewSlide;
 
+    const isMuted = Boolean(
+      videoPlayback.isMuted ||
+      (targetSlide?.videoMuted !== undefined ? targetSlide.videoMuted : false)
+    );
+
     const payload = {
       slide: targetSlide,
       backgroundGradient: activeBackground.gradient,
@@ -76,7 +97,10 @@ export const ProgramPreviewMonitor: React.FC = () => {
       transitionType,
       fadeDuration,
       source: projectorSource,
-      videoPlayback,
+      videoPlayback: {
+        ...videoPlayback,
+        isMuted,
+      },
     };
 
     // Save as persistent fallback
@@ -200,18 +224,33 @@ export const ProgramPreviewMonitor: React.FC = () => {
         return;
       }
 
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' || e.key === 'F4') {
         e.preventDefault();
         if (hasActiveOverride) {
           dispatch(clearAllOverrides());
         }
         dispatch(takeLive());
-      } else if (e.key === ' ' || e.key === 'ArrowDown') {
+      } else if (e.key === ' ' || e.key === 'ArrowDown' || e.key === 'PageDown') {
         e.preventDefault();
         dispatch(advanceSlide());
-      } else if (e.key === 'ArrowUp') {
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
         e.preventDefault();
         dispatch(previousSlide());
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        const currentItem = rundown.find((r) => r.id === selectedRundownId);
+        if (currentItem && currentItem.slides.length > 0) {
+          dispatch(setPreviewSlide({ slideId: currentItem.slides[0].id }));
+        }
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        const currentItem = rundown.find((r) => r.id === selectedRundownId);
+        if (currentItem && currentItem.slides.length > 0) {
+          dispatch(setPreviewSlide({ slideId: currentItem.slides[currentItem.slides.length - 1].id }));
+        }
+      } else if (e.key === 'F5' || e.key === 'F6') {
+        e.preventDefault();
+        handleOpenOutput();
       } else if (e.key === '1') {
         e.preventDefault();
         dispatch(setTransitionType('CUT'));
@@ -222,12 +261,39 @@ export const ProgramPreviewMonitor: React.FC = () => {
         e.preventDefault();
         const newDuration = fadeDuration >= 2.0 ? 0.5 : fadeDuration + 0.5;
         dispatch(setFadeDuration(newDuration));
+      } else if (e.key === 'b' || e.key === 'B' || e.key === 'F1') {
+        e.preventDefault();
+        dispatch(toggleBlackout());
+      } else if (e.key === 'c' || e.key === 'C' || e.key === 'F2') {
+        e.preventDefault();
+        dispatch(toggleClearText());
+      } else if (e.key === 'l' || e.key === 'L' || e.key === 'F3') {
+        e.preventDefault();
+        dispatch(toggleLogo());
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        dispatch(toggleVideoMute());
+      } else if (e.key === 'Escape' && hasActiveOverride) {
+        e.preventDefault();
+        dispatch(clearAllOverrides());
+      } else if (e.key === '[') {
+        e.preventDefault();
+        const currentIndex = rundown.findIndex((r) => r.id === selectedRundownId);
+        if (currentIndex > 0) {
+          dispatch(setSelectedRundownId(rundown[currentIndex - 1].id));
+        }
+      } else if (e.key === ']') {
+        e.preventDefault();
+        const currentIndex = rundown.findIndex((r) => r.id === selectedRundownId);
+        if (currentIndex >= 0 && currentIndex < rundown.length - 1) {
+          dispatch(setSelectedRundownId(rundown[currentIndex + 1].id));
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, fadeDuration, hasActiveOverride]);
+  }, [dispatch, fadeDuration, hasActiveOverride, rundown, selectedRundownId]);
 
   const handleGoLive = () => {
     if (hasActiveOverride) {
@@ -505,6 +571,7 @@ export const ProgramPreviewMonitor: React.FC = () => {
             fadeDuration={fadeDuration}
             emptyLabel="No live slide"
             isLive={true}
+            outputDimensions={outputDimensions}
           />
         </section>
 
@@ -527,24 +594,51 @@ export const ProgramPreviewMonitor: React.FC = () => {
             transitionType="CUT"
             emptyLabel="Nothing queued"
             isLive={false}
+            outputDimensions={outputDimensions}
           />
         </section>
       </div>
 
-      <VideoControlDeck slide={liveSlide} isLive={true} />
+      {(() => {
+        const hasLiveVideo = Boolean(
+          liveSlide &&
+            (extractYouTubeId(liveSlide) ||
+              liveSlide.videoType === 'local' ||
+              liveSlide.videoUrl ||
+              liveSlide.videoPath) &&
+            liveSlide.videoType !== 'none'
+        );
+        const hasPreviewVideo = Boolean(
+          previewSlide &&
+            (extractYouTubeId(previewSlide) ||
+              previewSlide.videoType === 'local' ||
+              previewSlide.videoUrl ||
+              previewSlide.videoPath) &&
+            previewSlide.videoType !== 'none'
+        );
+        const activeMediaSlide = hasLiveVideo ? liveSlide : hasPreviewVideo ? previewSlide : liveSlide;
+        return <VideoControlDeck slide={activeMediaSlide} isLive={hasLiveVideo} />;
+      })()}
 
       <details className="shortcut-details">
         <summary>
-          <span>Keyboard shortcuts</span>
-          <span>6 commands</span>
+          <span>Keyboard shortcuts & clicker</span>
+          <span>16 commands</span>
         </summary>
         <div className="shortcut-grid">
-          <div><kbd>Enter</kbd><span>Go live</span></div>
-          <div><kbd>Space</kbd><span>Next</span></div>
-          <div><kbd>Up</kbd><span>Previous</span></div>
-          <div><kbd>1</kbd><span>Cut</span></div>
-          <div><kbd>2</kbd><span>Fade</span></div>
+          <div><kbd>Enter / F4</kbd><span>Go live</span></div>
+          <div><kbd>Space / Down / PgDn</kbd><span>Next slide</span></div>
+          <div><kbd>Up / PgUp</kbd><span>Previous slide</span></div>
+          <div><kbd>Home / End</kbd><span>First / Last slide</span></div>
+          <div><kbd>F5 / F6</kbd><span>Present output</span></div>
+          <div><kbd>1 / 2</kbd><span>Cut / Fade</span></div>
           <div><kbd>F</kbd><span>Fade time</span></div>
+          <div><kbd>B / F1</kbd><span>Black screen</span></div>
+          <div><kbd>C / F2</kbd><span>Clear text</span></div>
+          <div><kbd>L / F3</kbd><span>Logo screen</span></div>
+          <div><kbd>M</kbd><span>Video mute</span></div>
+          <div><kbd>[ / ]</kbd><span>Prev / Next item</span></div>
+          <div><kbd>Esc</kbd><span>Clear override</span></div>
         </div>
       </details>
     </div>

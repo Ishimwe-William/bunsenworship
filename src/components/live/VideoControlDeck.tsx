@@ -139,6 +139,9 @@ export const VideoControlDeck: React.FC<VideoControlDeckProps> = ({ slide, isLiv
           <span className="video-control-title" title={videoTitle}>
             {videoTitle}
           </span>
+          <span className={`video-deck-target-badge ${isLive ? 'is-live' : 'is-preview'}`}>
+            {isLive ? 'Live Audio' : 'Preview Audio'}
+          </span>
         </div>
         <div className="video-control-status-group">
           <span

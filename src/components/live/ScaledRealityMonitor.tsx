@@ -22,9 +22,14 @@ import {
 import { YouTubePlayer } from './YouTubePlayer';
 import { EmbeddedDeckView } from './EmbeddedDeckView';
 
-export const getRealityStageScale = (width: number, height: number) => {
-  if (width <= 0 || height <= 0) return 0;
-  return Math.min(width / 1920, height / 1080);
+export const getRealityStageScale = (
+  width: number,
+  height: number,
+  stageWidth = 1920,
+  stageHeight = 1080
+) => {
+  if (width <= 0 || height <= 0 || stageWidth <= 0 || stageHeight <= 0) return 0;
+  return Math.min(width / stageWidth, height / stageHeight);
 };
 
 export interface ScaledRealityMonitorProps {
@@ -37,6 +42,7 @@ export interface ScaledRealityMonitorProps {
   fadeDuration?: number;
   emptyLabel?: string;
   isLive?: boolean;
+  outputDimensions?: { width: number; height: number };
 }
 
 export const getStageTypographicMetrics = (lines: string[]) => {
@@ -73,10 +79,15 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
   fadeDuration = 1.0,
   emptyLabel = '[No Content]',
   isLive = false,
+  outputDimensions,
 }) => {
   const dispatch = useAppDispatch();
   const videoPlayback = useAppSelector(selectVideoPlayback);
   const isProjectorActive = useAppSelector(selectIsProjectorActive);
+
+  const stageWidth = outputDimensions?.width || 1920;
+  const stageHeight = outputDimensions?.height || 1080;
+  const stageAspectRatio = `${stageWidth} / ${stageHeight}`;
 
   // When projector is active, mute operator preview to prevent dual sound / echo.
   // When projector is closed, operator preview plays audio for rehearsal / preview.
@@ -89,7 +100,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
   const [localVideoError, setLocalVideoError] = useState<boolean>(false);
   const lastDispatchedTimeRef = useRef<number>(0);
 
-  // Responsive scale factor to fit 1920x1080 stage inside container
+  // Responsive scale factor to fit output stage inside container
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -98,7 +109,9 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
       const bounds = el.getBoundingClientRect();
       const nextScale = getRealityStageScale(
         el.clientWidth || bounds.width,
-        el.clientHeight || bounds.height
+        el.clientHeight || bounds.height,
+        stageWidth,
+        stageHeight
       );
       if (nextScale > 0) {
         setScale(nextScale);
@@ -110,7 +123,7 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     resizeObserver.observe(el);
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [stageWidth, stageHeight]);
 
   const youtubeVideoId = extractYouTubeId(slide);
   const isYouTubeVideo = Boolean(youtubeVideoId);
@@ -286,7 +299,11 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
     <div
       ref={containerRef}
       className={`monitor-screen-frame ${isLive ? 'is-live-frame' : 'is-preview-frame'}`}
+      style={{ aspectRatio: stageAspectRatio }}
     >
+      <div className="monitor-dimension-tag">
+        {stageWidth}×{stageHeight}
+      </div>
       <input
         type="file"
         ref={relinkInputRef}
@@ -309,6 +326,10 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
       <div
         className="sanctuary-virtual-stage"
         style={{
+          width: stageWidth,
+          height: stageHeight,
+          marginLeft: -stageWidth / 2,
+          marginTop: -stageHeight / 2,
           transform: `scale(${scale})`,
         }}
       >

@@ -203,8 +203,9 @@ export const ProjectorWindowView: React.FC = () => {
       v.pause();
     }
 
-    v.volume = pb.volume;
-    v.muted = pb.isMuted;
+    const isMuted = Boolean(pb?.isMuted ?? slide?.videoMuted ?? true);
+    v.volume = pb?.volume ?? slide?.videoVolume ?? 1.0;
+    v.muted = isMuted;
 
     if (v.playbackRate !== pb.playbackRate) {
       v.playbackRate = pb.playbackRate;
@@ -225,6 +226,10 @@ export const ProjectorWindowView: React.FC = () => {
 
   const lines = slide?.lines || [];
   const { fontSize, lineHeight } = getStageTypographicMetrics(lines);
+  const isVideoMuted = Boolean(
+    state.videoPlayback?.isMuted ?? slide?.videoMuted ?? true
+  );
+
   return (
     <div
       style={{
@@ -329,7 +334,7 @@ export const ProjectorWindowView: React.FC = () => {
                 preload="auto"
                 autoPlay={slide?.autoPlay !== false && !state.isBlackout && !state.isLogoActive}
                 loop={Boolean(slide?.loop ?? slide?.videoLoop ?? state.videoPlayback?.isLooping)}
-                muted={Boolean(state.videoPlayback?.isMuted)}
+                muted={isVideoMuted}
                 playsInline
                 style={{
                   width: '100%',
@@ -361,7 +366,7 @@ export const ProjectorWindowView: React.FC = () => {
                 isPlaying={Boolean(state.videoPlayback?.isPlaying)}
                 currentTime={state.videoPlayback?.currentTime || 0}
                 volume={state.videoPlayback?.volume ?? 1.0}
-                isMuted={Boolean(state.videoPlayback?.isMuted)}
+                isMuted={isVideoMuted}
                 loop={Boolean(slide?.loop ?? slide?.videoLoop ?? state.videoPlayback?.isLooping)}
                 startTime={slide?.videoStartTime || 0}
                 isLive={state.source === 'LIVE'}

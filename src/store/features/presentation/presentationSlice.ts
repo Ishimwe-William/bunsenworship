@@ -649,9 +649,30 @@ export const presentationSlice = createSlice({
     },
     setVideoMuted: (state, action: PayloadAction<boolean>) => {
       state.videoPlayback.isMuted = action.payload;
+      const activeSlideId = state.liveSlideId || state.previewSlideId;
+      if (activeSlideId) {
+        for (const item of state.rundown) {
+          const s = item.slides.find((slide) => slide.id === activeSlideId);
+          if (s) {
+            s.videoMuted = action.payload;
+            break;
+          }
+        }
+      }
     },
     toggleVideoMute: (state) => {
-      state.videoPlayback.isMuted = !state.videoPlayback.isMuted;
+      const nextMuted = !state.videoPlayback.isMuted;
+      state.videoPlayback.isMuted = nextMuted;
+      const activeSlideId = state.liveSlideId || state.previewSlideId;
+      if (activeSlideId) {
+        for (const item of state.rundown) {
+          const s = item.slides.find((slide) => slide.id === activeSlideId);
+          if (s) {
+            s.videoMuted = nextMuted;
+            break;
+          }
+        }
+      }
     },
     setVideoPlaybackRate: (state, action: PayloadAction<number>) => {
       state.videoPlayback.playbackRate = action.payload;
