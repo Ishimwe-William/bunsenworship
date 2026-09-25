@@ -1,6 +1,7 @@
 {
   "name": "bunsenworship",
   "productName": "BunsenWorship",
+  "desktopName": "bunsenworship.desktop",
   "version": "1.0.14",
   "description": "BunsenWorship is an Electron application for managing worship presentations.",
   "main": "dist/main/main.js",
@@ -77,7 +78,6 @@
       ],
       "icon": "src/assets/AppIcon-512.png",
       "category": "AudioVideo",
-      "desktopName": "bunsenworship.desktop",
       "syncDesktopName": true
     },
     "directories": {
