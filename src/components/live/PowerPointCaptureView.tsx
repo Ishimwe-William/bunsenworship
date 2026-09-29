@@ -85,7 +85,7 @@ export const PowerPointCaptureView: React.FC<PowerPointCaptureViewProps> = ({ is
               chromeMediaSource: 'desktop',
               chromeMediaSourceId: captureSourceId,
             },
-          } as MediaStreamConstraints,
+          } as unknown as MediaTrackConstraints,
         });
 
         if (videoRef.current) {

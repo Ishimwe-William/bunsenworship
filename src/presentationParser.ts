@@ -335,9 +335,9 @@ export async function parsePowerPointFile(filePath: string): Promise<PptxParseRe
             const pArray = Array.isArray(rawP) ? rawP : rawP ? [rawP] : [];
 
             for (const p of pArray) {
-              const align = (p.pPr?.['@_algn'] || 'left') as 'left' | 'center' | 'right' | 'justify';
-              const mappedAlign =
-                align === 'ctr' ? 'center' : align === 'r' ? 'right' : align === 'just' ? 'justify' : 'left';
+              const rawAlign = String(p.pPr?.['@_algn'] || 'left');
+              const mappedAlign: 'left' | 'center' | 'right' | 'justify' =
+                rawAlign === 'ctr' ? 'center' : rawAlign === 'r' ? 'right' : rawAlign === 'just' ? 'justify' : 'left';
 
               const runs: PptxTextRun[] = [];
               const rawR = p.r;

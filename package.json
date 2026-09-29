@@ -28,6 +28,7 @@
     "make": "npm run build:all && electron-builder",
     "publish": "npm run build:all && electron-builder --publish always",
     "lint": "eslint --ext .ts,.tsx .",
+    "test": "vitest run",
     "generate:icons": "electron scripts/generate-icons.js",
     "release": "npm version patch && git push && git push --tags",
     "release:minor": "npm version minor && git push && git push --tags",
@@ -123,7 +124,8 @@
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
     "typescript": "^5.9.3",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",

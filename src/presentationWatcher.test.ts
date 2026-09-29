@@ -10,7 +10,12 @@ import path from 'node:path';
 
 // Mock file system operations
 vi.mock('node:fs');
-vi.mock('chokidar');
+vi.mock('chokidar', () => ({
+  watch: vi.fn(() => ({
+    on: vi.fn().mockReturnThis(),
+    close: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
 
 describe('PresentationWatcher', () => {
   beforeEach(() => {
@@ -69,12 +74,12 @@ describe('PresentationWatcher', () => {
   });
 
   describe('Running state management', () => {
-    it('should set running state for a watched file', () => {
+    it('should set running state for a watched file', async () => {
       const testPath = 'C:\\Test\\presentation.pptx';
       // Mock file exists
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
-      presentationWatcher.watch(testPath);
+      await presentationWatcher.watch(testPath);
       presentationWatcher.setRunningState(testPath, true, 5);
 
       const state = presentationWatcher.getRunningState(testPath);
@@ -89,11 +94,11 @@ describe('PresentationWatcher', () => {
       expect(state.currentSlideIndex).toBe(0);
     });
 
-    it('should update running state on slide change', () => {
+    it('should update running state on slide change', async () => {
       const testPath = 'C:\\Test\\presentation.pptx';
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
-      presentationWatcher.watch(testPath);
+      await presentationWatcher.watch(testPath);
       presentationWatcher.setRunningState(testPath, true, 3);
       presentationWatcher.setRunningState(testPath, true, 7);
 
@@ -107,7 +112,7 @@ describe('PresentationWatcher', () => {
       const testPath = 'C:\\Test\\presentation.pptx';
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
-      presentationWatcher.watch(testPath);
+      await presentationWatcher.watch(testPath);
       presentationWatcher.setRunningState(testPath, true, 1);
 
       // Simulate pending changes by directly manipulating the watcher entry
@@ -126,7 +131,7 @@ describe('PresentationWatcher', () => {
       const testPath = 'C:\\Test\\presentation.pptx';
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
-      presentationWatcher.watch(testPath);
+      await presentationWatcher.watch(testPath);
       presentationWatcher.setRunningState(testPath, false, 0);
 
       // No pending changes
@@ -138,7 +143,7 @@ describe('PresentationWatcher', () => {
   });
 
   describe('Debounce behavior', () => {
-    it('should debounce file changes', (done) => {
+    it('should debounce file changes', () => new Promise<void>((done) => {
       const testPath = 'C:\\Test\\presentation.pptx';
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
@@ -160,8 +165,8 @@ describe('PresentationWatcher', () => {
       setTimeout(() => {
         expect(callbackCount).toBeLessThanOrEqual(1);
         done();
-      }, 1000);
-    });
+      }, 100);
+    }));
   });
 
   describe('File change detection', () => {

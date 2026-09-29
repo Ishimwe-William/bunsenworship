@@ -489,8 +489,8 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: slide.imageFit || (lines.length > 0 && slide.externalType !== 'PPT' ? 'cover' : 'contain'),
-                filter: lines.length > 0 && slide.externalType !== 'PPT' ? 'brightness(0.72)' : 'none',
+                objectFit: slide.imageFit || (lines.length > 0 ? 'cover' : 'contain'),
+                filter: lines.length > 0 ? 'brightness(0.72)' : 'none',
               }}
             />
           </div>
