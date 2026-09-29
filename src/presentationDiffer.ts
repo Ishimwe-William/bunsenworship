@@ -10,6 +10,8 @@ export interface SlidePartInfo {
   slidePath: string; // e.g. "ppt/slides/slide1.xml"
   slideIndex: number; // 0-based presentation order
   contentHash: string; // Composite hash including XML, media, layout, master, theme
+  title?: string;
+  lines?: string[];
 }
 
 export interface DeckStructure {
@@ -34,6 +36,8 @@ export interface SlideDiffItem {
   cachedImagePath?: string;
   slidePath: string;
   cachedSlide?: CachedSlide;
+  title?: string;
+  lines?: string[];
 }
 
 export interface DeckDiffResult {
@@ -248,7 +252,7 @@ export class PresentationDiffer {
       return h;
     };
 
-    // 4. Map each slide and compute composite hash
+    // 4. Map each slide and compute composite hash + extracted text lines
     const slides: SlidePartInfo[] = [];
 
     for (let index = 0; index < orderedSldIds.length; index++) {
@@ -261,10 +265,28 @@ export class PresentationDiffer {
 
       // 4a. Slide XML
       const slideEntry = getEntry(slidePath);
-      if (slideEntry) {
-        hasher.update(slideEntry.getData());
+      const slideXmlString = slideEntry ? slideEntry.getData().toString('utf8') : '';
+      if (slideXmlString) {
+        hasher.update(slideXmlString);
       } else {
         hasher.update('slide-missing');
+      }
+
+      // Fast extraction of slide text lines for lightweight rendering before full render
+      const slideLines: string[] = [];
+      let slideTitle = `Slide ${index + 1}`;
+      if (slideXmlString) {
+        const pMatches = slideXmlString.matchAll(/<[a-zA-Z0-9:]*p\b[^>]*>([\s\S]*?)<\/[a-zA-Z0-9:]*p>/gi);
+        for (const pm of pMatches) {
+          const tMatches = Array.from(pm[1].matchAll(/<[a-zA-Z0-9:]*t\b[^>]*>([^<]+)<\/[a-zA-Z0-9:]*t>/gi)).map((m) => m[1]);
+          const line = tMatches.join('').trim();
+          if (line) {
+            slideLines.push(line);
+          }
+        }
+        if (slideLines.length > 0) {
+          slideTitle = slideLines[0];
+        }
       }
 
       // 4b. Slide rels + referenced media + layout
@@ -292,6 +314,8 @@ export class PresentationDiffer {
         slidePath,
         slideIndex: index,
         contentHash,
+        title: slideTitle,
+        lines: slideLines,
       });
     }
 
@@ -336,6 +360,8 @@ export class PresentationDiffer {
           slideIndex: slide.slideIndex,
           contentHash: slide.contentHash,
           slidePath: slide.slidePath,
+          title: slide.title,
+          lines: slide.lines,
         });
       } else {
         // Exists in cache: check content hash and cached image file
@@ -355,6 +381,8 @@ export class PresentationDiffer {
             cachedImagePath: cached.imagePath,
             slidePath: slide.slidePath,
             cachedSlide: cached,
+            title: slide.title,
+            lines: slide.lines,
           });
         } else if (cached.slideIndex !== slide.slideIndex) {
           // Content matches, but position in deck changed: reordered
@@ -368,6 +396,8 @@ export class PresentationDiffer {
             cachedImagePath: cached.imagePath,
             slidePath: slide.slidePath,
             cachedSlide: cached,
+            title: cached.title || slide.title,
+            lines: cached.lines || slide.lines,
           });
         } else {
           // Exact same content and exact same position
@@ -381,6 +411,8 @@ export class PresentationDiffer {
             cachedImagePath: cached.imagePath,
             slidePath: slide.slidePath,
             cachedSlide: cached,
+            title: cached.title || slide.title,
+            lines: cached.lines || slide.lines,
           });
         }
       }

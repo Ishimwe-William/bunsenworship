@@ -16,6 +16,7 @@ interface WatcherEntry {
   isRunning: boolean;
   currentSlideIndex: number;
   hasPendingChanges: boolean;
+  activeAbortController: AbortController | null;
 }
 
 interface FileMetadata {
@@ -62,10 +63,12 @@ export class PresentationWatcherManager {
    */
   private isLockOrTempFile(filePath: string): boolean {
     const baseName = path.basename(filePath).toLowerCase();
-    return baseName.startsWith('~$') || // PowerPoint lock file
-           baseName.includes('~') || // Temp file
-           baseName.startsWith('.tmp') ||
-           baseName.endsWith('.tmp');
+    return (
+      baseName.startsWith('~$') ||
+      baseName.includes('~') ||
+      baseName.startsWith('.tmp') ||
+      baseName.endsWith('.tmp')
+    );
   }
 
   /**
@@ -90,7 +93,7 @@ export class PresentationWatcherManager {
       return {
         mtime: stats.mtimeMs,
         size: stats.size,
-        hash: '', // Hash calculated separately for performance
+        hash: '',
       };
     } catch (error) {
       console.warn('[Presentation Watcher] Failed to get file metadata:', error);
@@ -102,12 +105,9 @@ export class PresentationWatcherManager {
    * Checks if a file has actually changed based on metadata and content hash.
    */
   private async hasFileChanged(filePath: string, metadata: FileMetadata, lastMetadata: FileMetadata): Promise<boolean> {
-    // Quick check: mtime or size changed
     if (metadata.mtime !== lastMetadata.mtime || metadata.size !== lastMetadata.size) {
       return true;
     }
-
-    // Deep check: content hash
     const currentHash = await this.calculateFileHash(filePath);
     return currentHash !== lastMetadata.hash;
   }
@@ -167,13 +167,13 @@ export class PresentationWatcherManager {
     if (entry && entry.hasPendingChanges) {
       console.log(`[Presentation Watcher] Applying pending changes for ${filePath}`);
       entry.hasPendingChanges = false;
-      await this.triggerParse(filePath, entry);
+      await this.triggerParse(filePath, entry, true);
     }
   }
 
   /**
    * Starts watching a PPTX presentation file.
-   * Debounces change events by 500-1000ms to avoid partial file write locks while PowerPoint is saving.
+   * Debounces change events by 800ms to avoid partial file write locks while PowerPoint is saving.
    */
   public async watch(targetFilePath: string): Promise<void> {
     if (!targetFilePath || typeof targetFilePath !== 'string') return;
@@ -191,7 +191,6 @@ export class PresentationWatcherManager {
 
     console.log(`[Presentation Watcher] Initializing watcher for: ${targetFilePath}`);
 
-    // Configure chokidar with write-stability protection
     const watcher = watch(normalized, {
       persistent: true,
       ignoreInitial: true,
@@ -215,6 +214,7 @@ export class PresentationWatcherManager {
       isRunning: false,
       currentSlideIndex: 0,
       hasPendingChanges: false,
+      activeAbortController: null,
     };
 
     const triggerParse = async () => {
@@ -228,7 +228,7 @@ export class PresentationWatcherManager {
       entry.debounceTimer = setTimeout(() => {
         entry.debounceTimer = null;
         triggerParse();
-      }, 800); // Increased debounce for better PowerPoint save handling
+      }, 800);
     };
 
     watcher.on('change', debouncedOnChange);
@@ -247,63 +247,90 @@ export class PresentationWatcherManager {
   }
 
   /**
-   * Triggers parsing of a presentation file.
+   * Triggers parsing of a presentation file with cancellation, coalescing,
+   * prioritized lazy export, and live show gating.
    */
-  private async triggerParse(filePath: string, entry: WatcherEntry): Promise<void> {
+  private async triggerParse(filePath: string, entry: WatcherEntry, force = false): Promise<void> {
     console.log(`[Presentation Watcher] Change detected on ${filePath}. Checking for actual changes...`);
 
     try {
-      // Check if file still exists
       if (!fs.existsSync(filePath)) {
         console.warn(`[Presentation Watcher] File no longer exists: ${filePath}`);
         this.notifyFileMissing(filePath);
         return;
       }
 
-      // Check if it's a lock file or temp file
       if (this.isLockOrTempFile(filePath)) {
         console.log(`[Presentation Watcher] Ignoring lock/temp file: ${filePath}`);
         return;
       }
 
-      // Check if file has actually changed
       const currentMetadata = this.getFileMetadata(filePath);
       const currentHash = await this.calculateFileHash(filePath);
-      const hasChanged = await this.hasFileChanged(filePath, currentMetadata, {
-        mtime: entry.lastMtime,
-        size: entry.lastSize,
-        hash: entry.lastHash,
-      });
 
-      if (!hasChanged) {
-        console.log(`[Presentation Watcher] File content unchanged, skipping parse: ${filePath}`);
-        return;
+      if (!force) {
+        const hasChanged = await this.hasFileChanged(filePath, currentMetadata, {
+          mtime: entry.lastMtime,
+          size: entry.lastSize,
+          hash: entry.lastHash,
+        });
+
+        if (!hasChanged) {
+          console.log(`[Presentation Watcher] File content unchanged, skipping parse: ${filePath}`);
+          return;
+        }
       }
 
       console.log(`[Presentation Watcher] File has changed, re-parsing presentation: ${filePath}`);
 
-      // Try to read file with retries (PowerPoint may have it locked)
+      // Wait for write lock to clear
       await this.readFileWithRetry(filePath);
 
-      const result = await exportWithNativePowerPoint(filePath);
+      // Cancel/supersede any existing in-flight export (coalescing)
+      if (entry.activeAbortController) {
+        console.log(`[Presentation Watcher] Cancelling previous in-flight export for ${filePath}`);
+        entry.activeAbortController.abort();
+        entry.activeAbortController = null;
+      }
+
+      const abortController = new AbortController();
+      entry.activeAbortController = abortController;
+
+      // Handle intermediate batches (e.g. priority slides during initial open)
+      const onProgressBatch = (batchPayload: PresentationSyncPayload) => {
+        if (abortController.signal.aborted) return;
+        if (!entry.isRunning) {
+          this.notifyUpdate(batchPayload);
+          this.broadcastToWindows(batchPayload);
+        }
+      };
+
+      const result = await exportWithNativePowerPoint(filePath, 1920, abortController.signal, onProgressBatch);
+
+      if (abortController.signal.aborted) {
+        console.log(`[Presentation Watcher] Export for ${filePath} was superseded/aborted.`);
+        return;
+      }
+
+      entry.activeAbortController = null;
+
       if (!result.ok || !result.slides) {
         console.warn(`[Presentation Watcher] Background re-parse failed: ${result.error}`);
         return;
       }
 
-      // Update metadata
       entry.lastParsedTimestamp = Date.now();
       entry.lastMtime = currentMetadata.mtime;
       entry.lastSize = currentMetadata.size;
       entry.lastHash = currentHash;
 
-      // Handle based on running state
+      // Gate live show updates: if show is currently running, mark changes pending
       if (entry.isRunning) {
-        console.log(`[Presentation Watcher] Presentation is running, marking as pending changes: ${filePath}`);
+        console.log(`[Presentation Watcher] Presentation is running live, marking changes as pending: ${filePath}`);
         entry.hasPendingChanges = true;
         this.notifyPendingChanges(filePath);
       } else {
-        console.log(`[Presentation Watcher] Presentation is idle, applying changes immediately: ${filePath}`);
+        console.log(`[Presentation Watcher] Presentation is idle, applying incremental changes: ${filePath}`);
         entry.hasPendingChanges = false;
 
         const payload: PresentationSyncPayload = {
@@ -312,26 +339,35 @@ export class PresentationWatcherManager {
           slideCount: result.slideCount || result.slides.length,
           slides: result.slides,
           timestamp: entry.lastParsedTimestamp,
+          isIncremental: result.isIncremental,
         };
 
         console.log(
-          `[Presentation Watcher] Successfully re-parsed ${payload.slideCount} slides for "${payload.title}". Broadcasting to renderer...`
+          `[Presentation Watcher] Successfully updated ${payload.slideCount} slides for "${payload.title}". Broadcasting to renderer...`
         );
 
-        // Notify registered callbacks
-        for (const cb of this.onUpdateCallbacks) {
-          try {
-            cb(payload);
-          } catch (err) {
-            console.error('[Presentation Watcher] Error in update callback:', err);
-          }
-        }
-
-        // Broadcast to all open Electron BrowserWindow instances
+        this.notifyUpdate(payload);
         this.broadcastToWindows(payload);
       }
     } catch (err) {
       console.error('[Presentation Watcher] Unexpected error during background re-parse:', err);
+    } finally {
+      if (entry.activeAbortController?.signal.aborted) {
+        entry.activeAbortController = null;
+      }
+    }
+  }
+
+  /**
+   * Dispatches payload to in-process listeners.
+   */
+  private notifyUpdate(payload: PresentationSyncPayload): void {
+    for (const cb of this.onUpdateCallbacks) {
+      try {
+        cb(payload);
+      } catch (err) {
+        console.error('[Presentation Watcher] Error in update callback:', err);
+      }
     }
   }
 
@@ -353,7 +389,6 @@ export class PresentationWatcherManager {
    */
   private notifyFileMissing(filePath: string): void {
     console.warn(`[Presentation Watcher] File missing: ${filePath}`);
-    // Could emit a special event for missing files
   }
 
   /**
@@ -376,7 +411,7 @@ export class PresentationWatcherManager {
   }
 
   /**
-   * Stops watching a specific PPTX file.
+   * Stops watching a specific PPTX file and cancels any in-flight export.
    */
   public unwatch(targetFilePath: string): void {
     const normalized = this.normalizePath(targetFilePath);
@@ -384,6 +419,10 @@ export class PresentationWatcherManager {
     if (entry) {
       if (entry.debounceTimer) {
         clearTimeout(entry.debounceTimer);
+      }
+      if (entry.activeAbortController) {
+        entry.activeAbortController.abort();
+        entry.activeAbortController = null;
       }
       entry.watcher.close().catch((err) => {
         console.warn(`[Presentation Watcher] Error closing watcher for ${targetFilePath}:`, err);
@@ -394,12 +433,16 @@ export class PresentationWatcherManager {
   }
 
   /**
-   * Stops watching all presentations (e.g. on application exit).
+   * Stops watching all presentations and aborts any active in-flight exports.
    */
   public unwatchAll(): void {
     for (const [key, entry] of this.watchers.entries()) {
       if (entry.debounceTimer) {
         clearTimeout(entry.debounceTimer);
+      }
+      if (entry.activeAbortController) {
+        entry.activeAbortController.abort();
+        entry.activeAbortController = null;
       }
       entry.watcher.close().catch((err) => {
         console.debug('Error closing watcher during unwatchAll:', err);
