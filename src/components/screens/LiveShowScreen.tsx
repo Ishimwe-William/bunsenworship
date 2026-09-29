@@ -114,7 +114,9 @@ export const LiveShowScreen: React.FC = () => {
       const next = !prev;
       try {
         localStorage.setItem('bunsenworship_rundown_collapsed', String(next));
-      } catch {}
+      } catch {
+        // ignore storage errors
+      }
       return next;
     });
   };

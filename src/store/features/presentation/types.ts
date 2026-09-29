@@ -1,3 +1,5 @@
+import { PptxSlideData } from '../../../types/presentation';
+
 export type RundownItemType = 'LOOP' | 'VIDEO' | 'SONG' | 'SERMON' | 'PPT' | 'CANVA' | 'IMAGE';
 export type TransitionType = 'CUT' | 'FADE';
 
@@ -11,6 +13,8 @@ export interface Slide {
   // Embedded / external presentation fields (PPT exports, Canva designs)
   embedUrl?: string;
   externalType?: 'PPT' | 'CANVA';
+  slideData?: PptxSlideData;
+  slideHtml?: string;
   // Video fields
   videoUrl?: string;
   videoPath?: string;

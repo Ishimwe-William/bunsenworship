@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Slide, VideoPlaybackState, getPersistedStartupDisplay } from '../../store/features/presentation';
+import { PptxSlideData } from '../../types/presentation';
 import { BunsenWorshipLogo } from '../sidebar/NavIcons';
 import {
   normalizeVideoSource,
@@ -8,6 +9,8 @@ import {
 } from '../../utils/videoHelpers';
 import { YouTubePlayer } from './YouTubePlayer';
 import { EmbeddedDeckView } from './EmbeddedDeckView';
+import { DynamicSlideView } from './DynamicSlideView';
+import { PowerPointCaptureView } from './PowerPointCaptureView';
 import { getRealityStageScale, getStageTypographicMetrics } from './ScaledRealityMonitor';
 import './LiveConsole.css';
 
@@ -56,6 +59,7 @@ export const ProjectorWindowView: React.FC = () => {
     width: typeof window !== 'undefined' ? window.innerWidth : 1920,
     height: typeof window !== 'undefined' ? window.innerHeight : 1080,
   });
+  const [isPowerPointLive, setIsPowerPointLive] = useState(false);
 
   useEffect(() => {
     document.title = 'BunsenWorship - Sanctuary Projection Output';
@@ -87,11 +91,55 @@ export const ProjectorWindowView: React.FC = () => {
     window.addEventListener('resize', reportDimensions);
     reportDimensions();
 
+    const updateSlideFromSync = (payload: { slides: PptxSlideData[] }) => {
+      setState((prev) => {
+        if (!prev.slide || prev.slide.externalType !== 'PPT') return prev;
+        const currentIdx = prev.slide.slideData?.slideIndex ?? 0;
+        const matching = payload.slides[Math.min(currentIdx, payload.slides.length - 1)];
+        if (matching) {
+          return {
+            ...prev,
+            slide: {
+              ...prev.slide,
+              section: matching.title || prev.slide.section,
+              lines: matching.lines,
+              imageUrl: matching.thumbnailDataUrl,
+              embedUrl: `data:text/html;charset=utf-8,${encodeURIComponent(matching.html)}`,
+              slideData: matching,
+              slideHtml: matching.html,
+            },
+          };
+        }
+        return prev;
+      });
+    };
+
+    // Listen for PowerPoint events
+    const handlePowerPointEvent = (event: { type: string; data?: unknown }) => {
+      console.log('[ProjectorWindow] PowerPoint event:', event.type, event.data);
+      if (event.type === 'slideChanged') {
+        // PowerPoint slide changed - we might want to update UI state
+        // For now, the capture view will handle the visual update
+      } else if (event.type === 'slideshowEnded') {
+        setIsPowerPointLive(false);
+      } else if (event.type === 'helperConnected') {
+        // Helper connected - could start live mode if appropriate
+      }
+    };
+
+    const unsubscribePowerPointEvents = window.electronAPI?.onPowerPointEvent?.(handlePowerPointEvent);
+
     channel.onmessage = (event) => {
       if (event.data?.type === 'UPDATE_PROJECTOR_STATE') {
         setState(event.data.payload);
+      } else if (event.data?.type === 'PPTX_AUTO_SYNC' && event.data.payload) {
+        updateSlideFromSync(event.data.payload);
       }
     };
+
+    const unsubscribeSync = window.electronAPI?.onPresentationSync?.((payload) => {
+      updateSlideFromSync(payload);
+    });
 
     // Announce projector is active with dimensions and request latest state from main window
     const currentDims = {
@@ -167,6 +215,8 @@ export const ProjectorWindowView: React.FC = () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('resize', reportDimensions);
       window.removeEventListener('keydown', handleKeyDown);
+      unsubscribeSync?.();
+      unsubscribePowerPointEvents?.();
     };
   }, []);
 
@@ -395,8 +445,33 @@ export const ProjectorWindowView: React.FC = () => {
           </div>
         )}
 
-        {/* Slide Image Layer */}
-        {slide?.imageUrl && !slide?.embedUrl && !state.isBlackout && !state.isLogoActive && !hasVideo && (
+        {/* PowerPoint Live Capture Layer */}
+        {isPowerPointLive && !state.isBlackout && !state.isLogoActive && !hasVideo && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 7,
+              overflow: 'hidden',
+            }}
+          >
+            <PowerPointCaptureView
+              isActive={isPowerPointLive}
+              onError={(error) => {
+                console.error('[ProjectorWindow] PowerPoint capture error:', error);
+                setIsPowerPointLive(false);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Dynamic Presentation Layer (PPTX structured / localized HTML5) */}
+        {slide && (slide.slideData || slide.externalType === 'PPT') && !isPowerPointLive && !state.isBlackout && !state.isLogoActive && !hasVideo && (
+          <DynamicSlideView slide={slide} style={{ zIndex: 6 }} />
+        )}
+
+        {/* Slide Image Layer (standard images / songs / backgrounds when not dynamic PPT) */}
+        {slide?.imageUrl && !slide?.embedUrl && slide?.externalType !== 'PPT' && !state.isBlackout && !state.isLogoActive && !hasVideo && (
           <div
             style={{
               position: 'absolute',
@@ -415,15 +490,15 @@ export const ProjectorWindowView: React.FC = () => {
                 width: '100%',
                 height: '100%',
                 objectFit:
-                  slide.imageFit || (lines.length > 0 ? 'cover' : 'contain'),
-                filter: lines.length > 0 ? 'brightness(0.72)' : 'none',
+                  slide.imageFit || (lines.length > 0 && slide.externalType !== 'PPT' ? 'cover' : 'contain'),
+                filter: lines.length > 0 && slide.externalType !== 'PPT' ? 'brightness(0.72)' : 'none',
               }}
             />
           </div>
         )}
 
-        {/* Embedded Deck Layer (Canva / live presentations) */}
-        {slide?.embedUrl && !state.isBlackout && !state.isLogoActive && (
+        {/* Embedded Deck Layer (Canva / external presentations) */}
+        {slide?.embedUrl && slide?.externalType === 'CANVA' && !state.isBlackout && !state.isLogoActive && (
           <EmbeddedDeckView slide={slide} />
         )}
 
@@ -440,9 +515,9 @@ export const ProjectorWindowView: React.FC = () => {
           >
             <BunsenWorshipLogo size={240} />
           </div>
-        ) : state.isTextCleared ? (
+        ) : state.isTextCleared && slide?.externalType !== 'PPT' ? (
           <div style={{ position: 'relative', zIndex: 10 }} />
-        ) : slide && lines.length > 0 ? (
+        ) : slide && lines.length > 0 && slide.externalType !== 'PPT' ? (
           <div
             key={slide.id}
             className={`stage-lyrics-wrap ${

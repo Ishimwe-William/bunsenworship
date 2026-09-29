@@ -811,34 +811,58 @@ export const MediaLibraryScreen: React.FC = () => {
       setIsExporting(true);
       try {
         const exportResult = (await window.electronAPI?.exportPowerPoint?.(pptSource)) ?? null;
-        if (!exportResult || !exportResult.ok || !exportResult.images || exportResult.images.length === 0) {
+        const hasSlides = Boolean(exportResult?.slides && exportResult.slides.length > 0);
+        const hasImages = Boolean(exportResult?.images && exportResult.images.length > 0);
+
+        if (!exportResult || !exportResult.ok || (!hasSlides && !hasImages)) {
           throw new Error(
             `${exportResult?.error || 'Failed to extract slides. Check that the file opens in PowerPoint.'} (source: "${pptSource}")`
           );
         }
 
-        const slideCount = exportResult.slideCount || exportResult.images.length;
-        const slides: ExternalPresentationRecord['slides'] = exportResult.images.map((absPath, i) => ({
-          id: `s-${Date.now()}-${i + 1}`,
-          section: i === 0 ? 'Title Slide' : `Slide ${i + 1}`,
-          lines: [] as string[],
-          externalType: 'PPT',
-          imageUrl: toMediaUrl(absPath),
-          imageFit: 'contain',
-        }));
+        const slideCount = exportResult.slideCount || exportResult.slides?.length || exportResult.images?.length || 0;
+        const slides: ExternalPresentationRecord['slides'] = hasSlides && exportResult.slides
+          ? exportResult.slides.map((s, i) => ({
+              id: `s-${Date.now()}-${i + 1}`,
+              section: s.title || (i === 0 ? 'Title Slide' : `Slide ${i + 1}`),
+              lines: s.lines || [],
+              externalType: 'PPT',
+              imageUrl: s.thumbnailDataUrl,
+              imageFit: 'contain',
+              slideData: s,
+              slideHtml: s.html,
+            }))
+          : (exportResult.images || []).map((absPath, i) => ({
+              id: `s-${Date.now()}-${i + 1}`,
+              section: i === 0 ? 'Title Slide' : `Slide ${i + 1}`,
+              lines: [] as string[],
+              externalType: 'PPT',
+              imageUrl: toMediaUrl(absPath),
+              imageFit: 'contain',
+            }));
 
+        const resolvedFilePath = exportResult.filePath || pptSource;
         const pptRecord: ExternalPresentationRecord = {
           id: `ppt-${Date.now()}`,
           title: pptTitle.trim() || exportResult.title || 'PowerPoint Presentation',
           type: 'PPT',
-          filePath: pptSource,
+          filePath: resolvedFilePath,
           slideCount,
-          slideImages: exportResult.images,
+          slideImages: exportResult.images || [],
           slides,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
+
         await bunsenDb.saveExternalPresentation(pptRecord);
+
+        // Auto-register file watcher for real-time live sync
+        if (window.electronAPI?.watchPresentation && resolvedFilePath && !resolvedFilePath.startsWith('http')) {
+          window.electronAPI.watchPresentation(resolvedFilePath).catch((err) => {
+            console.debug('Failed to auto-watch presentation:', err);
+          });
+        }
+
         await loadDatabaseRecords();
         setShowUploadModal(false);
         setPptTitle('');
@@ -846,7 +870,7 @@ export const MediaLibraryScreen: React.FC = () => {
         setPptUrl('');
         setPptSourceType('file');
         showFeedback(
-          `PowerPoint "${pptRecord.title}" imported with ${slideCount} original slide${slideCount === 1 ? '' : 's'}!`
+          `PowerPoint "${pptRecord.title}" imported with ${slideCount} dynamic slide${slideCount === 1 ? '' : 's'}!`
         );
       } catch (err) {
         console.error('PPTX export failed:', err);

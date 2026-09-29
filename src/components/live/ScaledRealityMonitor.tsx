@@ -21,6 +21,7 @@ import {
 } from '../../utils/videoHelpers';
 import { YouTubePlayer } from './YouTubePlayer';
 import { EmbeddedDeckView } from './EmbeddedDeckView';
+import { DynamicSlideView } from './DynamicSlideView';
 
 export const getRealityStageScale = (
   width: number,
@@ -463,8 +464,13 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
           </div>
         )}
 
-        {/* Slide Image Layer */}
-        {slide?.imageUrl && !slide?.embedUrl && !isBlackout && !isLogoActive && !hasVideo && (
+        {/* Dynamic Presentation Layer (PPTX structured / localized HTML5) */}
+        {slide && (slide.slideData || slide.externalType === 'PPT') && !isBlackout && !isLogoActive && !hasVideo && (
+          <DynamicSlideView slide={slide} style={{ zIndex: 6 }} />
+        )}
+
+        {/* Slide Image Layer (standard images / songs / backgrounds when not dynamic PPT) */}
+        {slide?.imageUrl && !slide?.embedUrl && slide?.externalType !== 'PPT' && !isBlackout && !isLogoActive && !hasVideo && (
           <div
             className="stage-image-layer"
             style={{
@@ -483,15 +489,15 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: slide.imageFit || (lines.length > 0 ? 'cover' : 'contain'),
-                filter: lines.length > 0 ? 'brightness(0.72)' : 'none',
+                objectFit: slide.imageFit || (lines.length > 0 && slide.externalType !== 'PPT' ? 'cover' : 'contain'),
+                filter: lines.length > 0 && slide.externalType !== 'PPT' ? 'brightness(0.72)' : 'none',
               }}
             />
           </div>
         )}
 
-        {/* Embedded Deck Layer (Canva / live presentations) */}
-        {slide?.embedUrl && !isBlackout && !isLogoActive && (
+        {/* Embedded Deck Layer (Canva / external presentations) */}
+        {slide?.embedUrl && slide?.externalType === 'CANVA' && !isBlackout && !isLogoActive && (
           <EmbeddedDeckView slide={slide} />
         )}
 
@@ -504,11 +510,11 @@ export const ScaledRealityMonitor: React.FC<ScaledRealityMonitorProps> = ({
           <div className="stage-logo-state">
             <BunsenWorshipLogo size={240} />
           </div>
-        ) : isTextCleared ? (
+        ) : isTextCleared && slide?.externalType !== 'PPT' ? (
           <div className="stage-cleared-state">
             <span>[ Text Cleared &bull; Background Only ]</span>
           </div>
-        ) : slide && lines.length > 0 ? (
+        ) : slide && lines.length > 0 && slide.externalType !== 'PPT' ? (
           <div
             key={slide.id}
             className={`stage-lyrics-wrap ${

@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils, IpcRendererEvent } from 'electron';
-import { UpdateInfo, FcmPushMessage, PresentationExportResult } from './types/electron';
+import {
+  UpdateInfo,
+  FcmPushMessage,
+  PresentationExportResult,
+  PptxParseResult,
+  PresentationSyncPayload,
+  PowerPointState,
+  PowerPointSlideInfo,
+} from './types/electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
@@ -49,6 +57,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
   exportPowerPoint: (source: string): Promise<PresentationExportResult> =>
     ipcRenderer.invoke('presentation:export-pptx', source) as Promise<PresentationExportResult>,
+  parsePowerPoint: (source: string): Promise<PptxParseResult> =>
+    ipcRenderer.invoke('presentation:parse-pptx', source) as Promise<PptxParseResult>,
+  watchPresentation: (filePath: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('presentation:watch-file', filePath) as Promise<{ ok: boolean }>,
+  unwatchPresentation: (filePath?: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('presentation:unwatch-file', filePath) as Promise<{ ok: boolean }>,
+  onPresentationSync: (callback: (payload: PresentationSyncPayload) => void) => {
+    const handler = (_event: IpcRendererEvent, payload: PresentationSyncPayload) => callback(payload);
+    ipcRenderer.on('presentation:sync-update', handler);
+    return () => {
+      ipcRenderer.removeListener('presentation:sync-update', handler);
+    };
+  },
   getPathForFile: (file: File) => {
     try {
       if (webUtils && typeof webUtils.getPathForFile === 'function') {
@@ -59,4 +80,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
     return (file as unknown as { path?: string }).path || file.name;
   },
+  // PowerPoint live control API
+  isPowerPointAvailable: () => ipcRenderer.invoke('powerpoint:is-available'),
+  pptOpen: (filePath: string): Promise<{ title: string; slideCount: number; path: string }> =>
+    ipcRenderer.invoke('powerpoint:open', filePath) as Promise<{ title: string; slideCount: number; path: string }>,
+  pptStartSlideshow: (options?: { windowed?: boolean; startSlide?: number }): Promise<{ isRunning: boolean; currentSlide: number }> =>
+    ipcRenderer.invoke('powerpoint:start-slideshow', options) as Promise<{ isRunning: boolean; currentSlide: number }>,
+  pptNext: (): Promise<{ currentSlide: number }> =>
+    ipcRenderer.invoke('powerpoint:next') as Promise<{ currentSlide: number }>,
+  pptPrev: (): Promise<{ currentSlide: number }> =>
+    ipcRenderer.invoke('powerpoint:prev') as Promise<{ currentSlide: number }>,
+  pptGotoSlide: (slideNumber: number): Promise<{ currentSlide: number }> =>
+    ipcRenderer.invoke('powerpoint:goto-slide', slideNumber) as Promise<{ currentSlide: number }>,
+  pptGetState: (): Promise<PowerPointState> =>
+    ipcRenderer.invoke('powerpoint:get-state') as Promise<PowerPointState>,
+  pptGetSlideInfo: (): Promise<{ title: string; slideCount: number; slides: PowerPointSlideInfo[] }> =>
+    ipcRenderer.invoke('powerpoint:get-slide-info') as Promise<{ title: string; slideCount: number; slides: PowerPointSlideInfo[] }>,
+  pptEndSlideshow: (): Promise<{ isRunning: boolean }> =>
+    ipcRenderer.invoke('powerpoint:end-slideshow') as Promise<{ isRunning: boolean }>,
+  pptClose: (): Promise<{ hasPresentation: boolean }> =>
+    ipcRenderer.invoke('powerpoint:close') as Promise<{ hasPresentation: boolean }>,
+  pptQuit: (): Promise<{ status: string }> =>
+    ipcRenderer.invoke('powerpoint:quit') as Promise<{ status: string }>,
+  onPowerPointEvent: (callback: (event: { type: string; data?: unknown }) => void) => {
+    const handler = (_event: IpcRendererEvent, eventData: { type: string; data?: unknown }) => callback(eventData);
+    ipcRenderer.on('powerpoint:event', handler);
+    return () => {
+      ipcRenderer.removeListener('powerpoint:event', handler);
+    };
+  },
+  // Window capture API
+  getCaptureSources: () => ipcRenderer.invoke('capture:get-sources'),
+  getAllCaptureSources: () => ipcRenderer.invoke('capture:get-all-sources'),
+  refreshCaptureSources: () => ipcRenderer.invoke('capture:refresh-sources'),
 });

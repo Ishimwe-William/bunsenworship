@@ -129,7 +129,7 @@ export const SlideCard: React.FC<SlideCardProps> = ({
         </div>
       )}
 
-      {slide.lines && slide.lines.length > 0 && (
+      {slide.lines && slide.lines.length > 0 && slide.externalType !== 'PPT' && (
         <div className={`slide-content-preview ${!hasMedia ? 'is-text-slide' : ''}`}>
           {slide.lines.map((line, idx) => (
             <p key={idx} className="slide-line">

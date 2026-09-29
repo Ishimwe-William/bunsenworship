@@ -9,4 +9,5 @@ export * from './ScaledRealityMonitor';
 export * from './ProjectorWindowView';
 export * from './SlideCard';
 export * from './RundownCard';
+export * from './DynamicSlideView';
 

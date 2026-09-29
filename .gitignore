@@ -94,3 +94,8 @@ dist/
 dist-release/
 /.idea/
 /.vscode/
+
+# Helper build artifacts
+helper/build/
+helper/PowerPointHelper/bin/
+helper/PowerPointHelper/obj/

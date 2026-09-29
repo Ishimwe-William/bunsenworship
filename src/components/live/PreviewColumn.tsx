@@ -536,11 +536,13 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
                         </div>
                       </div>
                     )}
-                    {slide.embedUrl && <div className="slide-embed-badge">Live Deck</div>}
+                    {slide.embedUrl && slide.externalType === 'CANVA' && (
+                      <div className="slide-embed-badge">Live Deck</div>
+                    )}
                   </div>
                 )}
 
-                {slide.lines && slide.lines.length > 0 && (
+                {slide.lines && slide.lines.length > 0 && slide.externalType !== 'PPT' && (
                   <div className={`slide-content-preview ${!hasMedia ? 'is-text-slide' : ''}`}>
                     {slide.lines.map((line, lineIndex) => (
                       <p key={lineIndex} className="slide-line">

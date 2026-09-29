@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PresentationState, RundownItem, Slide, TransitionType, BackgroundTheme, StartupDisplayMode } from './types';
+import { PresentationSyncPayload } from '../../../types/presentation';
 import { isVideoFile, extractYouTubeId } from '../../../utils/videoHelpers';
 
 
@@ -958,6 +959,69 @@ export const presentationSlice = createSlice({
       state.videoPlayback.videoError = false;
       state.videoPlayback.videoErrorMessage = '';
     },
+    syncPptxUpdate: (state, action: PayloadAction<PresentationSyncPayload>) => {
+      const { filePath, title, slides: incomingSlides } = action.payload;
+      const normalizedTarget = filePath.replace(/\\/g, '/').toLowerCase();
+      const baseName = filePath.split(/[/\\]/).pop()?.toLowerCase() || '';
+
+      for (const item of state.rundown) {
+        if (item.type !== 'PPT') continue;
+
+        const itemFilePath = item.externalMeta?.filePath?.replace(/\\/g, '/').toLowerCase();
+        const itemBaseName = itemFilePath?.split(/[/\\]/).pop()?.toLowerCase();
+        const isMatch =
+          (itemFilePath && (itemFilePath === normalizedTarget || itemBaseName === baseName)) ||
+          (item.title && title && item.title.trim().toLowerCase() === title.trim().toLowerCase());
+
+        if (isMatch) {
+          // Preserve the user's active slide index selection across hot-reloads
+          let currentPreviewIndex = -1;
+          let currentLiveIndex = -1;
+
+          if (state.previewSlideId) {
+            currentPreviewIndex = item.slides.findIndex((s) => s.id === state.previewSlideId);
+          }
+          if (state.liveSlideId) {
+            currentLiveIndex = item.slides.findIndex((s) => s.id === state.liveSlideId);
+          }
+
+          const newSlides: Slide[] = incomingSlides.map((parsed, idx) => ({
+            id: `s-pptx-${item.id}-${idx + 1}`,
+            section: parsed.title || `Slide ${idx + 1}`,
+            lines: parsed.lines,
+            imageUrl: parsed.thumbnailDataUrl,
+            imageFit: 'contain',
+            externalType: 'PPT',
+            slideData: parsed,
+            slideHtml: parsed.html,
+          }));
+
+          item.slides = newSlides;
+          if (title && !item.title.trim()) {
+            item.title = title;
+          }
+          if (item.externalMeta) {
+            item.externalMeta.slideCount = newSlides.length;
+            item.externalMeta.filePath = filePath;
+          }
+
+          // Restore active slide index selection
+          if (newSlides.length > 0) {
+            if (currentPreviewIndex >= 0) {
+              const safePreviewIdx = Math.min(currentPreviewIndex, newSlides.length - 1);
+              state.previewSlideId = newSlides[safePreviewIdx].id;
+            } else if (state.selectedRundownId === item.id) {
+              state.previewSlideId = newSlides[0].id;
+            }
+
+            if (currentLiveIndex >= 0 && state.liveRundownId === item.id) {
+              const safeLiveIdx = Math.min(currentLiveIndex, newSlides.length - 1);
+              state.liveSlideId = newSlides[safeLiveIdx].id;
+            }
+          }
+        }
+      }
+    },
     setProjectorActive: (state, action: PayloadAction<boolean>) => {
       state.isProjectorActive = action.payload;
     },
@@ -1009,6 +1073,7 @@ export const {
   restartVideo,
   setVideoError,
   clearVideoError,
+  syncPptxUpdate,
   setProjectorActive,
 } = presentationSlice.actions;
 

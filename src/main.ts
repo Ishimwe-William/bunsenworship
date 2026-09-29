@@ -23,6 +23,10 @@ import {loadWindowState, manageWindowState} from './windowState';
 import {createSplashScreen} from './splash';
 import {setupAutoUpdater} from './updater';
 import {registerPresentationIpc} from './presentationExport';
+import {presentationWatcher} from './presentationWatcher';
+import {registerPowerPointIpc} from './main/powerpoint/PowerPointIpc';
+import {getPowerPointController} from './main/powerpoint/PowerPointController';
+import {registerWindowCaptureIpc} from './main/powerpoint/WindowCapture';
 
 // Prevent Chromium from throttling timers, media, and video decoding when window is minimized or occluded
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
@@ -430,6 +434,12 @@ ipcMain.handle('video:resolve-path', async (_event, filename: string) => {
 // Register presentation import IPC (PowerPoint COM export, etc.)
 registerPresentationIpc();
 
+// Register PowerPoint live control IPC
+registerPowerPointIpc();
+
+// Register window capture IPC
+registerWindowCaptureIpc();
+
 // Open http(s) links in the system browser rather than an Electron child window
 ipcMain.handle('app:open-external', (_event, url: string) => {
     if (typeof url === 'string' && /^https?:\/\//i.test(url.trim())) {
@@ -654,9 +664,16 @@ app.on('activate', () => {
     }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
+    presentationWatcher.unwatchAll();
+    const pptController = getPowerPointController();
+    await pptController.stop();
     if (tray) {
         tray.destroy();
         tray = null;
     }
 });
+
+export { exportWithNativePowerPoint } from './presentationNativeEngine';
+export { parsePowerPointFile } from './presentationParser';
+export { presentationWatcher } from './presentationWatcher';

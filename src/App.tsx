@@ -23,6 +23,7 @@ import {
   SettingsScreen,
 } from './components/screens';
 import { ProjectorWindowView } from './components/live';
+import { usePresentationAutoSync } from './hooks/usePresentationAutoSync';
 import './App.css';
 
 export const App: React.FC = () => {
@@ -40,6 +41,9 @@ export const App: React.FC = () => {
   const activeTab = useAppSelector(selectActiveTab);
   const rundown = useAppSelector(selectRundown);
   const { t } = useLanguage();
+
+  // Real-time PowerPoint live auto-sync and hot-reloads
+  usePresentationAutoSync();
 
   // 1. Initial hydration: Load saved rundown from DB once on application boot
   const hasHydratedRef = useRef(false);

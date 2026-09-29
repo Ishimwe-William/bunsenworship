@@ -2,153 +2,21 @@ import { app, ipcMain, net } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execFile } from 'node:child_process';
+import { exportWithNativePowerPoint } from './presentationNativeEngine';
+import { presentationWatcher } from './presentationWatcher';
+import { isPowerPointAvailable } from './main/powerpoint/PowerPointController';
+import { PptxSlideData, PptxParseResult } from './types/presentation';
 
 export interface PresentationExportResult {
   ok: boolean;
   title?: string;
   slideCount?: number;
   images?: string[];
+  slides?: PptxSlideData[];
+  filePath?: string;
   width?: number;
   height?: number;
   error?: string;
-}
-
-const EXPORT_SUB_DIR = 'presentation-exports';
-const EXPORT_TIMEOUT_MS = 600000;
-
-const POWERPOINT_SCRIPT = `param(
-  [Parameter(Mandatory = $true)][string]$InputFile,
-  [Parameter(Mandatory = $true)][string]$OutDir,
-  [int]$TargetWidth = 1920
-)
-$ErrorActionPreference = 'Stop'
-function Out-Json { param($Obj) Write-Output ($Obj | ConvertTo-Json -Compress -Depth 6) }
-
-if (-not (Test-Path -LiteralPath $InputFile)) {
-  Out-Json @{ ok = $false; error = "The PowerPoint file could not be found at: $InputFile" }
-  exit 1
-}
-
-New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-
-try {
-  $ppt = New-Object -ComObject PowerPoint.Application
-  $ppt.DisplayAlerts = 1
-} catch {
-  Out-Json @{ ok = $false; error = 'Microsoft PowerPoint is not installed on this computer. Install PowerPoint (or Office) to import decks as original-looking slides.' }
-  exit 1
-}
-
-$pres = $null
-try {
-  $pres = $ppt.Presentations.Open($InputFile, $true, $false, $false)
-  $slideCount = $pres.Slides.Count
-  $ptWidth = $pres.PageSetup.SlideWidth
-  $ptHeight = $pres.PageSetup.SlideHeight
-  if ($ptHeight -le 0) { $ptHeight = $ptWidth * 9 / 16 }
-  $scaleFactor = $TargetWidth / [double]$ptWidth
-  $pxWidth = [int][Math]::Max(1, [Math]::Round($ptWidth * $scaleFactor))
-  $pxHeight = [int][Math]::Max(1, [Math]::Round($ptHeight * $scaleFactor))
-
-  $imagePaths = @()
-  for ($i = 1; $i -le $slideCount; $i++) {
-    $name = 'slide-{0}.png' -f $i
-    $outPath = Join-Path $OutDir $name
-    $pres.Slides.Item($i).Export($outPath, 'PNG', $pxWidth, $pxHeight)
-    if (Test-Path -LiteralPath $outPath) {
-      $imagePaths += $outPath
-    }
-  }
-
-  $presTitle = $pres.Name
-
-  try { $pres.Close() } catch { }
-  try { $ppt.Quit() } catch { }
-  if ($pres) { try { [System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($pres) | Out-Null } catch { } }
-  if ($ppt) { try { [System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($ppt) | Out-Null } catch { } }
-
-  $errorMsg = $null
-  if ($imagePaths.Count -eq 0) { $errorMsg = 'PowerPoint returned no slide images.' }
-  Out-Json @{ ok = ($imagePaths.Count -gt 0); title = $presTitle; slideCount = $slideCount; images = @($imagePaths); width = $pxWidth; height = $pxHeight; error = $errorMsg }
-} catch {
-  try { $pres.Close() } catch { }
-  try { $ppt.Quit() } catch { }
-  Out-Json @{ ok = $false; error = $_.Exception.Message }
-}
-exit 0
-`;
-
-function buildPowerShellScript(): string {
-  const scriptPath = path.join(os.tmpdir(), `bunsen-pptx-export-${Date.now()}.ps1`);
-  fs.writeFileSync(scriptPath, POWERPOINT_SCRIPT, 'utf8');
-  return scriptPath;
-}
-
-/**
- * Runs the PowerPoint COM export and resolves with structured results.
- */
-function runPowerPointExport(inputFile: string, outDir: string): Promise<PresentationExportResult> {
-  return new Promise<PresentationExportResult>((resolve) => {
-    const scriptPath = buildPowerShellScript();
-
-    execFile(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        scriptPath,
-        '-InputFile',
-        inputFile,
-        '-OutDir',
-        outDir,
-      ],
-      {
-        timeout: EXPORT_TIMEOUT_MS,
-        windowsHide: true,
-        maxBuffer: 10 * 1024 * 1024,
-        encoding: 'utf8',
-      },
-      (error, stdout, stderr) => {
-        try {
-          fs.unlinkSync(scriptPath);
-        } catch {
-          // ignore
-        }
-
-        const raw = (stdout || '').trim();
-        const jsonMatch = raw.match(/\{[^{}]*\}/);
-        const payload = jsonMatch ? jsonMatch[0] : null;
-
-        if (payload) {
-          try {
-            const parsed = JSON.parse(payload) as PresentationExportResult;
-            resolve({ ok: Boolean(parsed.ok), ...parsed });
-            return;
-          } catch {
-            // fall through to error path
-          }
-        }
-
-        // PowerShell unavailable entirely (e.g. stripped Windows images)
-        if (error && !stdout && !stderr) {
-          resolve({
-            ok: false,
-            error: 'PowerShell could not be launched. PowerPoint export is unavailable on this system.',
-          });
-          return;
-        }
-
-        resolve({
-          ok: false,
-          error: (stderr || error?.message || 'Unknown PowerPoint export failure.').trim(),
-        });
-      }
-    );
-  });
 }
 
 /**
@@ -169,12 +37,11 @@ async function downloadRemoteFile(url: string): Promise<string> {
 }
 
 /**
- * Normalizes a user-supplied local presentation path into an absolute path that
- * `Test-Path`/PowerShell can find: strips wrapping quotes, converts file:// and
- * bunsen-media:// URLs back to plain paths, and resolves relative paths against
- * the user's home directory.
+ * Normalizes a user-supplied local presentation path into an absolute path:
+ * strips wrapping quotes, converts file:// and bunsen-media:// URLs back to plain paths,
+ * and resolves relative paths against the user's home directory.
  */
-function normalizeLocalPresentationPath(raw: string): string {
+export function normalizeLocalPresentationPath(raw: string): string {
   let p = raw.trim();
   if (
     (p.startsWith('"') && p.endsWith('"')) ||
@@ -265,9 +132,8 @@ function findFileInCandidateFolders(filename: string): string | null {
   const hasExtension = /\.[^./\\]+$/.test(base);
   const variants = hasExtension
     ? [base]
-    : [base, `${base}.pptx`, `${base}.ppt`, `${base}.pdf`];
+    : [base, `${base}.pptx`, `${base}.ppt`];
 
-  // Normalize curly/smart quotes (’ vs ') and Unicode so typed names match disk names
   const normalizeName = (s: string) =>
     s
       .replace(/[\u2018\u2019]/g, "'")
@@ -279,7 +145,6 @@ function findFileInCandidateFolders(filename: string): string | null {
   const normalizedVariants = variants.map(normalizeName);
   const candidateDirs = getCandidateFolders();
 
-  // 1. Direct check in candidate dirs
   for (const dir of candidateDirs) {
     let entries: string[];
     try {
@@ -301,7 +166,6 @@ function findFileInCandidateFolders(filename: string): string | null {
     }
   }
 
-  // 2. One level deep in candidate dirs (skipping heavy system/cache folders)
   for (const dir of candidateDirs) {
     let dirents: fs.Dirent[];
     try {
@@ -341,58 +205,131 @@ function findFileInCandidateFolders(filename: string): string | null {
   return null;
 }
 
+/**
+ * Resolves a presentation source (path or URL) into an accessible local file path.
+ */
+async function resolvePresentationPath(source: string): Promise<{ resolvedPath: string | null; isRemote: boolean; error?: string }> {
+  if (!source || typeof source !== 'string') {
+    return { resolvedPath: null, isRemote: false, error: 'No PowerPoint source provided.' };
+  }
+
+  const trimmed = source.trim();
+  const isRemote = /^https?:\/\//i.test(trimmed);
+
+  if (isRemote) {
+    try {
+      const downloaded = await downloadRemoteFile(trimmed);
+      return { resolvedPath: downloaded, isRemote: true };
+    } catch (err) {
+      return { resolvedPath: null, isRemote: true, error: (err as Error)?.message || 'Failed to download remote file.' };
+    }
+  }
+
+  let inputFile = normalizeLocalPresentationPath(trimmed);
+  if (!fs.existsSync(inputFile)) {
+    const found = findFileInCandidateFolders(inputFile) || findFileInCandidateFolders(trimmed);
+    if (found) {
+      inputFile = found;
+    }
+  }
+
+  if (!fs.existsSync(inputFile)) {
+    const hasPathSep = /[/\\]/.test(trimmed);
+    return {
+      resolvedPath: null,
+      isRemote: false,
+      error: hasPathSep
+        ? `The PowerPoint file could not be found at: ${inputFile}`
+        : `The PowerPoint file "${trimmed}" could not be found. Please check that the file exists or select it using the Browse button.`,
+    };
+  }
+
+  return { resolvedPath: inputFile, isRemote: false };
+}
+
+/**
+ * Registers presentation IPC endpoints for the reactive PowerPoint pipeline.
+ */
 export function registerPresentationIpc(): void {
+  // 1. Primary PPTX parsing / export endpoint
   ipcMain.handle('presentation:export-pptx', async (_event, source: string): Promise<PresentationExportResult> => {
-    if (!source || typeof source !== 'string') {
-      return { ok: false, error: 'No PowerPoint source provided.' };
+    const resolution = await resolvePresentationPath(source);
+    if (!resolution.resolvedPath) {
+      return { ok: false, error: resolution.error || 'Failed to resolve presentation file.' };
     }
 
-    const trimmed = source.trim();
-    const isRemote = /^https?:\/\//i.test(trimmed);
-    const tempDownload = isRemote ? await downloadRemoteFile(trimmed).catch((err) => err) : null;
+    const { resolvedPath, isRemote } = resolution;
+    console.log('[PPTX Pipeline] Parsing presentation file:', resolvedPath);
 
-    if (tempDownload instanceof Error) {
-      return { ok: false, error: tempDownload.message };
+    // Check if PowerPoint is available for high-fidelity export
+    const pptAvailable = isPowerPointAvailable();
+    if (!pptAvailable) {
+      console.log('[PPTX Pipeline] PowerPoint not available, using fallback parser');
     }
 
-    let inputFile = (tempDownload as string | null) || normalizeLocalPresentationPath(trimmed);
-    console.log('[PPTX export] received source:', JSON.stringify(source), '=> normalized input:', inputFile);
-
-    if (!tempDownload && !fs.existsSync(inputFile)) {
-      const found = findFileInCandidateFolders(inputFile) || findFileInCandidateFolders(trimmed);
-      if (found) {
-        inputFile = found;
-        console.log('[PPTX export] resolved bare filename to:', inputFile);
+    const parseResult = await exportWithNativePowerPoint(resolvedPath);
+    if (!parseResult.ok || !parseResult.slides) {
+      if (isRemote) {
+        try {
+          fs.unlinkSync(resolvedPath);
+        } catch (err) {
+          console.debug('Failed to remove temp file:', err);
+        }
       }
-    }
-
-    if (!tempDownload && !fs.existsSync(inputFile)) {
-      const hasPathSep = /[/\\]/.test(trimmed);
       return {
         ok: false,
-        error: hasPathSep
-          ? `The PowerPoint file could not be found at: ${inputFile}`
-          : `The PowerPoint file "${trimmed}" could not be found. Please check that the file exists or select it using the Browse button.`,
+        error: parseResult.error || 'Failed to parse presentation file.',
       };
     }
 
-    const outDir = path.join(
-      app.getPath('userData'),
-      EXPORT_SUB_DIR,
-      `ppt-${Date.now()}${Math.random().toString(36).slice(2, 8)}`
-    );
-
-    const result = await runPowerPointExport(inputFile, outDir);
-
-    // Clean up downloaded temp file only (exported images live in userData)
-    if (tempDownload) {
-      try {
-        fs.unlinkSync(tempDownload as string);
-      } catch {
-        // ignore
-      }
+    // Auto-watch local PPTX files with chokidar for real-time live sync
+    if (!isRemote) {
+      await presentationWatcher.watch(resolvedPath);
     }
 
-    return result;
+    return {
+      ok: true,
+      title: parseResult.title,
+      slideCount: parseResult.slideCount,
+      slides: parseResult.slides,
+      images: parseResult.images,
+      filePath: resolvedPath,
+      width: parseResult.width,
+      height: parseResult.height,
+    };
+  });
+
+  // 2. Direct PPTX decoding handler
+  ipcMain.handle('presentation:parse-pptx', async (_event, source: string): Promise<PptxParseResult> => {
+    const resolution = await resolvePresentationPath(source);
+    if (!resolution.resolvedPath) {
+      return { ok: false, error: resolution.error || 'Failed to resolve presentation file.' };
+    }
+    return exportWithNativePowerPoint(resolution.resolvedPath);
+  });
+
+  // 3. File Watcher Management
+  ipcMain.handle('presentation:watch-file', async (_event, filePath: string) => {
+    if (filePath && typeof filePath === 'string') {
+      const normalized = normalizeLocalPresentationPath(filePath);
+      if (fs.existsSync(normalized)) {
+        await presentationWatcher.watch(normalized);
+        return { ok: true, watching: normalized };
+      }
+    }
+    return { ok: false, error: 'File path not found to watch.' };
+  });
+
+  ipcMain.handle('presentation:unwatch-file', (_event, filePath?: string) => {
+    if (filePath && typeof filePath === 'string') {
+      presentationWatcher.unwatch(filePath);
+    } else {
+      presentationWatcher.unwatchAll();
+    }
+    return { ok: true };
+  });
+
+  ipcMain.handle('presentation:get-watched-files', () => {
+    return presentationWatcher.getWatchedPaths();
   });
 }
