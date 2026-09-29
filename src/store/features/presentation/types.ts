@@ -15,6 +15,7 @@ export interface Slide {
   externalType?: 'PPT' | 'CANVA';
   slideData?: PptxSlideData;
   slideHtml?: string;
+  exportStatus?: 'ready' | 'updating' | 'error';
   // Video fields
   videoUrl?: string;
   videoPath?: string;
@@ -91,4 +92,3 @@ export interface PresentationState {
   videoPlayback: VideoPlaybackState;
   isProjectorActive?: boolean;
 }
-

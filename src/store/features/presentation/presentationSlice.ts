@@ -974,49 +974,76 @@ export const presentationSlice = createSlice({
           (item.title && title && item.title.trim().toLowerCase() === title.trim().toLowerCase());
 
         if (isMatch) {
-          // Preserve the user's active slide index selection across hot-reloads
-          let currentPreviewIndex = -1;
-          let currentLiveIndex = -1;
+          // Track previous active slide IDs for stable retention
+          const prevPreviewId = state.previewSlideId;
+          const prevLiveId = state.liveSlideId;
 
-          if (state.previewSlideId) {
-            currentPreviewIndex = item.slides.findIndex((s) => s.id === state.previewSlideId);
+          // Map existing slides by sldId or id
+          const existingSlideMap = new Map<string, Slide>();
+          for (const s of item.slides) {
+            const key = s.slideData?.sldId || s.id;
+            existingSlideMap.set(key, s);
           }
-          if (state.liveSlideId) {
-            currentLiveIndex = item.slides.findIndex((s) => s.id === state.liveSlideId);
+
+          const updatedSlides: Slide[] = [];
+
+          for (let idx = 0; idx < incomingSlides.length; idx++) {
+            const parsed = incomingSlides[idx];
+            const sldKey = parsed.sldId || `idx-${idx + 1}`;
+            const stableId = parsed.sldId ? `s-pptx-${item.id}-${parsed.sldId}` : `s-pptx-${item.id}-${idx + 1}`;
+            const existing = existingSlideMap.get(sldKey) || item.slides.find((s) => s.id === stableId);
+
+            if (existing) {
+              // Update properties while maintaining object reference
+              existing.section = parsed.title || `Slide ${idx + 1}`;
+              existing.lines = parsed.lines;
+              existing.imageUrl = parsed.thumbnailDataUrl;
+              existing.slideData = parsed;
+              existing.slideHtml = parsed.html;
+              existing.exportStatus = parsed.exportStatus || 'ready';
+              updatedSlides.push(existing);
+            } else {
+              // Added new slide
+              const newSlide: Slide = {
+                id: stableId,
+                section: parsed.title || `Slide ${idx + 1}`,
+                lines: parsed.lines,
+                imageUrl: parsed.thumbnailDataUrl,
+                imageFit: 'contain',
+                externalType: 'PPT',
+                slideData: parsed,
+                slideHtml: parsed.html,
+                exportStatus: parsed.exportStatus || 'ready',
+              };
+              updatedSlides.push(newSlide);
+            }
           }
 
-          const newSlides: Slide[] = incomingSlides.map((parsed, idx) => ({
-            id: `s-pptx-${item.id}-${idx + 1}`,
-            section: parsed.title || `Slide ${idx + 1}`,
-            lines: parsed.lines,
-            imageUrl: parsed.thumbnailDataUrl,
-            imageFit: 'contain',
-            externalType: 'PPT',
-            slideData: parsed,
-            slideHtml: parsed.html,
-          }));
-
-          item.slides = newSlides;
+          item.slides = updatedSlides;
           if (title && !item.title.trim()) {
             item.title = title;
           }
           if (item.externalMeta) {
-            item.externalMeta.slideCount = newSlides.length;
+            item.externalMeta.slideCount = updatedSlides.length;
             item.externalMeta.filePath = filePath;
           }
 
-          // Restore active slide index selection
-          if (newSlides.length > 0) {
-            if (currentPreviewIndex >= 0) {
-              const safePreviewIdx = Math.min(currentPreviewIndex, newSlides.length - 1);
-              state.previewSlideId = newSlides[safePreviewIdx].id;
+          // Restore active slide selection: retain current selection by ID
+          if (updatedSlides.length > 0) {
+            if (prevPreviewId) {
+              const stillExists = updatedSlides.some((s) => s.id === prevPreviewId);
+              if (!stillExists && state.selectedRundownId === item.id) {
+                state.previewSlideId = updatedSlides[0].id;
+              }
             } else if (state.selectedRundownId === item.id) {
-              state.previewSlideId = newSlides[0].id;
+              state.previewSlideId = updatedSlides[0].id;
             }
 
-            if (currentLiveIndex >= 0 && state.liveRundownId === item.id) {
-              const safeLiveIdx = Math.min(currentLiveIndex, newSlides.length - 1);
-              state.liveSlideId = newSlides[safeLiveIdx].id;
+            if (prevLiveId && state.liveRundownId === item.id) {
+              const stillExists = updatedSlides.some((s) => s.id === prevLiveId);
+              if (!stillExists) {
+                state.liveSlideId = updatedSlides[0].id;
+              }
             }
           }
         }

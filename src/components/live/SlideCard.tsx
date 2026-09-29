@@ -50,6 +50,8 @@ export const SlideCard: React.FC<SlideCardProps> = ({
     (slide.imageUrl && !isVideoFile(slide.imageUrl))
   );
 
+  const isUpdating = slide.exportStatus === 'updating' || slide.slideData?.exportStatus === 'updating';
+
   const thumbUrl = getSlideThumbnail(slide);
   const displayThumb = imgError
     ? generateVideoThumbnail(slide.videoTitle || slide.section || 'Video')
@@ -79,6 +81,23 @@ export const SlideCard: React.FC<SlideCardProps> = ({
           </span>
           <span className="slide-section-label">{slide.section}</span>
         </div>
+        {isUpdating && (
+          <span
+            className="slide-status-tag"
+            style={{
+              background: '#f59e0b',
+              color: '#000',
+              fontWeight: 700,
+              fontSize: '10px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#000', display: 'inline-block' }} />
+            UPDATING
+          </span>
+        )}
         {isPreview && !isLive && (
           <span className="slide-status-tag tag-next">NEXT UP</span>
         )}
@@ -96,8 +115,27 @@ export const SlideCard: React.FC<SlideCardProps> = ({
             src={displayThumb}
             alt={slide.section || 'Slide Thumbnail'}
             className="slide-thumbnail-img"
+            style={{ opacity: isUpdating ? 0.6 : 1 }}
             onError={() => setImgError(true)}
           />
+          {isUpdating && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0, 0, 0, 0.45)',
+                color: '#f59e0b',
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: 0.5,
+              }}
+            >
+              Updating frame...
+            </div>
+          )}
           {hasVideo && (
             <div
               style={{
