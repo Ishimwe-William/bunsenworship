@@ -40,6 +40,7 @@ export interface PptxSlideElement {
 
 export interface PptxSlideData {
   id: string;
+  sldId?: string;
   slideIndex: number;
   title: string;
   width: number;
@@ -55,6 +56,7 @@ export interface PptxSlideData {
   html: string;
   svg?: string;
   thumbnailDataUrl?: string;
+  exportStatus?: 'ready' | 'updating' | 'error';
 }
 
 export interface PptxParseResult {
@@ -69,10 +71,20 @@ export interface PptxParseResult {
   error?: string;
 }
 
+export interface SlidePatch {
+  sldId: string;
+  slideIndex: number;
+  status: 'unchanged' | 'changed' | 'added' | 'removed' | 'reordered';
+  slide?: PptxSlideData;
+}
+
 export interface PresentationSyncPayload {
   filePath: string;
   title: string;
   slideCount: number;
   slides: PptxSlideData[];
   timestamp: number;
+  isIncremental?: boolean;
+  patches?: SlidePatch[];
+  orderedSldIds?: string[];
 }

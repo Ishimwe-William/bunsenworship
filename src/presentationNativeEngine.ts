@@ -2,12 +2,15 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execFile } from 'node:child_process';
+import { execFile, ChildProcess } from 'node:child_process';
 import { PptxSlideData, PptxParseResult } from './types/presentation';
 import { parsePowerPointFile } from './presentationParser';
+import { presentationCache, PresentationDeckCache, CachedSlide } from './presentationCache';
+import { presentationDiffer, DeckStructure, DeckDiffResult } from './presentationDiffer';
 
 export interface NativePptSlideInfo {
   slideIndex: number;
+  sldId?: string;
   title: string;
   lines: string[];
   imagePath: string;
@@ -24,10 +27,26 @@ export interface NativePptExportJson {
   elapsedMs?: number;
 }
 
+export interface ExportSlideTarget {
+  slideIndex: number; // 1-based presentation index
+  sldId: string;      // Slide identity
+  outPath: string;    // Target file path for slide image
+}
+
+export interface IncrementalExportResult extends PptxParseResult {
+  diffResult?: DeckDiffResult;
+  isIncremental?: boolean;
+  exportedCount?: number;
+  reusedCount?: number;
+  fromCache?: boolean;
+}
+
 const POWERPOINT_EXPORT_SCRIPT = `param(
   [Parameter(Mandatory = $true)][string]$InputFile,
   [Parameter(Mandatory = $true)][string]$OutDir,
-  [int]$TargetWidth = 1920
+  [int]$TargetWidth = 1920,
+  [string]$TargetsFile = "",
+  [string]$TargetsJson = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,6 +58,19 @@ if (-not (Test-Path -LiteralPath $InputFile)) {
 }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+# Resolve selective targets if provided
+$targetList = $null
+if ($TargetsFile -and (Test-Path -LiteralPath $TargetsFile)) {
+  try {
+    $rawContent = Get-Content -LiteralPath $TargetsFile -Raw -Encoding UTF8
+    $targetList = $rawContent | ConvertFrom-Json
+  } catch {}
+} elseif ($TargetsJson) {
+  try {
+    $targetList = $TargetsJson | ConvertFrom-Json
+  } catch {}
+}
 
 $ppt = $null
 $pres = $null
@@ -93,48 +125,115 @@ try {
   $pxHeight = [int][Math]::Max(1, [Math]::Round($ptHeight * $scaleFactor))
 
   $slidesData = @()
-  for ($i = 1; $i -le $slideCount; $i++) {
-    $slide = $pres.Slides.Item($i)
-    $name = 'slide-{0}.png' -f $i
-    $outPath = Join-Path $OutDir $name
 
-    # Retry export up to 4 times in case of write lock / RPC busy
-    for ($retry = 0; $retry -lt 4; $retry++) {
-      try {
-        $slide.Export($outPath, 'PNG', $pxWidth, $pxHeight)
-        if (Test-Path -LiteralPath $outPath) { break }
-      } catch {
-        Start-Sleep -Milliseconds 250
+  if ($null -ne $targetList -and $targetList.Count -gt 0) {
+    # Selective slide export
+    foreach ($tgt in $targetList) {
+      $slide = $null
+      if ($tgt.sldId) {
+        try {
+          $slide = $pres.Slides.FindBySlideID([int]$tgt.sldId)
+        } catch {}
       }
-    }
+      if ($null -eq $slide -and $tgt.slideIndex -gt 0 -and $tgt.slideIndex -le $slideCount) {
+        try {
+          $slide = $pres.Slides.Item($tgt.slideIndex)
+        } catch {}
+      }
+      if ($null -eq $slide) { continue }
 
-    $lines = @()
-    foreach ($sh in $slide.Shapes) {
-      try {
-        if ($sh.HasTextFrame -and $sh.TextFrame.HasText) {
-          $txt = $sh.TextFrame.TextRange.Text.Trim()
-          if ($txt) {
-            $lines += ($txt -split "[\\r\\n]+" | Where-Object { $_.Trim() })
+      $outPath = $tgt.outPath
+      if (-not $outPath) {
+        $outPath = Join-Path $OutDir ("slide-{0}.png" -f $tgt.sldId)
+      }
+
+      # Retry export up to 4 times
+      for ($retry = 0; $retry -lt 4; $retry++) {
+        try {
+          $slide.Export($outPath, 'PNG', $pxWidth, $pxHeight)
+          if (Test-Path -LiteralPath $outPath) { break }
+        } catch {
+          Start-Sleep -Milliseconds 250
+        }
+      }
+
+      $lines = @()
+      foreach ($sh in $slide.Shapes) {
+        try {
+          if ($sh.HasTextFrame -and $sh.TextFrame.HasText) {
+            $txt = $sh.TextFrame.TextRange.Text.Trim()
+            if ($txt) {
+              $lines += ($txt -split "[\\r\\n]+" | Where-Object { $_.Trim() })
+            }
           }
+        } catch {}
+      }
+
+      $title = $null
+      try {
+        if ($slide.Shapes.HasTitle -ne 0) {
+          $title = $slide.Shapes.Title.TextFrame.TextRange.Text.Trim()
         }
       } catch {}
-    }
+      if (-not $title -and $lines.Count -gt 0) { $title = $lines[0] }
+      $actualIdx = [int]$slide.SlideIndex - 1
+      if (-not $title) { $title = "Slide $($actualIdx + 1)" }
 
-    $title = $null
-    try {
-      if ($slide.Shapes.HasTitle -ne 0) {
-        $title = $slide.Shapes.Title.TextFrame.TextRange.Text.Trim()
+      if (Test-Path -LiteralPath $outPath) {
+        $slidesData += @{
+          slideIndex = $actualIdx
+          sldId = [string]$slide.SlideID
+          title = $title
+          lines = $lines
+          imagePath = $outPath
+        }
       }
-    } catch {}
-    if (-not $title -and $lines.Count -gt 0) { $title = $lines[0] }
-    if (-not $title) { $title = "Slide $i" }
+    }
+  } else {
+    # Full export mode
+    for ($i = 1; $i -le $slideCount; $i++) {
+      $slide = $pres.Slides.Item($i)
+      $name = 'slide-{0}.png' -f $i
+      $outPath = Join-Path $OutDir $name
 
-    if (Test-Path -LiteralPath $outPath) {
-      $slidesData += @{
-        slideIndex = $i - 1
-        title = $title
-        lines = $lines
-        imagePath = $outPath
+      for ($retry = 0; $retry -lt 4; $retry++) {
+        try {
+          $slide.Export($outPath, 'PNG', $pxWidth, $pxHeight)
+          if (Test-Path -LiteralPath $outPath) { break }
+        } catch {
+          Start-Sleep -Milliseconds 250
+        }
+      }
+
+      $lines = @()
+      foreach ($sh in $slide.Shapes) {
+        try {
+          if ($sh.HasTextFrame -and $sh.TextFrame.HasText) {
+            $txt = $sh.TextFrame.TextRange.Text.Trim()
+            if ($txt) {
+              $lines += ($txt -split "[\\r\\n]+" | Where-Object { $_.Trim() })
+            }
+          }
+        } catch {}
+      }
+
+      $title = $null
+      try {
+        if ($slide.Shapes.HasTitle -ne 0) {
+          $title = $slide.Shapes.Title.TextFrame.TextRange.Text.Trim()
+        }
+      } catch {}
+      if (-not $title -and $lines.Count -gt 0) { $title = $lines[0] }
+      if (-not $title) { $title = "Slide $i" }
+
+      if (Test-Path -LiteralPath $outPath) {
+        $slidesData += @{
+          slideIndex = $i - 1
+          sldId = [string]$slide.SlideID
+          title = $title
+          lines = $lines
+          imagePath = $outPath
+        }
       }
     }
   }
@@ -151,7 +250,7 @@ try {
   Out-Json @{
     ok = $true
     title = $presTitle
-    slideCount = $slidesData.Count
+    slideCount = $slideCount
     width = $pxWidth
     height = $pxHeight
     slides = $slidesData
@@ -204,53 +303,70 @@ export async function isPowerPointEngineAvailable(): Promise<boolean> {
 }
 
 /**
- * High-fidelity PowerPoint native exporter:
- * Uses Microsoft PowerPoint's native engine to render 100% pixel-perfect Full-HD slide frames
- * with exact typography, master layouts, shapes, gradients, and original PowerPoint fidelity.
+ * Executes PowerShell PowerPoint COM export with optional selective targets and cancellation support.
  */
-export async function exportWithNativePowerPoint(
+function runPowerShellExport(
   inputFile: string,
-  targetWidth = 1920
-): Promise<PptxParseResult> {
-  // If not on Windows or PowerPoint is unavailable, fall back gracefully to the pure JS parser
-  const pptAvailable = await isPowerPointEngineAvailable();
-  if (!pptAvailable) {
-    console.log('[Native PPT Engine] PowerPoint COM unavailable; using cross-platform parser fallback.');
-    return parsePowerPointFile(inputFile);
+  exportDir: string,
+  targetWidth = 1920,
+  targets?: ExportSlideTarget[],
+  signal?: AbortSignal
+): { promise: Promise<NativePptExportJson>; processRef?: ChildProcess } {
+  const scriptPath = getPowerShellScriptPath();
+  let tempTargetsFile: string | null = null;
+
+  const args = [
+    '-NoProfile',
+    '-NonInteractive',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    scriptPath,
+    '-InputFile',
+    inputFile,
+    '-OutDir',
+    exportDir,
+    '-TargetWidth',
+    String(targetWidth),
+  ];
+
+  if (targets && targets.length > 0) {
+    tempTargetsFile = path.join(exportDir, `targets-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.json`);
+    try {
+      if (!fs.existsSync(exportDir)) {
+        fs.mkdirSync(exportDir, { recursive: true });
+      }
+      fs.writeFileSync(tempTargetsFile, JSON.stringify(targets), 'utf8');
+      args.push('-TargetsFile', tempTargetsFile);
+    } catch {
+      args.push('-TargetsJson', JSON.stringify(targets));
+    }
   }
 
-  const exportDir = path.join(
-    app.getPath('userData'),
-    'presentation-exports',
-    `ppt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-  );
+  let child: ChildProcess | undefined;
 
-  return new Promise<PptxParseResult>((resolve) => {
-    const scriptPath = getPowerShellScriptPath();
-
-    execFile(
+  const promise = new Promise<NativePptExportJson>((resolve) => {
+    child = execFile(
       'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        scriptPath,
-        '-InputFile',
-        inputFile,
-        '-OutDir',
-        exportDir,
-        '-TargetWidth',
-        String(targetWidth),
-      ],
+      args,
       {
-        timeout: 120000,
+        timeout: 180000,
         windowsHide: true,
-        maxBuffer: 20 * 1024 * 1024,
+        maxBuffer: 30 * 1024 * 1024,
         encoding: 'utf8',
       },
-      async (error, stdout, stderr) => {
+      (error, stdout, stderr) => {
+        if (tempTargetsFile && fs.existsSync(tempTargetsFile)) {
+          try {
+            fs.unlinkSync(tempTargetsFile);
+          } catch {}
+        }
+
+        if (signal?.aborted) {
+          resolve({ ok: false, error: 'Export aborted by user or superseded by newer save.' });
+          return;
+        }
+
         const raw = (stdout || '').trim();
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
         const payload = jsonMatch ? jsonMatch[0] : null;
@@ -258,71 +374,461 @@ export async function exportWithNativePowerPoint(
         if (payload) {
           try {
             const parsed = JSON.parse(payload) as NativePptExportJson;
-            if (parsed.ok && parsed.slides && parsed.slides.length > 0) {
-              const canvasWidth = parsed.width || targetWidth;
-              const canvasHeight = parsed.height || Math.round(canvasWidth * (9 / 16));
-              const aspectRatio = canvasWidth / canvasHeight;
-
-              const richSlides: PptxSlideData[] = [];
-              const images: string[] = [];
-
-              for (const s of parsed.slides) {
-                let dataUrl = '';
-                try {
-                  const imgBuf = fs.readFileSync(s.imagePath);
-                  dataUrl = `data:image/png;base64,${imgBuf.toString('base64')}`;
-                } catch {
-                  dataUrl = s.imagePath;
-                }
-
-                images.push(dataUrl);
-
-                richSlides.push({
-                  id: `s-pptx-${s.slideIndex + 1}`,
-                  slideIndex: s.slideIndex,
-                  title: s.title || `Slide ${s.slideIndex + 1}`,
-                  width: canvasWidth,
-                  height: canvasHeight,
-                  aspectRatio,
-                  background: {
-                    color: '#000000',
-                    imageDataUrl: dataUrl,
-                  },
-                  elements: [],
-                  lines: s.lines || [],
-                  html: `<!DOCTYPE html><html><body style="margin:0;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;"><img src="${dataUrl}" style="width:100%;height:100%;object-fit:contain;" /></body></html>`,
-                  thumbnailDataUrl: dataUrl,
-                });
-              }
-
-              console.log(
-                `[Native PPT Engine] Successfully exported ${richSlides.length} exact slides for "${parsed.title}" via Microsoft PowerPoint engine.`
-              );
-
-              resolve({
-                ok: true,
-                title: parsed.title || path.basename(inputFile, path.extname(inputFile)),
-                slideCount: richSlides.length,
-                slides: richSlides,
-                images,
-                filePath: inputFile,
-                width: canvasWidth,
-                height: canvasHeight,
-              });
-              return;
-            }
+            resolve(parsed);
+            return;
           } catch (parseErr) {
             console.warn('[Native PPT Engine] JSON parse error from PowerShell:', parseErr);
           }
         }
 
-        console.warn(
-          `[Native PPT Engine] Native COM export failed (${stderr || error?.message || 'Unknown'}). Falling back to in-memory parser.`
-        );
-        // Graceful fallback to pure JS parser if COM fails
-        const fallbackResult = await parsePowerPointFile(inputFile);
-        resolve(fallbackResult);
+        resolve({
+          ok: false,
+          error: stderr || error?.message || 'Unknown PowerShell export error',
+        });
       }
     );
+
+    if (signal) {
+      signal.addEventListener(
+        'abort',
+        () => {
+          if (child && !child.killed) {
+            console.log('[Native PPT Engine] Aborting PowerShell export process...');
+            child.kill();
+          }
+          if (tempTargetsFile && fs.existsSync(tempTargetsFile)) {
+            try {
+              fs.unlinkSync(tempTargetsFile);
+            } catch {}
+          }
+          resolve({ ok: false, error: 'Export aborted.' });
+        },
+        { once: true }
+      );
+    }
   });
+
+  return { promise, processRef: child };
+}
+
+/**
+ * Builds standard PptxSlideData from slide parameters and image.
+ */
+function buildSlideData(
+  sldId: string,
+  slideIndex: number,
+  title: string,
+  lines: string[],
+  imagePath: string,
+  canvasWidth: number,
+  canvasHeight: number,
+  aspectRatio: number,
+  exportStatus: 'ready' | 'updating' | 'error' = 'ready'
+): { slide: PptxSlideData; dataUrl: string } {
+  let dataUrl = '';
+  try {
+    const imgBuf = fs.readFileSync(imagePath);
+    dataUrl = `data:image/png;base64,${imgBuf.toString('base64')}`;
+  } catch {
+    dataUrl = imagePath;
+  }
+
+  const slide: PptxSlideData = {
+    id: `s-pptx-${sldId}`,
+    sldId,
+    slideIndex,
+    title: title || `Slide ${slideIndex + 1}`,
+    width: canvasWidth,
+    height: canvasHeight,
+    aspectRatio,
+    background: {
+      color: '#000000',
+      imageDataUrl: dataUrl,
+    },
+    elements: [],
+    lines: lines || [],
+    html: `<!DOCTYPE html><html><body style="margin:0;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;"><img src="${dataUrl}" style="width:100%;height:100%;object-fit:contain;" /></body></html>`,
+    thumbnailDataUrl: dataUrl,
+    exportStatus,
+  };
+
+  return { slide, dataUrl };
+}
+
+/**
+ * Performs a complete full export of all slides.
+ */
+export async function exportFullWithNativePowerPoint(
+  inputFile: string,
+  targetWidth = 1920,
+  signal?: AbortSignal
+): Promise<PptxParseResult> {
+  const pptAvailable = await isPowerPointEngineAvailable();
+  if (!pptAvailable) {
+    console.log('[Native PPT Engine] PowerPoint COM unavailable; using cross-platform parser fallback.');
+    return parsePowerPointFile(inputFile);
+  }
+
+  const deckCacheDir = presentationCache.getDeckCacheDir(inputFile);
+  if (!fs.existsSync(deckCacheDir)) {
+    fs.mkdirSync(deckCacheDir, { recursive: true });
+  }
+
+  const { promise } = runPowerShellExport(inputFile, deckCacheDir, targetWidth, undefined, signal);
+  const parsed = await promise;
+
+  if (parsed.ok && parsed.slides && parsed.slides.length > 0) {
+    const canvasWidth = parsed.width || targetWidth;
+    const canvasHeight = parsed.height || Math.round(canvasWidth * (9 / 16));
+    const aspectRatio = canvasWidth / canvasHeight;
+
+    const richSlides: PptxSlideData[] = [];
+    const images: string[] = [];
+    const cachedSlidesRecord: Record<string, CachedSlide> = {};
+    const orderedSldIds: string[] = [];
+
+    // Attempt to read deck structure sldIds for mapping
+    let deckStruct: DeckStructure | null = null;
+    try {
+      deckStruct = presentationDiffer.parseDeckStructure(inputFile);
+    } catch {
+      // Fallback
+    }
+
+    for (let i = 0; i < parsed.slides.length; i++) {
+      const s = parsed.slides[i];
+      const sldId = s.sldId || (deckStruct?.slides[i]?.sldId) || String(256 + i);
+      const permImagePath = presentationCache.getSlideImagePath(inputFile, sldId);
+
+      // Copy or move to persistent slide-<sldId>.png if needed
+      if (s.imagePath !== permImagePath && fs.existsSync(s.imagePath)) {
+        try {
+          fs.copyFileSync(s.imagePath, permImagePath);
+        } catch {
+          // Keep existing imagePath
+        }
+      }
+
+      const finalImagePath = fs.existsSync(permImagePath) ? permImagePath : s.imagePath;
+      const { slide, dataUrl } = buildSlideData(
+        sldId,
+        s.slideIndex,
+        s.title,
+        s.lines,
+        finalImagePath,
+        canvasWidth,
+        canvasHeight,
+        aspectRatio,
+        'ready'
+      );
+
+      richSlides.push(slide);
+      images.push(dataUrl);
+      orderedSldIds.push(sldId);
+
+      const contentHash = deckStruct?.slides[i]?.contentHash || '';
+      cachedSlidesRecord[sldId] = {
+        sldId,
+        slideIndex: s.slideIndex,
+        contentHash,
+        imagePath: finalImagePath,
+        title: s.title,
+        lines: s.lines,
+        width: canvasWidth,
+        height: canvasHeight,
+      };
+    }
+
+    // Save manifest
+    const newCache: PresentationDeckCache = {
+      filePath: inputFile,
+      lastUpdated: Date.now(),
+      width: canvasWidth,
+      height: canvasHeight,
+      aspectRatio,
+      slides: cachedSlidesRecord,
+      orderedSldIds,
+    };
+    presentationCache.saveCache(newCache);
+
+    console.log(
+      `[Native PPT Engine] Successfully exported ${richSlides.length} exact slides for "${parsed.title}" via Microsoft PowerPoint engine.`
+    );
+
+    return {
+      ok: true,
+      title: parsed.title || path.basename(inputFile, path.extname(inputFile)),
+      slideCount: richSlides.length,
+      slides: richSlides,
+      images,
+      filePath: inputFile,
+      width: canvasWidth,
+      height: canvasHeight,
+    };
+  }
+
+  console.warn(
+    `[Native PPT Engine] Native COM export failed (${parsed.error || 'Unknown'}). Falling back to in-memory parser.`
+  );
+  return parsePowerPointFile(inputFile);
+}
+
+/**
+ * Selective and incremental PowerPoint exporter:
+ * 1. Diffs the presentation without PowerPoint.
+ * 2. If diffing fails, falls back safely to full export.
+ * 3. Re-exports ONLY changed and added slides through PowerPoint COM.
+ * 4. Reuses cached images and metadata for unchanged and reordered slides.
+ */
+export async function exportWithNativePowerPoint(
+  inputFile: string,
+  targetWidth = 1920,
+  signal?: AbortSignal
+): Promise<IncrementalExportResult> {
+  const pptAvailable = await isPowerPointEngineAvailable();
+  if (!pptAvailable) {
+    console.log('[Native PPT Engine] PowerPoint COM unavailable; using cross-platform parser fallback.');
+    return parsePowerPointFile(inputFile);
+  }
+
+  // 1. Slide diffing without PowerPoint
+  let deckStructure: DeckStructure;
+  try {
+    deckStructure = presentationDiffer.parseDeckStructure(inputFile);
+  } catch (diffErr) {
+    console.warn(
+      `[Native PPT Engine] Slide diffing failed (${(diffErr as Error)?.message || diffErr}); falling back to full export.`
+    );
+    return exportFullWithNativePowerPoint(inputFile, targetWidth, signal);
+  }
+
+  const cachedDeck = presentationCache.loadCache(inputFile);
+
+  // If no cache exists, perform initial full export and cache it
+  if (!cachedDeck) {
+    console.log(`[Native PPT Engine] No cache found for ${inputFile}. Performing initial full export...`);
+    return exportFullWithNativePowerPoint(inputFile, targetWidth, signal);
+  }
+
+  // 2. Classify slides against cache
+  const diff = presentationDiffer.diffDeckAgainstCache(deckStructure, cachedDeck);
+
+  const canvasWidth = cachedDeck.width || targetWidth;
+  const canvasHeight = cachedDeck.height || Math.round(canvasWidth * (9 / 16));
+  const aspectRatio = cachedDeck.aspectRatio || canvasWidth / canvasHeight;
+
+  // Case A: Nothing changed at all
+  if (!diff.hasChanges) {
+    console.log(`[Native PPT Engine] 0 changes detected in ${deckStructure.slideCount} slides for ${inputFile}. Serving from cache.`);
+    const richSlides: PptxSlideData[] = [];
+    const images: string[] = [];
+
+    for (const item of diff.slides) {
+      const cached = item.cachedSlide!;
+      const { slide, dataUrl } = buildSlideData(
+        item.sldId,
+        item.slideIndex,
+        cached.title || `Slide ${item.slideIndex + 1}`,
+        cached.lines || [],
+        cached.imagePath,
+        canvasWidth,
+        canvasHeight,
+        aspectRatio,
+        'ready'
+      );
+      richSlides.push(slide);
+      images.push(dataUrl);
+    }
+
+    return {
+      ok: true,
+      title: deckStructure.title,
+      slideCount: richSlides.length,
+      slides: richSlides,
+      images,
+      filePath: inputFile,
+      width: canvasWidth,
+      height: canvasHeight,
+      diffResult: diff,
+      isIncremental: true,
+      exportedCount: 0,
+      reusedCount: richSlides.length,
+      fromCache: true,
+    };
+  }
+
+  // Case B: Reordering or deletion only (no content modified or added)
+  // Reordering alone must not trigger any export!
+  if (!diff.needsExport) {
+    console.log(
+      `[Native PPT Engine] Reorder/deletion detected (${diff.reorderedCount} reordered, ${diff.removedCount} removed). 0 slides require export.`
+    );
+
+    presentationCache.purgeRemovedSlides(inputFile, deckStructure.slides.map((s) => s.sldId));
+
+    const richSlides: PptxSlideData[] = [];
+    const images: string[] = [];
+    const updatedCacheSlides: Record<string, CachedSlide> = { ...cachedDeck.slides };
+
+    for (const item of diff.slides) {
+      const cached = item.cachedSlide!;
+      cached.slideIndex = item.slideIndex;
+      updatedCacheSlides[item.sldId] = cached;
+
+      const { slide, dataUrl } = buildSlideData(
+        item.sldId,
+        item.slideIndex,
+        cached.title || `Slide ${item.slideIndex + 1}`,
+        cached.lines || [],
+        cached.imagePath,
+        canvasWidth,
+        canvasHeight,
+        aspectRatio,
+        'ready'
+      );
+      richSlides.push(slide);
+      images.push(dataUrl);
+    }
+
+    cachedDeck.slides = updatedCacheSlides;
+    cachedDeck.orderedSldIds = deckStructure.slides.map((s) => s.sldId);
+    cachedDeck.lastUpdated = Date.now();
+    presentationCache.saveCache(cachedDeck);
+
+    return {
+      ok: true,
+      title: deckStructure.title,
+      slideCount: richSlides.length,
+      slides: richSlides,
+      images,
+      filePath: inputFile,
+      width: canvasWidth,
+      height: canvasHeight,
+      diffResult: diff,
+      isIncremental: true,
+      exportedCount: 0,
+      reusedCount: richSlides.length,
+    };
+  }
+
+  // Case C: Selective export for changed and added slides
+  const changedAndAdded = diff.slides.filter((s) => s.status === 'changed' || s.status === 'added');
+  console.log(
+    `[Native PPT Engine] Incremental sync: ${changedAndAdded.length} of ${diff.totalSlides} slides need export (${diff.changedCount} changed, ${diff.addedCount} added, ${diff.unchangedCount} unchanged, ${diff.reorderedCount} reordered).`
+  );
+
+  const exportTargets: ExportSlideTarget[] = changedAndAdded.map((s) => ({
+    slideIndex: s.slideIndex + 1, // 1-based index in presentation
+    sldId: s.sldId,
+    outPath: presentationCache.getSlideImagePath(inputFile, s.sldId),
+  }));
+
+  const deckCacheDir = presentationCache.getDeckCacheDir(inputFile);
+  const { promise } = runPowerShellExport(inputFile, deckCacheDir, targetWidth, exportTargets, signal);
+  const selectiveResult = await promise;
+
+  if (!selectiveResult.ok || !selectiveResult.slides || selectiveResult.slides.length === 0) {
+    console.warn(
+      `[Native PPT Engine] Selective COM export failed (${selectiveResult.error || 'No slides returned'}). Falling back to full export.`
+    );
+    return exportFullWithNativePowerPoint(inputFile, targetWidth, signal);
+  }
+
+  // Map newly exported slides by sldId and slideIndex
+  const newlyExportedBySldId = new Map<string, NativePptSlideInfo>();
+  const newlyExportedByIndex = new Map<number, NativePptSlideInfo>();
+  for (const s of selectiveResult.slides) {
+    if (s.sldId) {
+      newlyExportedBySldId.set(s.sldId, s);
+    }
+    newlyExportedByIndex.set(s.slideIndex, s);
+  }
+
+  // Update cache and assemble all slides in order
+  presentationCache.purgeRemovedSlides(inputFile, deckStructure.slides.map((s) => s.sldId));
+  const updatedCacheSlides: Record<string, CachedSlide> = { ...cachedDeck.slides };
+  const richSlides: PptxSlideData[] = [];
+  const images: string[] = [];
+
+  for (const item of diff.slides) {
+    const sldId = item.sldId;
+    const targetInfo = exportTargets.find((t) => t.sldId === sldId);
+    const permImagePath = presentationCache.getSlideImagePath(inputFile, sldId);
+
+    if (item.status === 'changed' || item.status === 'added') {
+      const exported = newlyExportedBySldId.get(sldId) || (targetInfo ? newlyExportedByIndex.get(targetInfo.slideIndex - 1) : undefined);
+      const title = exported?.title || item.cachedSlide?.title || `Slide ${item.slideIndex + 1}`;
+      const lines = exported?.lines || item.cachedSlide?.lines || [];
+      const imagePath = exported?.imagePath || permImagePath;
+
+      updatedCacheSlides[sldId] = {
+        sldId,
+        slideIndex: item.slideIndex,
+        contentHash: item.contentHash,
+        imagePath,
+        title,
+        lines,
+        width: canvasWidth,
+        height: canvasHeight,
+      };
+
+      const { slide, dataUrl } = buildSlideData(
+        sldId,
+        item.slideIndex,
+        title,
+        lines,
+        imagePath,
+        canvasWidth,
+        canvasHeight,
+        aspectRatio,
+        'ready'
+      );
+      richSlides.push(slide);
+      images.push(dataUrl);
+    } else {
+      // Unchanged or reordered: reuse from cache
+      const cached = item.cachedSlide!;
+      cached.slideIndex = item.slideIndex;
+      updatedCacheSlides[sldId] = cached;
+
+      const { slide, dataUrl } = buildSlideData(
+        sldId,
+        item.slideIndex,
+        cached.title || `Slide ${item.slideIndex + 1}`,
+        cached.lines || [],
+        cached.imagePath,
+        canvasWidth,
+        canvasHeight,
+        aspectRatio,
+        'ready'
+      );
+      richSlides.push(slide);
+      images.push(dataUrl);
+    }
+  }
+
+  // Persist updated manifest
+  cachedDeck.slides = updatedCacheSlides;
+  cachedDeck.orderedSldIds = deckStructure.slides.map((s) => s.sldId);
+  cachedDeck.lastUpdated = Date.now();
+  presentationCache.saveCache(cachedDeck);
+
+  console.log(
+    `[Native PPT Engine] Incremental sync complete for "${deckStructure.title}": ${changedAndAdded.length} exported, ${diff.unchangedCount + diff.reorderedCount} reused from cache.`
+  );
+
+  return {
+    ok: true,
+    title: deckStructure.title,
+    slideCount: richSlides.length,
+    slides: richSlides,
+    images,
+    filePath: inputFile,
+    width: canvasWidth,
+    height: canvasHeight,
+    diffResult: diff,
+    isIncremental: true,
+    exportedCount: changedAndAdded.length,
+    reusedCount: diff.unchangedCount + diff.reorderedCount,
+  };
 }
