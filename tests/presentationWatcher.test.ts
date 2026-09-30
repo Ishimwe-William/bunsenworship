@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { presentationWatcher } from './presentationWatcher';
+import { presentationWatcher } from '../src/presentationWatcher';
 import fs from 'node:fs';
 import path from 'node:path';
 

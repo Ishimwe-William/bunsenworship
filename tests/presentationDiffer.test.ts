@@ -3,8 +3,8 @@ import AdmZip from 'adm-zip';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { presentationDiffer, DeckStructure } from './presentationDiffer';
-import { PresentationCacheManager, PresentationDeckCache } from './presentationCache';
+import { presentationDiffer, DeckStructure } from '../src/presentationDiffer';
+import { PresentationCacheManager, PresentationDeckCache } from '../src/presentationCache';
 
 interface MockSlide {
   sldId: string;

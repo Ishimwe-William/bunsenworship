@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import AdmZip from 'adm-zip';
-import { parsePowerPointFile } from './presentationParser';
+import { parsePowerPointFile } from '../src/presentationParser';
 
 describe('Presentation Parser & Visual Layer Ordering', () => {
   it('parses PPTX slides and ensures text shapes render on top of images in SVG and HTML', async () => {
@@ -136,7 +136,7 @@ describe('Presentation Parser & Visual Layer Ordering', () => {
     });
 
     it('serves lightweight bunsen-media URLs without giant Base64 payload when loading from cache', async () => {
-      const { exportWithNativePowerPoint } = await import('./presentationNativeEngine');
+      const { exportWithNativePowerPoint } = await import('../src/presentationNativeEngine');
       const res = await exportWithNativePowerPoint(localTemplatePath);
       expect(res.ok).toBe(true);
       expect(res.slides && res.slides.length).toBeGreaterThan(0);
