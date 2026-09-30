@@ -80,9 +80,9 @@ function extractRelationships(relsXml: string, baseDir: string): Map<string, { t
   const relMatches = relsXml.matchAll(/<Relationship\s+([^>]+)\/?>/gi);
   for (const m of relMatches) {
     const attrs = m[1];
-    const idMatch = attrs.match(/\bId=[\"']([^\"']+)[\"']/i);
-    const typeMatch = attrs.match(/\bType=[\"']([^\"']+)[\"']/i);
-    const targetMatch = attrs.match(/\bTarget=[\"']([^\"']+)[\"']/i);
+    const idMatch = attrs.match(/\bId=["']([^"']+)["']/i);
+    const typeMatch = attrs.match(/\bType=["']([^"']+)["']/i);
+    const targetMatch = attrs.match(/\bTarget=["']([^"']+)["']/i);
     if (idMatch && targetMatch) {
       const id = idMatch[1];
       const type = typeMatch ? typeMatch[1] : '';
@@ -150,8 +150,8 @@ export class PresentationDiffer {
     let height = 1080;
     const sldSzMatch = presText.match(/<[a-zA-Z0-9:]*sldSz\s+([^>]+)\/?>/i);
     if (sldSzMatch) {
-      const cxMatch = sldSzMatch[1].match(/\bcx=[\"'](\d+)[\"']/i);
-      const cyMatch = sldSzMatch[1].match(/\bcy=[\"'](\d+)[\"']/i);
+      const cxMatch = sldSzMatch[1].match(/\bcx=["'](\d+)["']/i);
+      const cyMatch = sldSzMatch[1].match(/\bcy=["'](\d+)["']/i);
       if (cxMatch && cyMatch) {
         const cx = parseInt(cxMatch[1], 10);
         const cy = parseInt(cyMatch[1], 10);
@@ -180,8 +180,8 @@ export class PresentationDiffer {
     const sldIdMatches = presText.matchAll(/<[a-zA-Z0-9:]*sldId\s+([^>]+)\/?>/gi);
     for (const m of sldIdMatches) {
       const attrs = m[1];
-      const idMatch = attrs.match(/\bid=[\"']([^\"']+)[\"']/i);
-      const rIdMatch = attrs.match(/\b(?:r:)?id=[\"'](rId[^\"']+)[\"']/i) || attrs.match(/\br:id=[\"']([^\"']+)[\"']/i);
+      const idMatch = attrs.match(/\bid=["']([^"']+)["']/i);
+      const rIdMatch = attrs.match(/\b(?:r:)?id=["'](rId[^"']+)["']/i) || attrs.match(/\br:id=["']([^"']+)["']/i);
       if (idMatch && rIdMatch) {
         orderedSldIds.push({
           sldId: idMatch[1],

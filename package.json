@@ -23,7 +23,7 @@
     "install:dotnet": "powershell -ExecutionPolicy Bypass -File helper/install-dotnet-sdk.ps1",
     "build:helper": "powershell -ExecutionPolicy Bypass -File helper/build-helper.ps1",
     "build": "npm run build:renderer && npm run build:preload && npm run build:main",
-    "build:all": "npm run install:dotnet && npm run build:helper && npm run build",
+    "build:all": "node scripts/build-all.mjs",
     "package": "npm run build:all && electron-builder --win --publish never",
     "make": "npm run build:all && electron-builder",
     "publish": "npm run build:all && electron-builder --publish always",
@@ -42,12 +42,6 @@
       "src/assets/**/*",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "helper/build/PowerPointHelper.exe",
-        "to": "PowerPointHelper.exe"
-      }
-    ],
     "compression": "normal",
     "win": {
       "target": [
@@ -59,7 +53,13 @@
         }
       ],
       "icon": "src/assets/icon.ico",
-      "verifyUpdateCodeSignature": false
+      "verifyUpdateCodeSignature": false,
+      "extraResources": [
+        {
+          "from": "helper/build/PowerPointHelper.exe",
+          "to": "PowerPointHelper.exe"
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -78,7 +78,8 @@
         "dmg"
       ],
       "icon": "src/assets/icon.icns",
-      "category": "public.app-category.lifestyle"
+      "category": "public.app-category.lifestyle",
+      "identity": null
     },
     "linux": {
       "target": [

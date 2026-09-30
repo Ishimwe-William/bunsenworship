@@ -13,5 +13,11 @@
     "plugin:import/typescript"
   ],
   "parser": "@typescript-eslint/parser",
-  "ignorePatterns": ["dist/**", "dist-release/**", "helper/**", "**/*.test.ts"]
+  "ignorePatterns": ["dist/**", "dist-release/**", "helper/**", "**/*.test.ts"],
+  "rules": {
+    "no-empty": ["error", { "allowEmptyCatch": true }],
+    "@typescript-eslint/no-empty-function": "off",
+    "@typescript-eslint/no-unused-vars": "warn",
+    "@typescript-eslint/no-non-null-assertion": "warn"
+  }
 }
