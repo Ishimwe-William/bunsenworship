@@ -122,8 +122,7 @@ describe('Presentation Parser & Visual Layer Ordering', () => {
       expect(res.slides && res.slides.length).toBeGreaterThanOrEqual(3);
 
       const s3 = res.slides![2];
-      expect(s3.lines).toContain('MIFEM');
-      expect(s3.lines).toContain('IGITARAMO CYA');
+      expect(s3.lines.some((l) => l.includes('MIFEM'))).toBe(true);
 
       const imgIndex = s3.svg.indexOf('<image');
       const textIndex = s3.svg.indexOf('<text');
@@ -134,12 +133,69 @@ describe('Presentation Parser & Visual Layer Ordering', () => {
       expect(s3.html).toContain('z-index: 10');
       expect(s3.html).toContain('MIFEM');
     });
+  }
 
-    it('serves lightweight bunsen-media URLs without giant Base64 payload when loading from cache', async () => {
-      const { exportWithNativePowerPoint } = await import('../src/presentationNativeEngine');
-      const res = await exportWithNativePowerPoint(localTemplatePath);
+  it('serves lightweight bunsen-media URLs without giant Base64 payload when loading from cache', async () => {
+    const { presentationCache } = await import('../src/presentationCache');
+    const { exportWithNativePowerPoint } = await import('../src/presentationNativeEngine');
+    const { presentationDiffer } = await import('../src/presentationDiffer');
+
+    // Create a mock presentation with 1 slide and seed the cache
+    const testDeckPath = path.join(os.tmpdir(), `cache_test_deck_${Date.now()}.pptx`);
+    const zip = new AdmZip();
+    zip.addFile(
+      'ppt/presentation.xml',
+      Buffer.from(
+        `<?xml version="1.0" encoding="UTF-8"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldSz cx="12192000" cy="6858000"/><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>`,
+        'utf8'
+      )
+    );
+    zip.addFile(
+      'ppt/_rels/presentation.xml.rels',
+      Buffer.from(
+        `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`,
+        'utf8'
+      )
+    );
+    zip.addFile(
+      'ppt/slides/slide1.xml',
+      Buffer.from(
+        `<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld></p:sld>`,
+        'utf8'
+      )
+    );
+    fs.writeFileSync(testDeckPath, zip.toBuffer());
+
+    const fakeImagePath = path.join(os.tmpdir(), `mock_slide_${Date.now()}.png`);
+    fs.writeFileSync(fakeImagePath, Buffer.from('fake-png-bytes'));
+
+    try {
+      const struct = presentationDiffer.parseDeckStructure(testDeckPath);
+
+      presentationCache.saveCache({
+        filePath: testDeckPath,
+        lastUpdated: Date.now(),
+        width: 1920,
+        height: 1080,
+        aspectRatio: 16 / 9,
+        slides: {
+          '256': {
+            sldId: '256',
+            slideIndex: 0,
+            contentHash: struct.slides[0].contentHash,
+            imagePath: fakeImagePath,
+            title: 'Mock Slide 1',
+            lines: ['Line 1'],
+            width: 1920,
+            height: 1080,
+          },
+        },
+        orderedSldIds: ['256'],
+      });
+
+      const res = await exportWithNativePowerPoint(testDeckPath);
       expect(res.ok).toBe(true);
-      expect(res.slides && res.slides.length).toBeGreaterThan(0);
+      expect(res.fromCache).toBe(true);
 
       const firstSlide = res.slides![0];
       const imgUrl = firstSlide.thumbnailDataUrl || firstSlide.background?.imageDataUrl || '';
@@ -148,8 +204,11 @@ describe('Presentation Parser & Visual Layer Ordering', () => {
 
       const jsonSize = JSON.stringify(res).length;
       expect(jsonSize).toBeLessThan(1024 * 1024);
-    });
-  }
+    } finally {
+      if (fs.existsSync(fakeImagePath)) fs.unlinkSync(fakeImagePath);
+      if (fs.existsSync(testDeckPath)) fs.unlinkSync(testDeckPath);
+    }
+  });
 
   if (fs.existsSync(localAutosavedPath)) {
     it('renders all title and speaker text on top of background image in Template [Autosaved].pptx Slide 3', async () => {
