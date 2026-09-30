@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 interface WatcherEntry {
   watcher: FSWatcher;
   debounceTimer: NodeJS.Timeout | null;
+  recoveryTimer: NodeJS.Timeout | null;
   lastParsedTimestamp: number;
   lastMtime: number;
   lastSize: number;
@@ -190,7 +191,8 @@ export class PresentationWatcherManager {
     if (!targetFilePath || typeof targetFilePath !== 'string') return;
 
     const normalized = this.normalizePath(targetFilePath);
-    if (!fs.existsSync(normalized)) {
+    const absolutePath = path.resolve(targetFilePath);
+    if (!fs.existsSync(absolutePath)) {
       console.warn(`[Presentation Watcher] File does not exist: ${targetFilePath}`);
       return;
     }
@@ -202,7 +204,7 @@ export class PresentationWatcherManager {
 
     console.log(`[Presentation Watcher] Initializing watcher for: ${targetFilePath}`);
 
-    const watcher = watch(normalized, {
+    const watcher = watch(absolutePath, {
       persistent: true,
       ignoreInitial: true,
       awaitWriteFinish: {
@@ -210,6 +212,7 @@ export class PresentationWatcherManager {
         pollInterval: 150,
       },
       ignorePermissionErrors: true,
+      atomic: true,
     });
 
     const initialMetadata = this.getFileMetadata(targetFilePath);
@@ -218,6 +221,7 @@ export class PresentationWatcherManager {
     const entry: WatcherEntry = {
       watcher,
       debounceTimer: null,
+      recoveryTimer: null,
       lastParsedTimestamp: 0,
       lastMtime: initialMetadata.mtime,
       lastSize: initialMetadata.size,
@@ -250,8 +254,51 @@ export class PresentationWatcherManager {
     });
 
     watcher.on('unlink', () => {
-      console.log(`[Presentation Watcher] Target file removed: ${targetFilePath}`);
-      this.notifyFileMissing(targetFilePath);
+      console.log(
+        `[Presentation Watcher] Unlink event received for ${targetFilePath}. Checking for atomic save or file recreation...`
+      );
+      if (entry.recoveryTimer) {
+        clearInterval(entry.recoveryTimer);
+        entry.recoveryTimer = null;
+      }
+
+      let attempts = 0;
+      const maxAttempts = 15; // 15 * 200ms = 3000ms
+      entry.recoveryTimer = setInterval(async () => {
+        attempts++;
+        if (fs.existsSync(absolutePath)) {
+          if (entry.recoveryTimer) {
+            clearInterval(entry.recoveryTimer);
+            entry.recoveryTimer = null;
+          }
+          console.log(
+            `[Presentation Watcher] File restored after atomic save: ${targetFilePath}. Re-attaching watcher and updating slides...`
+          );
+          try {
+            await watcher.close();
+          } catch {
+            // ignore
+          }
+          this.watchers.delete(normalized);
+
+          await this.watch(targetFilePath);
+          const newEntry = this.watchers.get(normalized);
+          if (newEntry) {
+            await this.triggerParse(targetFilePath, newEntry, true);
+          }
+          return;
+        }
+
+        if (attempts >= maxAttempts) {
+          if (entry.recoveryTimer) {
+            clearInterval(entry.recoveryTimer);
+            entry.recoveryTimer = null;
+          }
+          console.log(`[Presentation Watcher] Target file permanently removed: ${targetFilePath}`);
+          this.unwatch(targetFilePath);
+          this.notifyFileMissing(targetFilePath);
+        }
+      }, 200);
     });
 
     this.watchers.set(normalized, entry);
@@ -265,6 +312,14 @@ export class PresentationWatcherManager {
     console.log(`[Presentation Watcher] Change detected on ${filePath}. Checking for actual changes...`);
 
     try {
+      // If file is temporarily missing during atomic swap, wait up to 1 second
+      if (!fs.existsSync(filePath)) {
+        for (let i = 0; i < 5; i++) {
+          await new Promise((r) => setTimeout(r, 200));
+          if (fs.existsSync(filePath)) break;
+        }
+      }
+
       if (!fs.existsSync(filePath)) {
         console.warn(`[Presentation Watcher] File no longer exists: ${filePath}`);
         this.notifyFileMissing(filePath);
@@ -430,6 +485,11 @@ export class PresentationWatcherManager {
     if (entry) {
       if (entry.debounceTimer) {
         clearTimeout(entry.debounceTimer);
+        entry.debounceTimer = null;
+      }
+      if (entry.recoveryTimer) {
+        clearInterval(entry.recoveryTimer);
+        entry.recoveryTimer = null;
       }
       if (entry.activeAbortController) {
         entry.activeAbortController.abort();
@@ -450,6 +510,11 @@ export class PresentationWatcherManager {
     for (const [key, entry] of this.watchers.entries()) {
       if (entry.debounceTimer) {
         clearTimeout(entry.debounceTimer);
+        entry.debounceTimer = null;
+      }
+      if (entry.recoveryTimer) {
+        clearInterval(entry.recoveryTimer);
+        entry.recoveryTimer = null;
       }
       if (entry.activeAbortController) {
         entry.activeAbortController.abort();
