@@ -413,6 +413,14 @@ export const MediaLibraryScreen: React.FC = () => {
 
   useEffect(() => {
     loadDatabaseRecords();
+    if (window.electronAPI?.onPresentationSync) {
+      const unsubscribe = window.electronAPI.onPresentationSync(() => {
+        loadDatabaseRecords();
+      });
+      return () => {
+        unsubscribe();
+      };
+    }
   }, []);
 
   const showFeedback = (

@@ -538,7 +538,14 @@ function buildSlideData(
 ): { slide: PptxSlideData; dataUrl: string } {
   let mediaUrl = '';
   if (exportStatus === 'ready' && imagePath && fs.existsSync(imagePath)) {
-    mediaUrl = toMediaUrl(imagePath);
+    const rawUrl = toMediaUrl(imagePath);
+    let mtime = 0;
+    try {
+      mtime = Math.floor(fs.statSync(imagePath).mtimeMs);
+    } catch {
+      mtime = Date.now();
+    }
+    mediaUrl = `${rawUrl}?t=${mtime}`;
   }
 
   const slide: PptxSlideData = {

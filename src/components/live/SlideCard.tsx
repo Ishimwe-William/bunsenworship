@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Slide } from '../../store/features/presentation/types';
 import { GripVerticalIcon, PlayIcon, YoutubeIcon } from '../common/Icons';
 import { getSlideThumbnail, extractYouTubeId, generateVideoThumbnail, isVideoFile } from '../../utils/videoHelpers';
@@ -35,6 +35,10 @@ export const SlideCard: React.FC<SlideCardProps> = ({
   onDragEnd,
 }) => {
   const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [slide.id, slide.imageUrl]);
 
   const youtubeVideoId = extractYouTubeId(slide);
   const isYouTube = Boolean(youtubeVideoId);

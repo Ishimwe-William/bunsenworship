@@ -95,7 +95,9 @@ export const ProjectorWindowView: React.FC = () => {
       setState((prev) => {
         if (!prev.slide || prev.slide.externalType !== 'PPT') return prev;
         const currentIdx = prev.slide.slideData?.slideIndex ?? 0;
-        const matching = payload.slides[Math.min(currentIdx, payload.slides.length - 1)];
+        const matching =
+          (prev.slide.slideData?.sldId ? payload.slides.find((s) => s.sldId === prev.slide!.slideData?.sldId) : null) ||
+          payload.slides[Math.min(currentIdx, payload.slides.length - 1)];
         if (matching) {
           return {
             ...prev,

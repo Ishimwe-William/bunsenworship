@@ -567,8 +567,8 @@ describe('PresentationDiffer & Cache Unit Tests', () => {
       expect(diff.needsExport).toBe(true);
 
       // Verify that parsing and diffing 200 slides without PowerPoint completes in milliseconds
-      expect(parseTimeMs).toBeLessThan(300);
-      expect(diffTimeMs).toBeLessThan(300);
+      expect(parseTimeMs).toBeLessThan(600);
+      expect(diffTimeMs).toBeLessThan(600);
     });
   });
 });

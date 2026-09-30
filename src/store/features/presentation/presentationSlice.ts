@@ -994,14 +994,17 @@ export const presentationSlice = createSlice({
             const existing = existingSlideMap.get(sldKey) || item.slides.find((s) => s.id === stableId);
 
             if (existing) {
-              // Update properties while maintaining object reference
-              existing.section = parsed.title || `Slide ${idx + 1}`;
-              existing.lines = parsed.lines;
-              existing.imageUrl = parsed.thumbnailDataUrl;
-              existing.slideData = parsed;
-              existing.slideHtml = parsed.html;
-              existing.exportStatus = parsed.exportStatus || 'ready';
-              updatedSlides.push(existing);
+              // Clone slide with new properties to ensure React-Redux selector equality detects updates instantly
+              const updatedSlide: Slide = {
+                ...existing,
+                section: parsed.title || `Slide ${idx + 1}`,
+                lines: [...parsed.lines],
+                imageUrl: parsed.thumbnailDataUrl || existing.imageUrl,
+                slideData: parsed,
+                slideHtml: parsed.html,
+                exportStatus: parsed.exportStatus || 'ready',
+              };
+              updatedSlides.push(updatedSlide);
             } else {
               // Added new slide
               const newSlide: Slide = {
@@ -1024,8 +1027,11 @@ export const presentationSlice = createSlice({
             item.title = title;
           }
           if (item.externalMeta) {
-            item.externalMeta.slideCount = updatedSlides.length;
-            item.externalMeta.filePath = filePath;
+            item.externalMeta = {
+              ...item.externalMeta,
+              slideCount: updatedSlides.length,
+              filePath,
+            };
           }
 
           // Restore active slide selection: retain current selection by ID

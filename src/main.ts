@@ -452,7 +452,9 @@ app.on('ready', () => {
     // Register custom bunsen-media protocol handler for secure streaming
     protocol.handle('bunsen-media', async (request) => {
         try {
-            let rawPath = decodeURIComponent(request.url.replace(/^bunsen-media:\/\//i, ''));
+            // Strip query string and hash fragment before decoding file path
+            const cleanUrl = request.url.split(/[?#]/)[0];
+            let rawPath = decodeURIComponent(cleanUrl.replace(/^bunsen-media:\/\//i, ''));
             rawPath = rawPath.replace(/^(media|local)\//i, '');
             if (process.platform === 'win32') {
                 if (/^\/[a-zA-Z]:[/\\]/.test(rawPath)) {
@@ -514,9 +516,16 @@ app.on('ready', () => {
             }
 
             const fileUrl = pathToFileURL(resolvedPath).toString();
-            return net.fetch(fileUrl, {
+            const response = await net.fetch(fileUrl, {
                 headers: request.headers,
                 method: request.method,
+            });
+            const newHeaders = new Headers(response.headers);
+            newHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+            return new Response(response.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: newHeaders,
             });
         } catch (err) {
             console.error('Failed to handle bunsen-media request:', request.url, err);

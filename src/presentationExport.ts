@@ -52,6 +52,7 @@ export function normalizeLocalPresentationPath(raw: string): string {
 
   if (/^bunsen-media:/i.test(p)) {
     let clean = p.replace(/^bunsen-media:\/+/i, '').replace(/^(media|local)\//i, '');
+    clean = clean.split(/[?#]/)[0];
     if (process.platform === 'win32') {
       if (/^\/[a-zA-Z]:[/\\]/.test(clean)) {
         clean = clean.slice(1);
