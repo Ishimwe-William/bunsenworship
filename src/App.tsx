@@ -26,21 +26,16 @@ import { ProjectorWindowView } from './components/live';
 import { usePresentationAutoSync } from './hooks/usePresentationAutoSync';
 import './App.css';
 
-export const App: React.FC = () => {
-  const isProjectorMode =
-    typeof window !== 'undefined' &&
-    (window.location.search.includes('mode=projector') ||
-      window.location.hash.includes('projector'));
-
-  if (isProjectorMode) {
-    return <ProjectorWindowView />;
-  }
-
+/**
+ * Isolated background manager for rundown hydration, IndexedDB auto-saving,
+ * and PowerPoint auto-sync.
+ * Isolating this in a dedicated subcomponent prevents rundown state mutations
+ * (such as adding media items or songs) from triggering a full-app re-render of
+ * <App />, <Sidebar />, and active screen components.
+ */
+const RundownSyncManager: React.FC = () => {
   const dispatch = useAppDispatch();
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const activeTab = useAppSelector(selectActiveTab);
   const rundown = useAppSelector(selectRundown);
-  const { t } = useLanguage();
 
   // Real-time PowerPoint live auto-sync and hot-reloads
   usePresentationAutoSync();
@@ -75,7 +70,7 @@ export const App: React.FC = () => {
       });
   }, [dispatch]);
 
-  // 2. Central auto-save: Persist rundown changes to IndexedDB
+  // 2. Central auto-save: Persist rundown changes to IndexedDB (debounced)
   const isInitialMount = useRef(true);
   useEffect(() => {
     if (isInitialMount.current) {
@@ -98,6 +93,23 @@ export const App: React.FC = () => {
 
     return () => clearTimeout(timer);
   }, [rundown]);
+
+  return null;
+};
+
+export const App: React.FC = () => {
+  const isProjectorMode =
+    typeof window !== 'undefined' &&
+    (window.location.search.includes('mode=projector') ||
+      window.location.hash.includes('projector'));
+
+  if (isProjectorMode) {
+    return <ProjectorWindowView />;
+  }
+
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const activeTab = useAppSelector(selectActiveTab);
+  const { t } = useLanguage();
 
   if (!isAuthenticated) {
     return <AuthContainer />;
@@ -133,6 +145,9 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-layout">
+      {/* Background sync & persistence manager (isolated from App re-render cycle) */}
+      <RundownSyncManager />
+
       {/* Expandable / Collapsible Navigation Sidebar */}
       <Sidebar />
 

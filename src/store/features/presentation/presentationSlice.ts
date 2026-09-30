@@ -234,9 +234,7 @@ export const presentationSlice = createSlice({
     setSelectedRundownId: (state, action: PayloadAction<string>) => {
       state.selectedRundownId = action.payload;
       const item = state.rundown.find((r) => r.id === action.payload);
-      if (item && item.slides.length > 0) {
-        state.previewSlideId = item.slides[0].id;
-      }
+      state.previewSlideId = item && item.slides.length > 0 ? item.slides[0].id : null;
     },
     setPreviewSlide: (
       state,
@@ -384,9 +382,7 @@ export const presentationSlice = createSlice({
         if (currentRundownIdx >= 0 && currentRundownIdx < state.rundown.length - 1) {
           const nextRundown = state.rundown[currentRundownIdx + 1];
           state.selectedRundownId = nextRundown.id;
-          if (nextRundown.slides.length > 0) {
-            state.previewSlideId = nextRundown.slides[0].id;
-          }
+          state.previewSlideId = nextRundown.slides.length > 0 ? nextRundown.slides[0].id : null;
         }
       }
     },
@@ -403,9 +399,8 @@ export const presentationSlice = createSlice({
         if (currentRundownIdx > 0) {
           const prevRundown = state.rundown[currentRundownIdx - 1];
           state.selectedRundownId = prevRundown.id;
-          if (prevRundown.slides.length > 0) {
-            state.previewSlideId = prevRundown.slides[0].id;
-          }
+          state.previewSlideId =
+            prevRundown.slides.length > 0 ? prevRundown.slides[prevRundown.slides.length - 1].id : null;
         }
       }
     },
@@ -522,14 +517,16 @@ export const presentationSlice = createSlice({
               if (currentRundownIdx + 1 < state.rundown.length - 1) {
                 const afterNext = state.rundown[currentRundownIdx + 2];
                 state.selectedRundownId = afterNext.id;
-                if (afterNext.slides.length > 0) {
-                  state.previewSlideId = afterNext.slides[0].id;
-                }
+                state.previewSlideId = afterNext.slides.length > 0 ? afterNext.slides[0].id : null;
               }
             } else {
               state.selectedRundownId = nextRundown.id;
-              state.previewSlideId = nextRundown.slides[1].id;
+              state.previewSlideId =
+                nextRundown.slides.length > 1 ? nextRundown.slides[1].id : nextRundown.slides[0].id;
             }
+          } else {
+            state.liveSlideId = null;
+            state.previewSlideId = null;
           }
         }
       }
@@ -610,6 +607,9 @@ export const presentationSlice = createSlice({
                 state.videoPlayback.playbackRate = topSlide.videoPlaybackRate;
               }
             }
+          } else {
+            state.liveSlideId = null;
+            state.previewSlideId = null;
           }
         }
       }

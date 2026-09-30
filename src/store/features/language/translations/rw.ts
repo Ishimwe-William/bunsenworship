@@ -105,6 +105,10 @@ export const rwTranslations: TranslationDictionary = {
     assetDeleted: "Ikirimo cyasibwe mu bubiko!",
     categoryLabel: "Icyiciro",
     titleLabel: "Izina",
+    addSongButton: "Ongeramo Indirimbo",
+    backupSyncButton: "Kubika & Guhuza",
+    addSongModalTitle: "Kwinjiza Indirimbo muri Bibliothèque",
+    backupModalTitle: "Kubika Amakuru & Guhuza",
   },
   settings: {
     title: 'Igenamiterere rya Porogaramu',

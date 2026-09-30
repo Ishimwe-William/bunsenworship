@@ -46,14 +46,30 @@ const POWERPOINT_EXPORT_SCRIPT = `param(
   [Parameter(Mandatory = $true)][string]$OutDir,
   [int]$TargetWidth = 1920,
   [string]$TargetsFile = "",
-  [string]$TargetsJson = ""
+  [string]$TargetsJson = "",
+  [string]$ResultFile = ""
 )
 
 $ErrorActionPreference = 'Stop'
-function Out-Json { param($Obj) Write-Output ($Obj | ConvertTo-Json -Compress -Depth 6) }
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Send-Result {
+  param($Obj)
+  try {
+    $json = $Obj | ConvertTo-Json -Compress -Depth 6
+    if ($ResultFile) {
+      [System.IO.File]::WriteAllText($ResultFile, $json, $utf8NoBom)
+      Write-Output "OK_FILE"
+      return
+    }
+    Write-Output $json
+  } catch {
+    Write-Output "ERROR: $($_.Exception.Message)"
+  }
+}
 
 if (-not (Test-Path -LiteralPath $InputFile)) {
-  Out-Json @{ ok = $false; error = "The PowerPoint file could not be found at: $InputFile" }
+  Send-Result @{ ok = $false; error = "The PowerPoint file could not be found at: $InputFile" }
   exit 0
 }
 
@@ -77,20 +93,55 @@ $pres = $null
 $shouldQuit = $false
 $shouldClosePres = $false
 
-try {
+function Init-PowerPointApp {
+  $app = $null
+  $quit = $false
   try {
-    $ppt = [System.Runtime.InteropServices.Marshal]::GetActiveObject("PowerPoint.Application")
+    $existing = [System.Runtime.InteropServices.Marshal]::GetActiveObject("PowerPoint.Application")
+    $ver = $existing.Version
+    if ($ver) {
+      $app = $existing
+      $quit = $false
+    }
   } catch {
-    $ppt = New-Object -ComObject PowerPoint.Application
-    $shouldQuit = $true
+    $app = $null
   }
 
-  $ppt.DisplayAlerts = 1
+  if ($null -eq $app) {
+    try {
+      $app = New-Object -ComObject PowerPoint.Application
+      $quit = $true
+    } catch {
+      Get-Process POWERPNT -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+      Start-Sleep -Milliseconds 600
+      $app = New-Object -ComObject PowerPoint.Application
+      $quit = $true
+    }
+  }
+  return @{ app = $app; shouldQuit = $quit }
+}
+
+try {
+  $init = Init-PowerPointApp
+  $ppt = $init.app
+  $shouldQuit = $init.shouldQuit
+
+  try {
+    $ppt.DisplayAlerts = 1
+  } catch {
+    try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ppt) | Out-Null } catch {}
+    Get-Process POWERPNT -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 600
+    $ppt = New-Object -ComObject PowerPoint.Application
+    $shouldQuit = $true
+    $ppt.DisplayAlerts = 1
+  }
 
   # Check if presentation is already open in PowerPoint, retry if busy
   for ($openRetry = 0; $openRetry -lt 5; $openRetry++) {
     try {
-      $normInput = (Resolve-Path -LiteralPath $InputFile).Path.ToLowerInvariant()
+      $resolvedInput = (Resolve-Path -LiteralPath $InputFile).Path
+      $normInput = $resolvedInput.ToLowerInvariant()
       foreach ($p in $ppt.Presentations) {
         try {
           if ((Resolve-Path -LiteralPath $p.FullName).Path.ToLowerInvariant() -eq $normInput) {
@@ -102,12 +153,21 @@ try {
 
       if ($null -eq $pres) {
         # Open read-only (-1), untitled=false (0), withwindow=false (0)
-        $pres = $ppt.Presentations.Open($InputFile, -1, 0, 0)
+        $pres = $ppt.Presentations.Open($resolvedInput, -1, 0, 0)
         $shouldClosePres = $true
       }
       if ($null -ne $pres) { break }
     } catch {
-      Start-Sleep -Milliseconds 350
+      if ($_.Exception.Message -match "0x800706BE" -or $_.Exception.Message -match "remote procedure call") {
+        try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ppt) | Out-Null } catch {}
+        Get-Process POWERPNT -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 600
+        $ppt = New-Object -ComObject PowerPoint.Application
+        $shouldQuit = $true
+        $ppt.DisplayAlerts = 1
+      } else {
+        Start-Sleep -Milliseconds 350
+      }
     }
   }
 
@@ -247,7 +307,7 @@ try {
     try { $ppt.Quit() } catch {}
   }
 
-  Out-Json @{
+  Send-Result @{
     ok = $true
     title = $presTitle
     slideCount = $slideCount
@@ -258,7 +318,7 @@ try {
 } catch {
   if ($shouldClosePres -and $null -ne $pres) { try { $pres.Close() } catch {} }
   if ($shouldQuit -and $null -ne $ppt) { try { $ppt.Quit() } catch {} }
-  Out-Json @{ ok = $false; error = $_.Exception.Message }
+  Send-Result @{ ok = $false; error = $_.Exception.Message }
 }
 exit 0
 `;
@@ -315,6 +375,13 @@ function runPowerShellExport(
   const scriptPath = getPowerShellScriptPath();
   let tempTargetsFile: string | null = null;
 
+  const normalizedInput = path.resolve(inputFile);
+  const normalizedOutDir = path.resolve(exportDir);
+  const resultFilePath = path.join(
+    exportDir,
+    `result-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.json`
+  );
+
   const args = [
     '-NoProfile',
     '-NonInteractive',
@@ -323,11 +390,13 @@ function runPowerShellExport(
     '-File',
     scriptPath,
     '-InputFile',
-    inputFile,
+    normalizedInput,
     '-OutDir',
-    exportDir,
+    normalizedOutDir,
     '-TargetWidth',
     String(targetWidth),
+    '-ResultFile',
+    resultFilePath,
   ];
 
   if (targets && targets.length > 0) {
@@ -352,7 +421,7 @@ function runPowerShellExport(
       {
         timeout: 180000,
         windowsHide: true,
-        maxBuffer: 30 * 1024 * 1024,
+        maxBuffer: 50 * 1024 * 1024,
         encoding: 'utf8',
       },
       (error, stdout, stderr) => {
@@ -363,10 +432,28 @@ function runPowerShellExport(
         }
 
         if (signal?.aborted) {
+          if (fs.existsSync(resultFilePath)) {
+            try { fs.unlinkSync(resultFilePath); } catch {}
+          }
           resolve({ ok: false, error: 'Export aborted by user or superseded by newer save.' });
           return;
         }
 
+        // 1. Primary path: Read result JSON file directly
+        if (fs.existsSync(resultFilePath)) {
+          try {
+            const rawFile = fs.readFileSync(resultFilePath, 'utf8').replace(/^\uFEFF/, '').trim();
+            fs.unlinkSync(resultFilePath);
+            const parsed = JSON.parse(rawFile) as NativePptExportJson;
+            resolve(parsed);
+            return;
+          } catch (fileErr) {
+            console.warn('[Native PPT Engine] Error reading result JSON file:', fileErr);
+            try { fs.unlinkSync(resultFilePath); } catch {}
+          }
+        }
+
+        // 2. Fallback: Parse from stdout
         const raw = (stdout || '').trim();
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
         const payload = jsonMatch ? jsonMatch[0] : null;
@@ -377,7 +464,7 @@ function runPowerShellExport(
             resolve(parsed);
             return;
           } catch (parseErr) {
-            console.warn('[Native PPT Engine] JSON parse error from PowerShell:', parseErr);
+            console.warn('[Native PPT Engine] JSON parse error from PowerShell stdout:', parseErr);
           }
         }
 
@@ -401,6 +488,9 @@ function runPowerShellExport(
               fs.unlinkSync(tempTargetsFile);
             } catch {}
           }
+          if (fs.existsSync(resultFilePath)) {
+            try { fs.unlinkSync(resultFilePath); } catch {}
+          }
           resolve({ ok: false, error: 'Export aborted.' });
         },
         { once: true }
@@ -409,6 +499,27 @@ function runPowerShellExport(
   });
 
   return { promise, processRef: child };
+}
+
+/**
+ * Converts an absolute file path to a bunsen-media:// URL for fast, zero-copy streaming in Electron.
+ */
+function toMediaUrl(absPath: string): string {
+  if (!absPath) return '';
+  if (
+    absPath.startsWith('data:') ||
+    absPath.startsWith('blob:') ||
+    absPath.startsWith('http://') ||
+    absPath.startsWith('https://') ||
+    absPath.startsWith('bunsen-media://')
+  ) {
+    return absPath;
+  }
+  const forward = absPath.replace(/\\/g, '/');
+  if (/^[a-zA-Z]:\//.test(forward)) {
+    return `bunsen-media://${forward.startsWith('/') ? '' : '/'}${forward}`;
+  }
+  return `bunsen-media:///${forward}`;
 }
 
 /**
@@ -425,14 +536,9 @@ function buildSlideData(
   aspectRatio: number,
   exportStatus: 'ready' | 'updating' | 'error' = 'ready'
 ): { slide: PptxSlideData; dataUrl: string } {
-  let dataUrl = '';
+  let mediaUrl = '';
   if (exportStatus === 'ready' && imagePath && fs.existsSync(imagePath)) {
-    try {
-      const imgBuf = fs.readFileSync(imagePath);
-      dataUrl = `data:image/png;base64,${imgBuf.toString('base64')}`;
-    } catch {
-      dataUrl = imagePath;
-    }
+    mediaUrl = toMediaUrl(imagePath);
   }
 
   const slide: PptxSlideData = {
@@ -445,18 +551,18 @@ function buildSlideData(
     aspectRatio,
     background: {
       color: '#000000',
-      imageDataUrl: dataUrl || undefined,
+      imageDataUrl: mediaUrl || undefined,
     },
     elements: [],
     lines: lines || [],
-    html: dataUrl
-      ? `<!DOCTYPE html><html><body style="margin:0;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;"><img src="${dataUrl}" style="width:100%;height:100%;object-fit:contain;" /></body></html>`
+    html: mediaUrl
+      ? `<!DOCTYPE html><html><body style="margin:0;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;"><img src="${mediaUrl}" style="width:100%;height:100%;object-fit:contain;" /></body></html>`
       : `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#18181b;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;justify-content:center;"><h2>${title}</h2>${lines.map((l) => `<p>${l}</p>`).join('')}</body></html>`,
-    thumbnailDataUrl: dataUrl || undefined,
+    thumbnailDataUrl: mediaUrl || undefined,
     exportStatus,
   };
 
-  return { slide, dataUrl };
+  return { slide, dataUrl: mediaUrl };
 }
 
 /**

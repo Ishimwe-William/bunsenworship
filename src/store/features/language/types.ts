@@ -182,6 +182,10 @@ export interface MediaLibraryTranslations {
   assetDeleted: string;
   categoryLabel: string;
   titleLabel: string;
+  addSongButton?: string;
+  backupSyncButton?: string;
+  addSongModalTitle?: string;
+  backupModalTitle?: string;
 }
 
 export interface TranslationDictionary {

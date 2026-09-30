@@ -105,6 +105,10 @@ export const enTranslations: TranslationDictionary = {
     assetDeleted: 'Media asset removed from library!',
     categoryLabel: 'Category',
     titleLabel: 'Title',
+    addSongButton: 'Add Song',
+    backupSyncButton: 'Backup & Sync',
+    addSongModalTitle: 'Add Worship Song to Library',
+    backupModalTitle: 'Database Backup & Media Sync',
   },
   settings: {
     title: 'Application Settings',

@@ -89,11 +89,25 @@ export const useProjectorOutput = (): UseProjectorOutputReturn => {
       },
     };
 
-    // Save as persistent fallback
+    // Save as persistent fallback safely without blocking the main JavaScript thread
+    // Strip heavy base64 strings and large data structures from localStorage fallback
     try {
-      localStorage.setItem('bunsenworship_projector_state', JSON.stringify(payload));
+      let sanitizedSlide: typeof targetSlide = null;
+      if (targetSlide) {
+        const { slideData, slideHtml, ...slideRest } = targetSlide;
+        sanitizedSlide = {
+          ...slideRest,
+          // Strip multi-megabyte base64 strings from localStorage to prevent thread blocking & quota exceeded errors
+          imageUrl: slideRest.imageUrl && slideRest.imageUrl.length > 50000 ? '' : slideRest.imageUrl,
+        };
+      }
+      const storagePayload = {
+        ...payload,
+        slide: sanitizedSlide,
+      };
+      localStorage.setItem('bunsenworship_projector_state', JSON.stringify(storagePayload));
     } catch {
-      // ignore
+      // ignore localStorage quota errors
     }
 
     // Broadcast message

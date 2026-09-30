@@ -72,11 +72,18 @@ export class PresentationWatcherManager {
   }
 
   /**
-   * Calculates a hash of file content for change detection.
+   * Calculates a hash of file content for change detection asynchronously to prevent
+   * blocking the Electron main thread during large PowerPoint file checks.
    */
   private async calculateFileHash(filePath: string): Promise<string> {
     try {
-      const buffer = fs.readFileSync(filePath);
+      let buffer: Buffer | undefined;
+      if (fs.promises && typeof fs.promises.readFile === 'function') {
+        buffer = await fs.promises.readFile(filePath);
+      } else if (typeof fs.readFileSync === 'function') {
+        buffer = fs.readFileSync(filePath);
+      }
+      if (!buffer) return '';
       return createHash('md5').update(buffer).digest('hex');
     } catch (error) {
       console.warn('[Presentation Watcher] Failed to calculate file hash:', error);
@@ -91,8 +98,8 @@ export class PresentationWatcherManager {
     try {
       const stats = fs.statSync(filePath);
       return {
-        mtime: stats.mtimeMs,
-        size: stats.size,
+        mtime: stats?.mtimeMs || 0,
+        size: stats?.size || 0,
         hash: '',
       };
     } catch (error) {
@@ -113,12 +120,16 @@ export class PresentationWatcherManager {
   }
 
   /**
-   * Reads a file with retries to handle temporary locks.
+   * Reads a file asynchronously with retries to handle temporary locks without
+   * blocking the Electron main thread.
    */
   private async readFileWithRetry(filePath: string, maxRetries = 5, delayMs = 120): Promise<Buffer> {
     let lastError: unknown;
     for (let i = 0; i < maxRetries; i++) {
       try {
+        if (fs.promises && typeof fs.promises.readFile === 'function') {
+          return await fs.promises.readFile(filePath);
+        }
         return fs.readFileSync(filePath);
       } catch (err: unknown) {
         lastError = err;

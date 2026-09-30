@@ -20,6 +20,8 @@ export interface SongRecord {
   tempo?: string;
   tags: string[];
   slides: Slide[];
+  bgType?: 'color' | 'gradient' | 'image' | 'shortvid';
+  bgValue?: string;
   createdAt: number;
   updatedAt: number;
 }

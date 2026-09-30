@@ -29,7 +29,7 @@ interface NavItemDef {
   icon: React.ReactNode;
 }
 
-export const Sidebar: React.FC = () => {
+export const Sidebar: React.FC = React.memo(() => {
   const dispatch = useAppDispatch();
   const activeTab = useAppSelector(selectActiveTab);
   const isExpanded = useAppSelector(selectIsSidebarExpanded);
@@ -142,4 +142,6 @@ export const Sidebar: React.FC = () => {
       </div>
     </aside>
   );
-};
+});
+
+Sidebar.displayName = 'Sidebar';

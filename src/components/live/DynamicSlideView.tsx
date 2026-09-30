@@ -12,12 +12,19 @@ export interface DynamicSlideViewProps {
  * matching Microsoft PowerPoint (and EasyWorship).
  */
 export const DynamicSlideView: React.FC<DynamicSlideViewProps> = ({ slide, className, style }) => {
+  const [imgError, setImgError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImgError(false);
+  }, [slide.id, slide.imageUrl]);
+
   // 1. High-fidelity slide rendering (PowerPoint native frame / full-res PNG data URL)
   // Delivers 100% exact look of the presentation: fonts, master slides, shapes, colors, and graphics.
-  const imgSource =
-    slide.imageUrl ||
-    slide.slideData?.thumbnailDataUrl ||
-    slide.slideData?.background?.imageDataUrl;
+  const imgSource = !imgError
+    ? slide.imageUrl ||
+      slide.slideData?.thumbnailDataUrl ||
+      slide.slideData?.background?.imageDataUrl
+    : undefined;
 
   if (imgSource) {
     return (
@@ -45,6 +52,7 @@ export const DynamicSlideView: React.FC<DynamicSlideViewProps> = ({ slide, class
             display: 'block',
             userSelect: 'none',
           }}
+          onError={() => setImgError(true)}
         />
       </div>
     );
@@ -137,6 +145,7 @@ export const DynamicSlideView: React.FC<DynamicSlideViewProps> = ({ slide, class
               height: `${b.heightPct}%`,
               boxSizing: 'border-box',
               overflow: 'hidden',
+              zIndex: elem.type === 'text' ? 10 : elem.type === 'image' ? 2 : 1,
             };
 
             if (elem.type === 'image' && elem.imageDataUrl) {
@@ -218,6 +227,43 @@ export const DynamicSlideView: React.FC<DynamicSlideViewProps> = ({ slide, class
             return <div key={elem.id} style={{ ...elementStyle, ...shapeStyle }} />;
           })}
         </div>
+      </div>
+    );
+  }
+
+  // 4. Text lines fallback: If image failed and no structured elements exist, render extracted slide text
+  if (slide.lines && slide.lines.length > 0) {
+    return (
+      <div
+        className={`dynamic-slide-stage ${className || ''}`}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '4vw 6vw',
+          backgroundColor: '#000000',
+          color: '#ffffff',
+          textAlign: 'center',
+          ...style,
+        }}
+      >
+        {slide.lines.map((line, idx) => (
+          <p
+            key={idx}
+            style={{
+              fontSize: '3.2vw',
+              fontWeight: 700,
+              lineHeight: 1.3,
+              margin: '0.3em 0',
+              textShadow: '0 2px 8px rgba(0, 0, 0, 0.8)',
+            }}
+          >
+            {line}
+          </p>
+        ))}
       </div>
     );
   }

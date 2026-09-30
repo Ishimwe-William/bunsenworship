@@ -542,7 +542,7 @@ export const PreviewColumn: React.FC<PreviewColumnProps> = ({
                   </div>
                 )}
 
-                {slide.lines && slide.lines.length > 0 && slide.externalType !== 'PPT' && (
+                {slide.lines && slide.lines.length > 0 && (!hasMedia || brokenThumbs[slide.id] || slide.externalType !== 'PPT') && (
                   <div className={`slide-content-preview ${!hasMedia ? 'is-text-slide' : ''}`}>
                     {slide.lines.map((line, lineIndex) => (
                       <p key={lineIndex} className="slide-line">

@@ -473,6 +473,19 @@ export async function parsePowerPointFile(filePath: string): Promise<PptxParseRe
         }
       }
 
+      // Sort elements by z-index layer:
+      // Layer 1: Background shapes (shapes without text)
+      // Layer 2: Images (slide illustrations, photos, full-bleed graphic fills)
+      // Layer 3: Shapes containing text / Paragraphs (titles, verses, lyrics, headings)
+      elements.sort((a, b) => {
+        const orderScore = (elem: PptxSlideElement) => {
+          if (elem.type === 'shape' && (!elem.paragraphs || elem.paragraphs.length === 0)) return 1;
+          if (elem.type === 'image') return 2;
+          return 3; // text shapes
+        };
+        return orderScore(a) - orderScore(b);
+      });
+
       if (!detectedTitle && lines.length > 0) {
         detectedTitle = lines[0].slice(0, 50);
       }
@@ -559,7 +572,7 @@ function generateSlideHtml(params: {
       const posStyle = `left: ${b.leftPct.toFixed(2)}%; top: ${b.topPct.toFixed(2)}%; width: ${b.widthPct.toFixed(2)}%; height: ${b.heightPct.toFixed(2)}%;`;
 
       if (elem.type === 'image' && elem.imageDataUrl) {
-        return `<div class="pptx-element pptx-image-box" style="position: absolute; ${posStyle} overflow: hidden;">
+        return `<div class="pptx-element pptx-image-box" style="position: absolute; ${posStyle} z-index: 2; overflow: hidden;">
   <img src="${elem.imageDataUrl}" style="width: 100%; height: 100%; object-fit: contain; display: block;" alt="Slide graphic" />
 </div>`;
       }
@@ -582,10 +595,8 @@ function generateSlideHtml(params: {
             const runsContent = p.runs
               .map((r) => {
                 const styles: string[] = [];
-                if (r.fontSize) {
-                  // Scale font size proportionally to 1080p canvas
-                  styles.push(`font-size: ${Math.round(r.fontSize * 1.5)}px;`);
-                }
+                const fs = r.fontSize || 24;
+                styles.push(`font-size: ${Math.round(fs * 1.5)}px;`);
                 if (r.color) styles.push(`color: ${r.color};`);
                 if (r.bold) styles.push('font-weight: 700;');
                 if (r.italic) styles.push('font-style: italic;');
@@ -603,12 +614,12 @@ function generateSlideHtml(params: {
           })
           .join('');
 
-        return `<div class="pptx-element pptx-text-box" style="position: absolute; ${posStyle} ${shapeStyleParts.join(' ')} display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; padding: 8px 12px; overflow: hidden; word-break: break-word;">
+        return `<div class="pptx-element pptx-text-box" style="position: absolute; ${posStyle} ${shapeStyleParts.join(' ')} z-index: 10; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; padding: 8px 12px; overflow: hidden; word-break: break-word;">
   ${textContent}
 </div>`;
       }
 
-      return `<div class="pptx-element pptx-shape-box" style="position: absolute; ${posStyle} ${shapeStyleParts.join(' ')} box-sizing: border-box;"></div>`;
+      return `<div class="pptx-element pptx-shape-box" style="position: absolute; ${posStyle} ${shapeStyleParts.join(' ')} z-index: 1; box-sizing: border-box;"></div>`;
     })
     .join('\n');
 
@@ -665,7 +676,20 @@ function generateSlideSvg(params: {
     bgSnippet = `<image href="${background.imageDataUrl}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice"/>`;
   }
 
-  const elementsSvg = elements
+  // Ensure layers are rendered in correct visual order in SVG (which has no z-index):
+  // Layer 1: Background shapes (shapes without text)
+  // Layer 2: Images (slide illustrations, photos, full-bleed graphic fills)
+  // Layer 3: Shapes containing text / Paragraphs (titles, verses, lyrics, headings)
+  const sortedElements = [...elements].sort((a, b) => {
+    const orderScore = (elem: PptxSlideElement) => {
+      if (elem.type === 'shape' && (!elem.paragraphs || elem.paragraphs.length === 0)) return 1;
+      if (elem.type === 'image') return 2;
+      return 3; // text shapes
+    };
+    return orderScore(a) - orderScore(b);
+  });
+
+  const elementsSvg = sortedElements
     .map((elem) => {
       const x = elem.bounds.x || Math.round((elem.bounds.leftPct / 100) * width);
       const y = elem.bounds.y || Math.round((elem.bounds.topPct / 100) * height);
@@ -687,29 +711,46 @@ function generateSlideSvg(params: {
       }
 
       if (elem.paragraphs && elem.paragraphs.length > 0) {
-        const textLines = elem.paragraphs
-          .map((p) => {
-            const align = p.align || 'left';
-            const runs = p.runs
-              .map((r) => {
-                const fs = Math.round((r.fontSize || 24) * 1.5);
-                const col = r.color || '#ffffff';
-                const fw = r.bold ? 'font-weight: 700;' : '';
-                const fi = r.italic ? 'font-style: italic;' : '';
-                const esc = r.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                return `<span style="font-size: ${fs}px; color: ${col}; ${fw} ${fi}">${esc}</span>`;
-              })
-              .join('');
-            return `<div style="text-align: ${align}; margin-bottom: 4px; line-height: 1.25;">${runs}</div>`;
-          })
-          .join('');
+        const textElements: string[] = [];
+        const validParagraphs = elem.paragraphs.filter((p) => p.runs && p.runs.length > 0);
+        let curY = y + (validParagraphs.length <= 1 ? Math.round(h * 0.55) : Math.round(h * 0.35));
 
-        const fo = `<foreignObject x="${x}" y="${y}" width="${w}" height="${h}">
-  <div xmlns="http://www.w3.org/1999/xhtml" style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 8px 12px; box-sizing: border-box; overflow: hidden; word-break: break-word; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-    ${textLines}
-  </div>
-</foreignObject>`;
-        return `${shapeSvg}\n${fo}`;
+        for (const p of validParagraphs) {
+          const align = p.align || 'left';
+          const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start';
+          const textX = align === 'center' ? x + Math.round(w / 2) : align === 'right' ? x + w - 16 : x + 16;
+
+          let maxFontSize = 24;
+          for (const r of p.runs) {
+            if (r.fontSize && r.fontSize > maxFontSize) maxFontSize = r.fontSize;
+          }
+          const scaledFs = Math.round(maxFontSize * 1.4);
+
+          const tspans = p.runs
+            .map((r) => {
+              const fs = Math.round((r.fontSize || 24) * 1.4);
+              const col = r.color || '#ffffff';
+              const fw = r.bold ? 'font-weight="bold"' : '';
+              const fi = r.italic ? 'font-style="italic"' : '';
+              const td = r.underline ? 'text-decoration="underline"' : '';
+              const esc = r.text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+              return `<tspan fill="${col}" font-size="${fs}px" ${fw} ${fi} ${td}>${esc}</tspan>`;
+            })
+            .join(' ');
+
+          if (tspans.trim()) {
+            textElements.push(
+              `<text x="${textX}" y="${curY}" text-anchor="${anchor}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${tspans}</text>`
+            );
+            curY += Math.round(scaledFs * 1.3) + 8;
+          }
+        }
+
+        return `${shapeSvg}\n${textElements.join('\n')}`;
       }
 
       return shapeSvg;
